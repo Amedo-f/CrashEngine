@@ -27,6 +27,11 @@ public sealed class ProjectSetupScene : Scene
     private string? _pendingDiscPath;
     private string? _pendingProjectPath;
 
+    // Amedo 2026-09-20
+    private System.Threading.CancellationTokenSource? _cts;
+    private System.Threading.ManualResetEventSlim? _pauseGate;
+    private volatile bool _paused;
+
     private readonly ImGuiFileBrowser _fileBrowser = new();
 
     public ProjectSetupScene(string scriptOut) => _scriptOut = scriptOut;
@@ -145,6 +150,24 @@ public sealed class ProjectSetupScene : Scene
         if (_creating)
         {
             ImGui.ProgressBar(_progress, new Vector2(-10f, 22f), $"{_progress * 100f:F1}%");
+
+            // Amedo 2026-09-20
+            if (!_paused)
+            {
+                if (ImGui.Button("Pause", new Vector2(120f, 26f))) { _paused = true; _pauseGate?.Reset(); }
+            }
+            else
+            {
+                if (ImGui.Button("Resume", new Vector2(120f, 26f))) { _paused = false; _pauseGate?.Set(); }
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel", new Vector2(120f, 26f))) { _cts?.Cancel(); _pauseGate?.Set(); }
+            if (_paused)
+            {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(1f, 0.8f, 0.3f, 1f), "Paused");
+            }
+
             ImGui.BeginChild("##unpacklog", new Vector2(-10f, 140f), ImGuiChildFlags.None);
             lock (_logLock)
             {
@@ -210,6 +233,13 @@ public sealed class ProjectSetupScene : Scene
         _status = "Creating project...";
         var started = DateTime.Now;
 
+        // Amedo 2026-09-20
+        _paused = false;
+        _cts = new System.Threading.CancellationTokenSource();
+        _pauseGate = new System.Threading.ManualResetEventSlim(true);
+        var ct = _cts.Token;
+        var gate = _pauseGate;
+
         void WLog(string msg) { lock (_logLock) _unpackLog.Add(msg); Console.WriteLine(msg); }
 
         Task.Run(() =>
@@ -221,7 +251,7 @@ public sealed class ProjectSetupScene : Scene
                 project.Save();
 
                 WLog("Copying disc contents to project...");
-                project.CopyDiscContents(p => _progress = p * 0.5f);
+                project.CopyDiscContents(p => _progress = p * 0.5f, ct, gate);
 
                 WLog("Reading game archives...");
                 using (var pkg = PackageReader.Open(project.DiscContentPathPS2!))
@@ -239,7 +269,7 @@ public sealed class ProjectSetupScene : Scene
 
                     WLog("Unpacking PS2 assets...");
                     var result = AssetUnpacker.Unpack(pkg, project.ProjectPath, WLog,
-                        p => _progress = 0.5f + p * 0.5f, doneSet, OnRecordDone);
+                        p => _progress = 0.5f + p * 0.5f, doneSet, OnRecordDone, ct, gate);
                     WLog($"Unpacked {result.Files} files, {result.Chunks} chunks, " +
                          $"{result.Assets} assets, {result.Textures} textures " +
                          $"({result.Skipped} already done, {result.Errors} warnings)");
@@ -257,11 +287,21 @@ public sealed class ProjectSetupScene : Scene
                 _pendingProjectPath = project.ProjectPath;
                 _pendingDiscPath = project.DiscContentPathPS2;
             }
+            catch (OperationCanceledException)
+            {
+                WLog("Cancelled by user.");
+                _status = "Extraction cancelled — progress is saved; resume it later from \"Incomplete project found\".";
+            }
             catch (Exception ex)
             {
                 _status = $"ERROR: {ex.Message}";
             }
-            finally { _creating = false; }
+            finally
+            {
+                _creating = false;
+                _paused = false;
+                _incomplete = CrashProject.FindIncompleteProjects();
+            }
         });
     }
 

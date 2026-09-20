@@ -36,7 +36,10 @@ public sealed class CrashProject
         Directory.CreateDirectory(System.IO.Path.Combine(ProjectPath, "disc"));
     }
 
-    public void CopyDiscContents(Action<float>? progress = null)
+    // Amedo 2026-09-20
+    public void CopyDiscContents(Action<float>? progress = null,
+        System.Threading.CancellationToken ct = default,
+        System.Threading.ManualResetEventSlim? pauseGate = null)
     {
         if (string.IsNullOrEmpty(DiscContentPathPS2)) return;
         var source = DiscContentPathPS2;
@@ -48,9 +51,14 @@ public sealed class CrashProject
 
         var files = Directory.GetFiles(source, "*.*", SearchOption.AllDirectories);
         int done = 0;
-        var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)) };
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)),
+            CancellationToken = ct,
+        };
         Parallel.ForEach(files, options, file =>
         {
+            pauseGate?.Wait(ct);
             var dest = System.IO.Path.Combine(target, System.IO.Path.GetRelativePath(source, file));
             var srcInfo = new FileInfo(file);
             var destInfo = new FileInfo(dest);

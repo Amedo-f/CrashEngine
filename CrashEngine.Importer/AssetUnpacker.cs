@@ -61,7 +61,8 @@ public static class AssetUnpacker
                                 Action<string> log, Action<float> progress,
                                 IReadOnlySet<string>? skip = null,
                                 Action<string>? onRecordDone = null,
-                                CancellationToken ct = default)
+                                CancellationToken ct = default,
+                                ManualResetEventSlim? pauseGate = null)
     {
         var assetsRoot = Path.Combine(projectPath, "assets");
         var rawRoot    = Path.Combine(assetsRoot, "raw");
@@ -71,6 +72,7 @@ public static class AssetUnpacker
 
         void ProcessRecord(BHRecord rec)
         {
+            pauseGate?.Wait(ct);
             if (skip is not null && skip.Contains(rec.Path))
             {
                 Interlocked.Increment(ref skipped);
