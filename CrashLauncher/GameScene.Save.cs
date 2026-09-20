@@ -359,9 +359,10 @@ public sealed partial class GameScene : Scene
         List<string>? excludedCutscenes = null;
         const string startingLevel = @"Levels\Earth\Hub\beach";
         var projectRoot = Path.GetDirectoryName(_scriptOut) ?? _extractedRoot;
-        if (CrashProject.Open(projectRoot) is { IsNewGame: true } proj)
+        // Amedo 2026-09-20
+        if (CrashProject.Open(projectRoot) is { } proj)
         {
-            if (proj.ExcludedCutscenes.Count == 0)
+            if (proj.IsNewGame && proj.ExcludedCutscenes.Count == 0)
             {
                 var fmvRoot = Path.Combine(_extractedRoot, "FMV");
                 if (Directory.Exists(fmvRoot))
@@ -372,20 +373,26 @@ public sealed partial class GameScene : Scene
                     if (proj.ExcludedCutscenes.Count > 0) proj.Save();
                 }
             }
-            excludedCutscenes = proj.ExcludedCutscenes;
-            var claimed = new HashSet<string>(proj.ClaimedLevels.Select(p => p.Replace('/', '\\').TrimStart('\\')),
-                                               StringComparer.OrdinalIgnoreCase);
-            excludePath = normalizedPath =>
+
+            if (proj.ExcludedCutscenes.Count > 0)
+                excludedCutscenes = proj.ExcludedCutscenes;
+
+            if (proj.IsNewGame)
             {
-                if (!normalizedPath.StartsWith(@"Levels\", StringComparison.OrdinalIgnoreCase)) return false;
-                var ext = Path.GetExtension(normalizedPath);
-                if (!ext.Equals(".rm2", StringComparison.OrdinalIgnoreCase) && !ext.Equals(".sm2", StringComparison.OrdinalIgnoreCase)) return false;
-                var basePath = normalizedPath[..^ext.Length];
-                if (basePath.Equals(startingLevel, StringComparison.OrdinalIgnoreCase)) return false;
-                return !claimed.Contains(basePath);
-            };
-            keepLevelPaths = new List<string>(claimed) { startingLevel };
-            BLog($"Build ISO: New Game mode ON — excluding every original level NOT in ClaimedLevels ({proj.ClaimedLevels.Count} claimed).");
+                var claimed = new HashSet<string>(proj.ClaimedLevels.Select(p => p.Replace('/', '\\').TrimStart('\\')),
+                                                   StringComparer.OrdinalIgnoreCase);
+                excludePath = normalizedPath =>
+                {
+                    if (!normalizedPath.StartsWith(@"Levels\", StringComparison.OrdinalIgnoreCase)) return false;
+                    var ext = Path.GetExtension(normalizedPath);
+                    if (!ext.Equals(".rm2", StringComparison.OrdinalIgnoreCase) && !ext.Equals(".sm2", StringComparison.OrdinalIgnoreCase)) return false;
+                    var basePath = normalizedPath[..^ext.Length];
+                    if (basePath.Equals(startingLevel, StringComparison.OrdinalIgnoreCase)) return false;
+                    return !claimed.Contains(basePath);
+                };
+                keepLevelPaths = new List<string>(claimed) { startingLevel };
+                BLog($"Build ISO: New Game mode ON — excluding every original level NOT in ClaimedLevels ({proj.ClaimedLevels.Count} claimed).");
+            }
         }
 
         Task.Run(() =>

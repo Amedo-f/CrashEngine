@@ -140,6 +140,8 @@ public static class BuildIsoToPS2
             if (moved > 0)
                 log($"New Game mode: excluding {moved} cutscene(s) per the project's own per-file selection — moved out for this build only.");
         }
+        ApplyCutsceneSkipPatch(discContentPath, excludedCutscenes, log); // Amedo 2026-09-20
+
         try
         {
             log("Building ISO image (native packer — this can take a bit)...");
@@ -179,6 +181,101 @@ public static class BuildIsoToPS2
         if (fileName.Length < 4) return false;
         var c0 = char.ToUpperInvariant(fileName[0]);
         return (c0 == 'H' || c0 == 'B') && char.IsDigit(fileName[1]) && char.IsDigit(fileName[2]) && fileName[3] == '_';
+    }
+
+    // Amedo 2026-09-20
+    private const int FmvSkipLoadBias   = 0xFF000;
+    private const int FmvSkipCallOffset = 0x78588;
+    private const int FmvSkipStubOffset = 0x82C1C;
+    private const int FmvTableOffset    = 0x1E7D60;
+    private const int FmvTableCount     = 21;
+    private static readonly byte[] FmvSkipOrigCall = { 0xD8, 0xCA, 0x05, 0x0C };
+    private static readonly byte[] FmvSkipStubCall = { 0x07, 0x07, 0x06, 0x0C };
+
+    internal static void ApplyCutsceneSkipPatch(string discContentPath, IReadOnlyCollection<string>? excludedCutscenes, Action<string> log)
+    {
+        var exePath = Path.Combine(discContentPath, "SLUS_209.09");
+        if (!File.Exists(exePath))
+        {
+            if (File.Exists(Path.Combine(discContentPath, "SLES_525.68")))
+                log("Cutscene-skip: PAL (SLES_525.68) not reverse-engineered for this yet — excluded cutscenes could hang. Keep them included, or use an NTSC-U disc.");
+            return;
+        }
+
+        var bytes = File.ReadAllBytes(exePath);
+
+        uint mask = 0;
+        var skipped = new List<string>();
+        if (excludedCutscenes is { Count: > 0 })
+        {
+            var excludedBase = new HashSet<string>(
+                excludedCutscenes.Select(p => Path.GetFileNameWithoutExtension(p)),
+                StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < FmvTableCount; i++)
+            {
+                int entryOff = FmvTableOffset + i * 8;
+                if (entryOff + 4 > bytes.Length) break;
+                uint namePtr = BitConverter.ToUInt32(bytes, entryOff);
+                int nameOff = (int)(namePtr - (uint)FmvSkipLoadBias);
+                if (nameOff < 0 || nameOff >= bytes.Length) continue;
+                var name = ReadAsciiZ(bytes, nameOff);
+                var baseName = Path.GetFileNameWithoutExtension(name.Replace('\\', '/'));
+                if (baseName.Length > 0 && excludedBase.Contains(baseName))
+                {
+                    mask |= 1u << i;
+                    skipped.Add(baseName);
+                }
+            }
+        }
+
+        if (mask == 0)
+        {
+            if (BytesEqualAt(bytes, FmvSkipCallOffset, FmvSkipStubCall))
+            {
+                Array.Copy(FmvSkipOrigCall, 0, bytes, FmvSkipCallOffset, 4);
+                File.WriteAllBytes(exePath, bytes);
+                log("Cutscene-skip: no excluded cutscenes — in-game cutscene player restored to normal.");
+            }
+            return;
+        }
+
+        bool caveOurs = BytesEqualAt(bytes, FmvSkipCallOffset, FmvSkipStubCall);
+        bool caveFree = true;
+        for (int k = 0; k < 44; k++) if (bytes[FmvSkipStubOffset + k] != 0) { caveFree = false; break; }
+        if (!caveFree && !caveOurs)
+        {
+            log("Cutscene-skip: ABORTED — code cave at 0x82C1C is not free (unexpected). Excluded cutscenes were NOT patched to skip.");
+            return;
+        }
+
+        uint[] words =
+        {
+            0x3C010000u | (mask >> 16),
+            0x34210000u | (mask & 0xFFFF),
+            0x34030001u, 0x00E31804u, 0x00611824u, 0x14600003u, 0x00000000u,
+            0x0805CAD8u, 0x00000000u, 0x03E00008u, 0x34020001u,
+        };
+        for (int i = 0; i < words.Length; i++)
+            BitConverter.GetBytes(words[i]).CopyTo(bytes, FmvSkipStubOffset + i * 4);
+        Array.Copy(FmvSkipStubCall, 0, bytes, FmvSkipCallOffset, 4);
+        File.WriteAllBytes(exePath, bytes);
+
+        log($"Cutscene-skip: patched {skipped.Count} excluded cutscene(s) to skip in-game (no hang): {string.Join(", ", skipped)}.");
+    }
+
+    private static bool BytesEqualAt(byte[] data, int off, byte[] pattern)
+    {
+        if (off + pattern.Length > data.Length) return false;
+        for (int i = 0; i < pattern.Length; i++) if (data[off + i] != pattern[i]) return false;
+        return true;
+    }
+
+    private static string ReadAsciiZ(byte[] data, int off)
+    {
+        int end = off;
+        while (end < data.Length && data[end] != 0) end++;
+        return System.Text.Encoding.ASCII.GetString(data, off, end - off);
     }
 
     private static void NeuterDanglingLinksForNewGame(string stagingDir, string backupBdPath, string backupBhPath,

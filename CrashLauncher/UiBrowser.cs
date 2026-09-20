@@ -195,19 +195,22 @@ public sealed partial class GameScene
                 ImGui.TextColored(new Vector4(0.4f, 0.8f, 1f, 1f), "  Converting with FFmpeg — this can take a while for longer clips...");
 
             var proj = GetGameProject();
-            if (proj is { IsNewGame: true })
+            if (proj is not null) // Amedo 2026-09-20
             {
                 bool excluded = proj.ExcludedCutscenes.Contains(rel);
-                if (ImGui.Checkbox("Exclude from New Game build##fmvexclude", ref excluded))
+                if (ImGui.Checkbox("Exclude & skip in-game##fmvexclude", ref excluded))
                 {
                     if (excluded) proj.ExcludedCutscenes.Add(rel);
                     else proj.ExcludedCutscenes.RemoveAll(p => string.Equals(p, rel, StringComparison.OrdinalIgnoreCase));
                     proj.Save();
                 }
                 if (ImGui.IsItemHovered())
-                    MaybeTooltip("Only affects Build ISO in New Game mode — this exact file is moved\n" +
-                                 "out for that build only, restored right after. Never touches the\n" +
-                                 "boot-required intro videos unless you check them yourself here.");
+                    MaybeTooltip("Applies to ANY Build ISO (not just New Game): this exact cutscene\n" +
+                                 "is left out of the built disc AND the game is patched to skip it in-\n" +
+                                 "game, so it never hangs waiting for the missing video. The file is\n" +
+                                 "moved out for that build only and restored right after. Only the\n" +
+                                 "checked cutscenes are skipped — the rest still play normally.\n" +
+                                 "(In-game skip is NTSC-U / SLUS_209.09 only for now.)");
             }
 
             ImGui.PopID();
@@ -556,24 +559,6 @@ public sealed partial class GameScene
             },
             "both movie-start calls (Vivendi + TTIdent) now return a fake success instantly, " +
             "skipping the videos while every other side effect those states have still runs"),
-
-        // Amedo 2026-09-20
-        new(
-            "SLUS_209.09",
-            "Skip in-game cutscenes (prevents New Game hang on excluded cutscenes)",
-            "Replaces the runtime-queued movie-play call in state 14 (vaddr 0x00177588) with a " +
-            "fake \"succeeded\" result (li v0,1) — so every in-game / story / attract cutscene is " +
-            "skipped instantly instead of streaming its .pss file. Use this for New Game builds: " +
-            "when a story cutscene's file has been excluded from the build, the game would " +
-            "otherwise hang forever waiting on a video that isn't on the disc; this makes it skip " +
-            "cleanly. All cutscenes (boot, story, attract, menu previews) share this one movie " +
-            "system. Confirmed live in PCSX2 (Attract demo skipped, returned to menu, no hang).",
-            new[]
-            {
-                new PatchEdit(0x78588, new byte[] { 0x01, 0x00, 0x02, 0x34 }),
-            },
-            "in-game cutscenes now return a fake success instantly (state 14 movie-play skipped), " +
-            "so excluded/missing cutscenes never hang the game"),
     };
 
     private readonly record struct BootRegionDef(string ExeName, int StartingChunkOffset, int StartingChunkSize);
