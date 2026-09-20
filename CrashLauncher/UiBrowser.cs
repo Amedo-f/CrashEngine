@@ -137,15 +137,7 @@ public sealed partial class GameScene
         }
         catch (Exception ex) { ImGui.TextDisabled($"(couldn't list FMV\\: {ex.Message})"); return; }
 
-        var seedProj = GetGameProject();
-        if (seedProj is { IsNewGame: true } && seedProj.ExcludedCutscenes.Count == 0)
-        {
-            foreach (var f in files)
-                if (BuildIsoToPS2.IsStoryCutscene(System.IO.Path.GetFileName(f)))
-                    seedProj.ExcludedCutscenes.Add(System.IO.Path.GetRelativePath(fmvRoot, f));
-            if (seedProj.ExcludedCutscenes.Count > 0) seedProj.Save();
-        }
-
+        // Amedo 2026-09-20
         foreach (var full in files)
         {
             var rel = System.IO.Path.GetRelativePath(fmvRoot, full);

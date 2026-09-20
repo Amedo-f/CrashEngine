@@ -362,18 +362,6 @@ public sealed partial class GameScene : Scene
         // Amedo 2026-09-20
         if (CrashProject.Open(projectRoot) is { } proj)
         {
-            if (proj.IsNewGame && proj.ExcludedCutscenes.Count == 0)
-            {
-                var fmvRoot = Path.Combine(_extractedRoot, "FMV");
-                if (Directory.Exists(fmvRoot))
-                {
-                    foreach (var f in Directory.EnumerateFiles(fmvRoot, "*.pss", SearchOption.AllDirectories))
-                        if (BuildIsoToPS2.IsStoryCutscene(Path.GetFileName(f)))
-                            proj.ExcludedCutscenes.Add(Path.GetRelativePath(fmvRoot, f));
-                    if (proj.ExcludedCutscenes.Count > 0) proj.Save();
-                }
-            }
-
             if (proj.ExcludedCutscenes.Count > 0)
                 excludedCutscenes = proj.ExcludedCutscenes;
 
