@@ -31,6 +31,7 @@ public sealed class ProjectSetupScene : Scene
     private System.Threading.CancellationTokenSource? _cts;
     private System.Threading.ManualResetEventSlim? _pauseGate;
     private volatile bool _paused;
+    private volatile bool _deleteOnCancel;
 
     private readonly ImGuiFileBrowser _fileBrowser = new();
 
@@ -161,11 +162,37 @@ public sealed class ProjectSetupScene : Scene
                 if (ImGui.Button("Resume", new Vector2(120f, 26f))) { _paused = false; _pauseGate?.Set(); }
             }
             ImGui.SameLine();
-            if (ImGui.Button("Cancel", new Vector2(120f, 26f))) { _cts?.Cancel(); _pauseGate?.Set(); }
+            if (ImGui.Button("Cancel", new Vector2(120f, 26f)))
+            {
+                _paused = true; _pauseGate?.Reset();
+                ImGui.OpenPopup("Cancel extraction?");
+            }
             if (_paused)
             {
                 ImGui.SameLine();
                 ImGui.TextColored(new Vector4(1f, 0.8f, 0.3f, 1f), "Paused");
+            }
+
+            if (ImGui.BeginPopupModal("Cancel extraction?", ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                ImGui.TextUnformatted("Cancel this extraction and delete the project?");
+                ImGui.TextDisabled("All copied and extracted files will be removed.");
+                ImGui.Spacing();
+                if (ImGui.Button("Yes, delete", new Vector2(150f, 30f)))
+                {
+                    _deleteOnCancel = true;
+                    _cts?.Cancel();
+                    _pauseGate?.Set();
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("No", new Vector2(150f, 30f)))
+                {
+                    _paused = false;
+                    _pauseGate?.Set();
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.EndPopup();
             }
 
             ImGui.BeginChild("##unpacklog", new Vector2(-10f, 140f), ImGuiChildFlags.None);
@@ -290,7 +317,16 @@ public sealed class ProjectSetupScene : Scene
             catch (OperationCanceledException)
             {
                 WLog("Cancelled by user.");
-                _status = "Extraction cancelled — progress is saved; resume it later from \"Incomplete project found\".";
+                if (_deleteOnCancel)
+                {
+                    try { CrashProject.DeleteProject(project.ProjectPath); WLog("Project deleted."); }
+                    catch (Exception ex) { WLog($"Delete failed: {ex.Message}"); }
+                    _status = "Extraction cancelled and project deleted.";
+                }
+                else
+                {
+                    _status = "Extraction cancelled — progress is saved; resume it later from \"Incomplete project found\".";
+                }
             }
             catch (Exception ex)
             {
@@ -300,6 +336,7 @@ public sealed class ProjectSetupScene : Scene
             {
                 _creating = false;
                 _paused = false;
+                _deleteOnCancel = false;
                 _incomplete = CrashProject.FindIncompleteProjects();
             }
         });
