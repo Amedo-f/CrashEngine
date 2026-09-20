@@ -1,0 +1,33 @@
+# .NET build output (every project folder)
+bin/
+obj/
+
+# Visual Studio cache/state
+.vs/
+*.user
+*.suo
+
+# ISO build pipeline output — contains real PS2 disc archive data (Crash.BD/BH,
+# staged .rm2/.sm2, built .iso) — copyrighted game content, never commit.
+Build/
+
+# Per-level script/asset dump output — also derived from the real game archive.
+Scripts/
+
+# Saved chunk round-trip output (.rm2/.sm2) — same reason as Build/.
+SavedChunks/
+
+# local ImGui window-layout state, not project data
+imgui.ini
+
+# re/ research tooling, Python helpers, and shell scripts are engine-external, kept out of public.
+re/
+tools/
+*.py
+*.sh
+
+# local backup copies
+*.bak
+
+# personal notes (kept private)
+ملاحظات المستخدمين.md

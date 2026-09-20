@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.23.0" />
+    <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
+    <PackageReference Include="StbImageSharp" Version="2.30.15" />
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- TT Lab shaders (ported 1:1). Content flows to referencing exe output. -->
+    <Content Include="Shaders\**\*.*" CopyToOutputDirectory="PreserveNewest"
+             Link="Shaders\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

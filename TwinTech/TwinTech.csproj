@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <RootNamespace>Twinsanity</RootNamespace>
+    <AssemblyName>TwinTech</AssemblyName>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>13</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpHash" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="AgentLabDefsXbox.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="AgentLabDefsPS2.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TextureDescriptionHelper.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="AgentLab\action_definitions.lab" />
+    <Content Include="AgentLab\ActionDefinitionsPs2.lab">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Remove="AgentLab\ConditionDefinitions.lab" />
+    <Content Include="AgentLab\ConditionDefinitions.lab">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Remove="AgentLab\ActionDefinitionsXbox.lab" />
+    <Content Include="AgentLab\ActionDefinitionsXbox.lab">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

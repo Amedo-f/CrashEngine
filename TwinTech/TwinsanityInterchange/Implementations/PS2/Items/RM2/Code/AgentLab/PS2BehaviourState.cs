@@ -1,0 +1,239 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Twinsanity.AgentLab.AgentLabObjectDescs;
+using Twinsanity.AgentLab.AgentLabObjectDescs.PS2;
+using Twinsanity.AgentLab.Resolvers;
+using Twinsanity.AgentLab.Resolvers.Interfaces;
+using Twinsanity.AgentLab.Resolvers.Interfaces.Decompiler;
+using Twinsanity.Libraries;
+using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
+
+namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab
+{
+    public class PS2BehaviourState : ITwinBehaviourState
+    {
+        public UInt16 Bitfield { get; set; }
+        public UInt16 Unknown { get; set; }
+        public Int16 BehaviourIndexOrSlot { get; set; }
+        public Boolean SkipsFirstStateBody { get; set; }
+        public Boolean UsesObjectSlot { get; set; }
+        public Boolean NoneBlocking { get; set; }
+        public TwinBehaviourControlPacket ControlPacket { get; set; }
+        public List<ITwinBehaviourStateBody> Bodies { get; set; }
+        internal int Index { get; set; }
+
+        bool ITwinBehaviourState.HasNext { get; set; }
+
+        public PS2BehaviourState()
+        {
+            Bodies = new List<ITwinBehaviourStateBody>(0x1F);
+            BehaviourIndexOrSlot = -1;
+        }
+
+        public int GetLength()
+        {
+            return 4 + (ControlPacket != null ? ControlPacket.GetLength() : 0) + Bodies.Sum(body => body.GetLength());
+        }
+
+        public void Compile()
+        {
+            return;
+        }
+
+        public void Decompile(IResolver resolver, StreamWriter writer, int tabs = 0)
+        {
+            var stateResolver = resolver as IStateResolver;
+            ControlPacket?.Decompile(resolver, writer, tabs);
+
+            writer.WriteLine();
+            
+            StringUtils.WriteLineTabulated(writer, $"[Unknown(0x{Unknown:X})]", tabs);
+            if (ControlPacket != null)
+            {
+                StringUtils.WriteLineTabulated(writer, $"[ControlPacket({ControlPacket.Name})]", tabs);
+            }
+            if (UsesObjectSlot)
+            {
+                StringUtils.WriteLineTabulated(writer, $"[UseObjectSlot({(ITwinBehaviourState.ObjectBehaviourSlots)BehaviourIndexOrSlot})]", tabs);
+            }
+            if (NoneBlocking)
+            {
+                StringUtils.WriteLineTabulated(writer, "[NonBlocking]", tabs);
+            }
+            if (SkipsFirstStateBody)
+            {
+                StringUtils.WriteLineTabulated(writer, "[SkipFirstBody]", tabs);
+            }
+
+            var behaviourIndex = stateResolver?.ResolveBehaviour() ?? BehaviourIndexOrSlot.ToString();
+            if (BehaviourIndexOrSlot == -1)
+            {
+                behaviourIndex = null;
+            }
+            
+            if (behaviourIndex != null && !UsesObjectSlot)
+            {
+                StringUtils.WriteLineTabulated(writer, $"state State_{Index}(\"{behaviourIndex}\") {{", tabs);
+            }
+            else
+            {
+                StringUtils.WriteLineTabulated(writer, $"state State_{Index}() {{", tabs);
+            }
+
+            foreach (var body in Bodies)
+            {
+                body.Decompile(resolver, writer, tabs + 1);
+            }
+            
+            StringUtils.WriteLineTabulated(writer, "}", tabs);
+            writer.WriteLine();
+        }
+
+        public void Read(BinaryReader reader, int length)
+        {
+            Bitfield = reader.ReadUInt16();
+            Unknown = (UInt16)(Bitfield & 0x3E0);
+            SkipsFirstStateBody = (Bitfield & 0x400) != 0;
+            NoneBlocking = (Bitfield & 0x800) != 0;
+            UsesObjectSlot = (Bitfield & 0x1000) != 0;
+            BehaviourIndexOrSlot = reader.ReadInt16();
+            if ((Bitfield & 0x4000) != 0)
+            {
+                ControlPacket = new TwinBehaviourControlPacket();
+                ControlPacket.PacketIndex = Index;
+                ControlPacket.Read(reader, length);
+            }
+        }
+
+        public void Read(BinaryReader reader, int length, IList<ITwinBehaviourState> scriptStates)
+        {
+            Read(reader, length);
+            var hasNext = (Bitfield & 0x8000) != 0;
+            if (hasNext)
+            {
+                var state = new PS2BehaviourState();
+                scriptStates.Add(state);
+                state.Read(reader, length, scriptStates);
+            }
+        }
+        
+        public void Write(BinaryWriter writer)
+        {
+            UInt16 newBitfield = (UInt16)(Bodies.Count & 0x1F);
+            newBitfield |= Unknown;
+            if (SkipsFirstStateBody)
+            {
+                newBitfield |= 0x400;
+            }
+            if (NoneBlocking)
+            {
+                newBitfield |= 0x800;
+            }
+            if (UsesObjectSlot)
+            {
+                newBitfield |= 0x1000;
+            }
+            if (ControlPacket != null)
+            {
+                newBitfield |= 0x4000;
+            }
+            ITwinBehaviourState downCast = this;
+            if (downCast.HasNext)
+            {
+                newBitfield |= 0x8000;
+            }
+            Bitfield = newBitfield;
+            writer.Write(newBitfield);
+            writer.Write(BehaviourIndexOrSlot);
+            ControlPacket?.Write(writer);
+        }
+        public void WriteText(StreamWriter writer, Int32 i, Int32 tabs = 0)
+        {
+            if (BehaviourIndexOrSlot != -1)
+            {
+                StringUtils.WriteLineTabulated(writer, $"State_{i}({BehaviourIndexOrSlot}) {{", tabs);
+                writer.WriteLine();
+            }
+            else
+            {
+                StringUtils.WriteLineTabulated(writer, $"State_{i}() {"{"}", tabs);
+                writer.WriteLine();
+            }
+            if (UsesObjectSlot)
+            {
+                StringUtils.WriteLineTabulated(writer, $"uses_object_slot = {UsesObjectSlot}", tabs + 1);
+            }
+            if (NoneBlocking)
+            {
+                StringUtils.WriteLineTabulated(writer, "none_blocking", tabs + 1);
+            }
+            if (SkipsFirstStateBody)
+            {
+                StringUtils.WriteLineTabulated(writer, "skip_first_state_body", tabs + 1);
+            }
+            ControlPacket?.WriteText(writer, tabs + 1);
+            foreach (var body in Bodies)
+            {
+                body.WriteText(writer, tabs + 1);
+            }
+            StringUtils.WriteLineTabulated(writer, "}", tabs);
+            writer.WriteLine();
+        }
+
+        public void ReadText(StreamReader reader)
+        {
+            String line = "";
+            ControlPacket = null;
+            Bodies.Clear();
+            while (!line.EndsWith("}"))
+            {
+                line = reader.ReadLine().Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+                if (line.StartsWith("packet "))
+                {
+                    // Amedo -- the line is "packet ControlPacket_N {", not "ControlPacket": the old
+                    // check never matched and desynced the read; now consumes the packet block.
+                    ControlPacket = new TwinBehaviourControlPacket();
+                    while (!line.EndsWith("{"))
+                    {
+                        line = reader.ReadLine().Trim();
+                    }
+                    ControlPacket.ReadText(reader);
+                    while (!line.EndsWith("}"))
+                    {
+                        line = reader.ReadLine().Trim();
+                    }
+                    line = reader.ReadLine().Trim();
+                }
+                if (line.StartsWith("Body"))
+                {
+                    PS2BehaviourStateBody body = new();
+                    while (!line.EndsWith("{"))
+                    {
+                        line = reader.ReadLine().Trim();
+                    }
+                    body.ReadText(reader);
+                    Bodies.Add(body);
+                }
+                if (line.StartsWith("uses_object_slot"))
+                {
+                    UsesObjectSlot = Boolean.Parse(StringUtils.GetStringAfter(line, "=").Trim());
+                }
+                if (line.StartsWith("none_blocking"))
+                {
+                    NoneBlocking = true;
+                }
+                if (line.StartsWith("skip_first_state_body"))
+                {
+                    SkipsFirstStateBody = true;
+                }
+            }
+        }
+    }
+}

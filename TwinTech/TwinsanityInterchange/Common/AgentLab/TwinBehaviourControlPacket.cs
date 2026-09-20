@@ -1,0 +1,459 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using Twinsanity.AgentLab.Resolvers;
+using Twinsanity.AgentLab.Resolvers.Interfaces;
+using Twinsanity.Libraries;
+using Twinsanity.TwinsanityInterchange.Interfaces;
+using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
+
+namespace Twinsanity.TwinsanityInterchange.Common.AgentLab
+{
+    public class TwinBehaviourControlPacket : ITwinAgentLab
+    {
+        public List<Byte> Bytes { get; }
+        public List<UInt32> Floats { get; }
+        public SpaceType Space { get; set; }
+        public MotionType Motion { get; set; }
+        public ContinuousRotateType ContinuousRotate { get; set; }
+        public AccelFunction AccelerationFunction { get; set; }
+        public Boolean Translates { get; set; }
+        public Boolean Rotates { get; set; }
+        public Boolean TranslationContinues { get; set; }
+        public Boolean TracksDestination { get; set; }
+        public Boolean InterpolatesAngles { get; set; }
+        public Boolean YawFaces { get; set; }
+        public Boolean PitchFaces { get; set; }
+        public Boolean OrientsPredicts { get; set; }
+        public Boolean KeyIsLocal { get; set; }
+        public Boolean UsesRotator { get; set; }
+        public Boolean UsesInterpolator { get; set; }
+        public Boolean UsesPhysics { get; set; }
+        public Boolean ContinuouslyRotatesInWorldSpace { get; set; }
+        public NaturalAxes Axes { get; set; }
+        public Boolean Stalls { get; set; }
+        internal int PacketIndex { get; set; }
+        internal string Name { get; private set; }
+
+
+        public TwinBehaviourControlPacket()
+        {
+            Bytes = new List<Byte>();
+            Floats = new List<UInt32>();
+        }
+
+        public int GetLength()
+        {
+            return 8 + Bytes.Count + Floats.Count * 4;
+        }
+
+        public void Compile()
+        {
+            return;
+        }
+
+        public void Decompile(IResolver resolver, StreamWriter writer, int tabs = 0)
+        {
+            WriteText(writer, tabs);
+        }
+
+        public void Read(BinaryReader reader, int length)
+        {
+            Byte bytesCnt = reader.ReadByte();
+            Byte floatsCnt = reader.ReadByte();
+            reader.ReadUInt16(); // Version should always be 0x6
+            var packetSettings = reader.ReadInt32();
+            {
+                Space = (SpaceType)(packetSettings & 0x7);
+                Motion = (MotionType)(packetSettings >> 0x3 & 0xF);
+                ContinuousRotate = (ContinuousRotateType)(packetSettings >> 0x7 & 0xF);
+                AccelerationFunction = (AccelFunction)(packetSettings >> 0xB & 0x3);
+                Translates = (packetSettings >> 0xD & 0x1) == 1;
+                Rotates = (packetSettings >> 0xE & 0x1) == 1;
+                TranslationContinues = (packetSettings >> 0xF & 0x1) == 1;
+                TracksDestination = (packetSettings >> 0x10 & 0x1) == 1;
+                InterpolatesAngles = (packetSettings >> 0x11 & 0x1) == 1;
+                YawFaces = (packetSettings >> 0x12 & 0x1) == 1;
+                PitchFaces = (packetSettings >> 0x13 & 0x1) == 1;
+                OrientsPredicts = (packetSettings >> 0x14 & 0x1) == 1;
+                // Amedo -- bit 0x15 (HasValidData): Write() always forces it to 1, and real game
+                // data legitimately has it 0 in some packets, so the old Debug.Assert was removed.
+                KeyIsLocal = (packetSettings >> 0x16 & 0x1) == 1;
+                UsesRotator = (packetSettings >> 0x17 & 0x1) == 1;
+                UsesInterpolator = (packetSettings >> 0x18 & 0x1) == 1;
+                UsesPhysics = (packetSettings >> 0x19 & 0x1) == 1;
+                ContinuouslyRotatesInWorldSpace = (packetSettings >> 0x1A & 0x1) == 1;
+                Axes = (NaturalAxes)(packetSettings >> 0x1B & 0x7);
+                Stalls = (packetSettings >> 0x1F & 0x1) == 1;
+            }
+
+            Floats.Clear();
+            for (var i = 0; i < floatsCnt; ++i)
+            {
+                Floats.Add(reader.ReadUInt32());
+            }
+            Bytes.Clear();
+            for (var i = 0; i < bytesCnt; ++i)
+            {
+                Bytes.Add(reader.ReadByte());
+            }
+        }
+
+        public void Write(BinaryWriter writer)
+        {
+            writer.Write((Byte)Bytes.Count);
+            writer.Write((Byte)Floats.Count);
+            writer.Write((UInt16)0x6);
+            UInt32 newPacketSettings = 0x200000 | (UInt32)Space; // Set HasValidData to true
+            {
+                static UInt32 BoolToUInt32(Boolean b) => b ? 1U : 0U;
+
+                newPacketSettings |= (UInt32)Motion << 0x3;
+                newPacketSettings |= (UInt32)ContinuousRotate << 0x7;
+                newPacketSettings |= (UInt32)AccelerationFunction << 0xB;
+                newPacketSettings |= BoolToUInt32(Translates) << 0xD;
+                newPacketSettings |= BoolToUInt32(Rotates) << 0xE;
+                newPacketSettings |= BoolToUInt32(TranslationContinues) << 0xF;
+                newPacketSettings |= BoolToUInt32(TracksDestination) << 0x10;
+                newPacketSettings |= BoolToUInt32(InterpolatesAngles) << 0x11;
+                newPacketSettings |= BoolToUInt32(YawFaces) << 0x12;
+                newPacketSettings |= BoolToUInt32(PitchFaces) << 0x13;
+                newPacketSettings |= BoolToUInt32(OrientsPredicts) << 0x14;
+                newPacketSettings |= BoolToUInt32(KeyIsLocal) << 0x16;
+                newPacketSettings |= BoolToUInt32(UsesRotator) << 0x17;
+                newPacketSettings |= BoolToUInt32(UsesInterpolator) << 0x18;
+                newPacketSettings |= BoolToUInt32(UsesPhysics) << 0x19;
+                newPacketSettings |= BoolToUInt32(ContinuouslyRotatesInWorldSpace) << 0x1A;
+                newPacketSettings |= (UInt32)Axes << 0x1B;
+                newPacketSettings |= BoolToUInt32(Stalls) << 0x1F;
+            }
+            writer.Write(newPacketSettings);
+            for (var i = 0; i < Floats.Count; ++i)
+            {
+                writer.Write(Floats[i]);
+            }
+            foreach (var b in Bytes)
+            {
+                writer.Write(b);
+            }
+        }
+        public void WriteText(StreamWriter writer, Int32 tabs = 0)
+        {
+            Name = $"ControlPacket_{PacketIndex}";
+            StringUtils.WriteLineTabulated(writer, $"packet {Name} {"{"}", tabs);
+            StringUtils.WriteLineTabulated(writer, "settings {", tabs + 1);
+            {
+                StringUtils.WriteLineTabulated(writer, $"Space = {Space};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"Motion = {Motion};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"ContinuousRotate = {ContinuousRotate};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"AccelerationFunction = {AccelerationFunction};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"Translates = {Translates.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"Rotates = {Rotates.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"TranslationContinues = {TranslationContinues.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"TracksDestination = {TracksDestination.ToString().ToLower()};", tabs + 2); // Amedo 2026-09-19
+                StringUtils.WriteLineTabulated(writer, $"InterpolatesAngles = {InterpolatesAngles.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"YawFaces = {YawFaces.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"PitchFaces = {PitchFaces.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"OrientsPredicts = {OrientsPredicts.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"KeyIsLocal = {KeyIsLocal.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"UsesRotator = {UsesRotator.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"UsesInterpolator = {UsesInterpolator.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"UsesPhysics = {UsesPhysics.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"ContinuouslyRotatesInWorldSpace = {ContinuouslyRotatesInWorldSpace.ToString().ToLower()};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"Axes = {Axes};", tabs + 2);
+                StringUtils.WriteLineTabulated(writer, $"Stalls = {Stalls.ToString().ToLower()};", tabs + 2);
+            }
+            StringUtils.WriteLineTabulated(writer, "}", tabs + 1);
+            StringUtils.WriteLineTabulated(writer, "data {", tabs + 1);
+            {
+                for (var i = 0; i < Bytes.Count; ++i)
+                {
+                    if (Bytes[i] == 0xFF)
+                    {
+                        continue;
+                    }
+                    var packet = (ControlPacketData)i;
+                    if (Bytes[i] >= 0x80)
+                    {
+                        StringUtils.WriteLineTabulated(writer, $"{(ControlPacketData)i} = InstanceFloat[{Bytes[i] - 128}];", tabs + 2);
+                        continue;
+                    }
+                    if (IsIntegerPacket(packet))
+                    {
+                        StringUtils.WriteLineTabulated(writer, $"{(ControlPacketData)i} = {(UInt32)Floats[Bytes[i]]};", tabs + 2);
+                    }
+                    else
+                    {
+                        StringUtils.WriteLineTabulated(writer, $"{(ControlPacketData)i} = {BitConverter.UInt32BitsToSingle(Floats[Bytes[i]]).ToString(CultureInfo.InvariantCulture)};", tabs + 2);
+                    }
+                }
+            }
+            StringUtils.WriteLineTabulated(writer, "}", tabs + 1);
+            StringUtils.WriteLineTabulated(writer, "}", tabs);
+        }
+
+        public void ReadText(StreamReader reader)
+        {
+            String line = "";
+            Bytes.Clear();
+            Floats.Clear();
+
+            // Read settings
+            while (!line.EndsWith("}"))
+            {
+                line = reader.ReadLine().Trim();
+                if (String.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+                // WriteText emits "Name = value;" using THESE exact field names (Space, Motion,
+                // Translates, Rotates, TranslationContinues, InterpolatesAngles, YawFaces,
+                // PitchFaces, OrientsPredicts) — this used a completely different, older set of
+                // names (SpaceType, MotionType, DoesTranslate, ...) that never matched anything
+                // WriteText actually produces, so every one of these settings silently kept
+                // its default value on every round-trip. Also strip the trailing ";" WriteText
+                // always appends, which Enum.Parse/Boolean.Parse both reject outright.
+                var valueString = StringUtils.GetStringAfter(line, "=").Trim().TrimEnd(';').Trim();
+                if (line.StartsWith("Space"))
+                {
+                    Space = Enum.Parse<SpaceType>(valueString);
+                }
+                else if (line.StartsWith("Motion"))
+                {
+                    Motion = Enum.Parse<MotionType>(valueString);
+                }
+                else if (line.StartsWith("AccelerationFunction"))
+                {
+                    AccelerationFunction = Enum.Parse<AccelFunction>(valueString);
+                }
+                else if (line.StartsWith("ContinuousRotate"))
+                {
+                    ContinuousRotate = Enum.Parse<ContinuousRotateType>(valueString);
+                }
+                else if (line.StartsWith("Translates"))
+                {
+                    Translates = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("Rotates"))
+                {
+                    Rotates = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("TranslationContinues"))
+                {
+                    TranslationContinues = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("TracksDestination")) // Amedo 2026-09-19
+                {
+                    TracksDestination = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("InterpolatesAngles"))
+                {
+                    InterpolatesAngles = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("YawFaces"))
+                {
+                    YawFaces = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("PitchFaces"))
+                {
+                    PitchFaces = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("OrientsPredicts"))
+                {
+                    OrientsPredicts = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("KeyIsLocal"))
+                {
+                    KeyIsLocal = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("UsesRotator"))
+                {
+                    UsesRotator = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("UsesInterpolator"))
+                {
+                    UsesInterpolator = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("UsesPhysics"))
+                {
+                    UsesPhysics = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("ContinuouslyRotatesInWorldSpace"))
+                {
+                    ContinuouslyRotatesInWorldSpace = Boolean.Parse(valueString);
+                }
+                else if (line.StartsWith("Axes"))
+                {
+                    Axes = Enum.Parse<NaturalAxes>(valueString);
+                }
+                else if (line.StartsWith("Stalls"))
+                {
+                    Stalls = Boolean.Parse(valueString);
+                }
+            }
+
+            // Read bytes and floats
+            for (var i = 0; i < PacketDataLength; i++)
+            {
+                Bytes.Add(0xFF);
+                Floats.Add(0);
+            }
+            var maxPacketIndex = -1;
+            Byte floatIdx = 0;
+            line = reader.ReadLine().Trim(); // Read the start of data
+            while (!line.EndsWith("}"))
+            {
+                line = reader.ReadLine().Trim();
+                if (String.IsNullOrWhiteSpace(line) || line.StartsWith("}"))
+                {
+                    continue;
+                }
+                var packetName = StringUtils.GetStringBefore(line, "=").Trim();
+                // Same trailing-";" issue as the settings block above, plus WriteText's actual
+                // format for an instance-float reference is "InstanceFloat[N]" (capitalized,
+                // bracketed) — this checked for "instance_float_" (lowercase, underscore),
+                // which never matched, so every instance-float reference silently fell through
+                // to being parsed as a plain number/enum and threw instead.
+                var valueString = StringUtils.GetStringAfter(line, "=").Trim().TrimEnd(';').Trim();
+                var packet = Enum.Parse<ControlPacketData>(packetName);
+                if ((Int32)packet > maxPacketIndex)
+                {
+                    maxPacketIndex = (Int32)packet;
+                }
+
+                if (valueString.StartsWith("InstanceFloat["))
+                {
+                    var instFloatIdx = Byte.Parse(StringUtils.GetStringInBetween(valueString, "[", "]"), CultureInfo.InvariantCulture);
+                    Bytes[(Int32)packet] = (Byte)(instFloatIdx + 0x80);
+                    continue;
+                }
+
+                Bytes[(Int32)packet] = floatIdx;
+                if (IsIntegerPacket(packet))
+                {
+                    var value = UInt32.Parse(valueString, CultureInfo.InvariantCulture);
+                    Floats[floatIdx++] = value;
+                }
+                else
+                {
+                    var value = Single.Parse(valueString, CultureInfo.InvariantCulture);
+                    Floats[floatIdx++] = BitConverter.SingleToUInt32Bits(value);
+                }
+            }
+            if (maxPacketIndex != -1)
+            {
+                Bytes.RemoveRange(maxPacketIndex + 1, PacketDataLength - maxPacketIndex - 1);
+                Floats.RemoveRange(floatIdx, PacketDataLength - floatIdx);
+            }
+            else
+            {
+                Bytes.Clear();
+                Floats.Clear();
+            }
+        }
+
+        public static bool IsIntegerPacket(ControlPacketData packet)
+        {
+            return packet == ControlPacketData.Selector || packet == ControlPacketData.KeyIndex || packet == ControlPacketData.SyncUnit || packet == ControlPacketData.JointIndex;
+        }
+
+        public const Int32 PacketDataLength = 23;
+        public enum ControlPacketData
+        {
+            Selector,
+            // SyncIndex = Selector,
+            KeyIndex,
+            // FocusData = KeyIndex,
+            MoveSpeed,
+            // RiseHeight = MoveSpeed,
+            TurnSpeed,
+            RawPosX,
+            RawPosY,
+            RawPosZ,
+            Pitch,
+            // RawAngsX = Pitch,
+            Yaw,
+            // RawAngsY = Yaw,
+            Roll,
+            // RawAngsZ = Roll,
+            Delay,
+            Duration,
+            // Curvy = Duration,
+            // HomePower = Duration,
+            TumbleData,
+            SpinData,
+            TwistData,
+            RandRange,
+            // SqrTolerance = RandRange,
+            Power,
+            // Gravity = Power,
+            // Banking = Power,
+            Damping,
+            // SpeedLim = Damping,
+            // Braking = Damping,
+            AcDist,
+            // RtOpt = AcDist,
+            // ShiftFreq = AcDist,
+            DecDist,
+            // PhysOpt = DecDist,
+            // Shift = DecDist,
+            Bounce,
+            // BankLimit = Bounce,
+            SyncUnit,
+            JointIndex
+        }
+
+        public enum SpaceType
+        {
+            WORLD_SPACE = 0,
+            INITIAL_SPACE,
+            CURRENT_SPACE,
+            TARGET_SPACE,
+            PARENT_SPACE,
+            CHASE_SPACE = PARENT_SPACE,
+            INITIAL_POS,
+            CURRENT_POS,
+            STORED_SPACE,
+        }
+        public enum MotionType
+        {
+            NO_MOTION = 0,
+            CONSTANT_VEL,
+            ACCELERATED,
+            SPRING,
+            PROJECTILE,
+            LINEAR_INTERP,
+            SMOOTH_PATH,
+            FACE_DEST_ONLY,
+            DRIVE,
+            GROUND_CHASE,
+            AIR_CHASE,
+            UNKNOWN_11,
+            UNKNOWN_12,
+            UNKNOWN_13,
+        }
+        public enum ContinuousRotateType
+        {
+            NO_CONT_ROTATION = 0,
+            NUM_FULL_ROTS,
+            RADS_PER_SECOND, // Or degrees?
+            NATURAL_ROLL,
+        }
+        public enum NaturalAxes
+        {
+            NO_NATURAL = 0,
+            X_NATURAL,
+            Y_NATURAL,
+            Z_NATURAL,
+            ALL_NATURAL,
+        }
+        public enum AccelFunction
+        {
+            NO_ACCEL = 0,
+            CONSTANT_ACCEL,
+            SMOOTH_CURVE,
+        }
+    }
+}

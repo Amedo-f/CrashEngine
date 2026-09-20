@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="..\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
+    <ProjectReference Include="..\CrashEngine.Assets\CrashEngine.Assets.csproj" />
+    <ProjectReference Include="..\CrashEngine.Stealth\CrashEngine.Stealth.csproj" />
+    <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
+  </ItemGroup>
+
+  <!-- 2026-08-22 — MP3 import support: NLayer is a fully-managed C# MP3 decoder (no native code,
+       no external process/install needed — verified via github.com/naudio/NLayer, MIT-licensed,
+       widely used by MonoGame/FNA). Replaces an earlier ffmpeg-shell-out attempt per explicit user
+       direction: the engine itself must be self-contained, not depend on an external program the
+       end user would need installed separately. -->
+  <ItemGroup>
+    <PackageReference Include="NLayer" Version="1.16.0" />
+  </ItemGroup>
+
+  <!-- 2026-09-04: editor-only UI assets (not real game data), e.g. the Camera layout marker's
+       billboard icon (Assets\Icons\camera_marker.png), copied next to the built exe so
+       Texture2D.FromFile(AppContext.BaseDirectory + ...) finds it at runtime regardless of
+       working directory. -->
+  <ItemGroup>
+    <None Include="Assets\Icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs) -->
+  <Target Name="CopyPs2ImageMaker" AfterTargets="AfterBuild">
+    <ItemGroup>
+      <Ps2ImageMakerLib Include="..\Libraries\Native\Windows\PS2ImageMaker.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(Ps2ImageMakerLib)" DestinationFolder="$(MSBuildProjectDirectory)\$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

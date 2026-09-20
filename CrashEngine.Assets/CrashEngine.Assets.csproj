@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpGLTF.Core"   Version="1.0.6" />
+    <PackageReference Include="AssimpNet"         Version="4.1.0" />
+    <PackageReference Include="StbImageSharp"     Version="2.30.15" />
+    <PackageReference Include="Silk.NET.OpenGL"   Version="2.23.0" />
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="..\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
+  </ItemGroup>
+</Project>

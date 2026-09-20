@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- TwinTech: the same PS2 parsing library TT Lab uses -->
+    <ProjectReference Include="..\TwinTech\TwinTech.csproj" />
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="..\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
+    <ProjectReference Include="..\CrashEngine.Stealth\CrashEngine.Stealth.csproj" />
+    <!-- ModelImporter.RawSubmesh: the format-independent GLB/FBX/OBJ mesh data
+         MeshDecoder.BakeExternalModelAsObject bridges into a real PS2 RigidModel. One directional
+         (Assets never references Importer/TwinTech back), so no cycle. -->
+    <ProjectReference Include="..\CrashEngine.Assets\CrashEngine.Assets.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
+  </ItemGroup>
+</Project>
