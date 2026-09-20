@@ -184,11 +184,9 @@ public static class BlankSceneTemplate
         {
             scenery.Name = sceneName;
             scenery.Sceneries.Clear();
-            // Amedo 2026-09-20
+            // Amedo 2026-09-21
             scenery.PointLights.Clear();
-            scenery.AmbientLights.Clear();
-            scenery.DirectionalLights.Clear();
-            scenery.HasLighting = false;
+            scenery.NegativeLights.Clear();
         }
 
         var collision = rm2.GetItem<PS2AnyCollisionData>((uint)Constants.LEVEL_COLLISION_ITEM);
