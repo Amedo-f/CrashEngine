@@ -233,15 +233,40 @@ public sealed partial class GameScene : Scene
             {
                 ImGui.TextDisabled("Saved into the level's own SM2 on Save Chunk / Build ISO (updates\nexisting lights only - can't add a new light to an unlit level).");
 
+                // Amedo 2026-09-21
                 var intensity = lighting.Intensity;
                 ImGui.SetNextItemWidth(-1f);
-                if (ImGui.SliderFloat("Intensity##wli", ref intensity, 0f, 5f))
+                bool intensityChanged = ImGui.SliderFloat("Intensity##wli", ref intensity, 0f, 5f);
+                if (ImGui.IsItemActivated())
+                {
+                    lighting.IntensityDragBaseAmbient = lighting.AmbientColor;
+                    lighting.IntensityDragBaseDir = lighting.Directional.Select(d => d.Color).ToList();
+                }
+                if (intensityChanged)
+                {
                     lighting.Intensity = intensity;
+                    if (lighting.IntensityDragBaseDir is not null)
+                    {
+                        lighting.AmbientColor = lighting.IntensityDragBaseAmbient * intensity;
+                        for (int i = 0; i < lighting.Directional.Count && i < lighting.IntensityDragBaseDir.Count; i++)
+                        {
+                            var dir = lighting.Directional[i].Direction;
+                            lighting.Directional[i] = (lighting.IntensityDragBaseDir[i] * intensity, dir);
+                        }
+                    }
+                }
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                {
+                    lighting.Intensity = 1f;
+                    lighting.IntensityDragBaseDir = null;
+                }
                 if (ImGui.IsItemHovered())
-                    MaybeTooltip("Multiplies ambient + every directional light's colour before it\n" +
-                                      "reaches the shader - the real per-level colours are already dim\n" +
-                                      "(0.2-0.6 range) and the colour pickers below clamp at 1.0, so this\n" +
-                                      "is the direct way to make the whole rig stronger/weaker.");
+                    MaybeTooltip("Scales the level's REAL ambient + directional colours directly (from\n" +
+                                      "where they were when you grabbed the slider), so the actual game\n" +
+                                      "values below are what change and get saved — no hidden multiplier.\n" +
+                                      "The slider is relative (snaps back to 1.0 on release); the true\n" +
+                                      "values persist exactly, never compound silently on reload. Use it\n" +
+                                      "to brighten/dim levels the devs left too dark or too bright.");
 
                 var sceneryBrightness = lighting.SceneryBrightness;
                 ImGui.SetNextItemWidth(-1f);

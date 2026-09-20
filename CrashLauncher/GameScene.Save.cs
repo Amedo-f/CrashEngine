@@ -495,7 +495,7 @@ public sealed partial class GameScene : Scene
             });
         }
         {
-            var c = settings.AmbientColor * settings.Intensity;
+            var c = settings.AmbientColor; // Amedo 2026-09-21
             sceneryItem.AmbientLights[0].Color = new TwinVec4(c.X, c.Y, c.Z, 0f);
             ambientSynced = 1;
         }
@@ -523,7 +523,7 @@ public sealed partial class GameScene : Scene
         for (int i = 0; i < n; i++)
         {
             var (col, dir) = settings.Directional[i];
-            var boosted = col * settings.Intensity;
+            var boosted = col; // Amedo 2026-09-21
             var light = sceneryItem.DirectionalLights[i];
             light.Color = new TwinVec4(boosted.X, boosted.Y, boosted.Z, 0f);
             light.UnkVec3 = new TwinVec4(-dir.X, dir.Y, dir.Z, 0f);
@@ -532,7 +532,7 @@ public sealed partial class GameScene : Scene
 
         if (ambientSynced > 0 || directionalSynced > 0) sceneryItem.HasLighting = true;
 
-        _browser.Log($"Synced world lighting: {ambientSynced} ambient + {directionalSynced} directional light(s) (intensity x{settings.Intensity:F2}), " +
+        _browser.Log($"Synced world lighting: {ambientSynced} ambient + {directionalSynced} directional light(s) (real values), " +
                      $"fog = {CrashEngine.Importer.MeshDecoder.FogColorNames[fogIdxToSave]}, HasLighting={sceneryItem.HasLighting}.");
 
         // Amedo 2026-09-19
