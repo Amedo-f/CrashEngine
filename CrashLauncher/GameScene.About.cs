@@ -28,7 +28,7 @@ public sealed partial class GameScene
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextUnformatted("Version 0.0.5");
+        ImGui.TextUnformatted("Version 0.0.6");
         ImGui.TextUnformatted("Developed by Yonko Amedo");
 
         ImGui.Spacing();
