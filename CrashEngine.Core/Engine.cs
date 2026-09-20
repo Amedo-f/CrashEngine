@@ -128,6 +128,10 @@ public sealed class Engine
 
     private void OnRender(double dt)
     {
+        // Amedo 2026-09-20
+        _gl.ClearColor(0.10f, 0.10f, 0.12f, 1f);
+        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
         _imgui?.Update((float)dt);
         var io = ImGui.GetIO();
         Win32Clipboard.Hook(io);
