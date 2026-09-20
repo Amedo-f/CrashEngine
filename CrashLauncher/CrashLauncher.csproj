@@ -31,11 +31,12 @@
     <None Include="Assets\Icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs) -->
-  <Target Name="CopyPs2ImageMaker" AfterTargets="AfterBuild">
-    <ItemGroup>
-      <Ps2ImageMakerLib Include="..\Libraries\Native\Windows\PS2ImageMaker.dll" />
-    </ItemGroup>
-    <Copy SourceFiles="@(Ps2ImageMakerLib)" DestinationFolder="$(MSBuildProjectDirectory)\$(OutputPath)" SkipUnchangedFiles="true" />
-  </Target>
+  <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs).
+       Content item so it lands in BOTH build and publish output. -->
+  <ItemGroup>
+    <Content Include="..\Libraries\Native\Windows\PS2ImageMaker.dll">
+      <Link>PS2ImageMaker.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

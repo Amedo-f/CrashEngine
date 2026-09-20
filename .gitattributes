@@ -1,0 +1,2 @@
+# Bundled third-party shader library — exclude from GitHub language stats
+CrashEngine.Renderer/Shaders/lygia/** linguist-vendored
