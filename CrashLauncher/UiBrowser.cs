@@ -556,6 +556,24 @@ public sealed partial class GameScene
             },
             "both movie-start calls (Vivendi + TTIdent) now return a fake success instantly, " +
             "skipping the videos while every other side effect those states have still runs"),
+
+        // Amedo 2026-09-20
+        new(
+            "SLUS_209.09",
+            "Skip in-game cutscenes (prevents New Game hang on excluded cutscenes)",
+            "Replaces the runtime-queued movie-play call in state 14 (vaddr 0x00177588) with a " +
+            "fake \"succeeded\" result (li v0,1) — so every in-game / story / attract cutscene is " +
+            "skipped instantly instead of streaming its .pss file. Use this for New Game builds: " +
+            "when a story cutscene's file has been excluded from the build, the game would " +
+            "otherwise hang forever waiting on a video that isn't on the disc; this makes it skip " +
+            "cleanly. All cutscenes (boot, story, attract, menu previews) share this one movie " +
+            "system. Confirmed live in PCSX2 (Attract demo skipped, returned to menu, no hang).",
+            new[]
+            {
+                new PatchEdit(0x78588, new byte[] { 0x01, 0x00, 0x02, 0x34 }),
+            },
+            "in-game cutscenes now return a fake success instantly (state 14 movie-play skipped), " +
+            "so excluded/missing cutscenes never hang the game"),
     };
 
     private readonly record struct BootRegionDef(string ExeName, int StartingChunkOffset, int StartingChunkSize);
