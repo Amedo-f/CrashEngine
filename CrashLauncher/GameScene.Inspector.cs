@@ -236,37 +236,14 @@ public sealed partial class GameScene : Scene
                 // Amedo 2026-09-21
                 var intensity = lighting.Intensity;
                 ImGui.SetNextItemWidth(-1f);
-                bool intensityChanged = ImGui.SliderFloat("Intensity##wli", ref intensity, 0f, 5f);
-                if (ImGui.IsItemActivated())
-                {
-                    lighting.IntensityDragBaseAmbient = lighting.AmbientColor;
-                    lighting.IntensityDragBaseDir = lighting.Directional.Select(d => d.Color).ToList();
-                }
-                if (intensityChanged)
-                {
+                if (ImGui.SliderFloat("Intensity##wli", ref intensity, 0f, 5f))
                     lighting.Intensity = intensity;
-                    if (lighting.IntensityDragBaseDir is not null)
-                    {
-                        lighting.AmbientColor = lighting.IntensityDragBaseAmbient * intensity;
-                        for (int i = 0; i < lighting.Directional.Count && i < lighting.IntensityDragBaseDir.Count; i++)
-                        {
-                            var dir = lighting.Directional[i].Direction;
-                            lighting.Directional[i] = (lighting.IntensityDragBaseDir[i] * intensity, dir);
-                        }
-                    }
-                }
-                if (ImGui.IsItemDeactivatedAfterEdit())
-                {
-                    lighting.Intensity = 1f;
-                    lighting.IntensityDragBaseDir = null;
-                }
                 if (ImGui.IsItemHovered())
-                    MaybeTooltip("Scales the level's REAL ambient + directional colours directly (from\n" +
-                                      "where they were when you grabbed the slider), so the actual game\n" +
-                                      "values below are what change and get saved — no hidden multiplier.\n" +
-                                      "The slider is relative (snaps back to 1.0 on release); the true\n" +
-                                      "values persist exactly, never compound silently on reload. Use it\n" +
-                                      "to brighten/dim levels the devs left too dark or too bright.");
+                    MaybeTooltip("Per-level brightness multiplier on the real ambient + directional\n" +
+                                      "lights. Your value is remembered for this level (persists on exit/\n" +
+                                      "reload) and baked into the real colours only when building the ISO,\n" +
+                                      "so it never compounds. Use it to fix levels the devs left too dark\n" +
+                                      "or too bright.");
 
                 var sceneryBrightness = lighting.SceneryBrightness;
                 ImGui.SetNextItemWidth(-1f);

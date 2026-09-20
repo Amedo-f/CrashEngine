@@ -302,9 +302,6 @@ public sealed partial class GameScene : Scene
 		public readonly List<(System.Numerics.Vector3 Color, System.Numerics.Vector3 Direction)> Directional = new List<(System.Numerics.Vector3, System.Numerics.Vector3)>();
 
 		public float Intensity = 1f;
-		// Amedo 2026-09-21
-		public System.Numerics.Vector3 IntensityDragBaseAmbient;
-		public List<System.Numerics.Vector3>? IntensityDragBaseDir;
 
 		public float SceneryBrightness = 1f;
 
@@ -319,8 +316,8 @@ public sealed partial class GameScene : Scene
 			RenderPipeline instance = RenderPipeline.Instance;
 			if (instance != null)
 			{
-				instance.AmbientLightColor = AmbientColor;
-				instance.DirectionalLights = Directional.Select(((System.Numerics.Vector3 Color, System.Numerics.Vector3 Direction) l) => (l.Color, Direction: l.Direction)).ToList();
+				instance.AmbientLightColor = AmbientColor * Intensity;
+				instance.DirectionalLights = Directional.Select(((System.Numerics.Vector3 Color, System.Numerics.Vector3 Direction) l) => (l.Color * Intensity, Direction: l.Direction)).ToList();
 				int idx = Math.Clamp(FogColorIndex, 0, CrashEngine.Importer.MeshDecoder.FogColors.Length - 1);
 				instance.FogColor = CrashEngine.Importer.MeshDecoder.FogColors[idx];
 			}
@@ -843,6 +840,7 @@ public sealed partial class GameScene : Scene
 			worldLightingSettings.AmbientColor = System.Numerics.Vector3.One;
 			goto IL_0273;
 			IL_0273:
+			if (useShadowDir) RestoreWorldLightingMeta(worldLightingSettings); // Amedo 2026-09-21
 			entity.AddChild(entity2);
 			foreach (var item2 in worldLightingSettings.Directional)
 			{

@@ -1987,14 +1987,14 @@ public sealed partial class GameScene : Scene
 
                 if (foreignScenery.AmbientLights.Count > 0)
                 {
-                    var c = lighting.AmbientColor; // Amedo 2026-09-21
+                    var c = lighting.AmbientColor * lighting.Intensity;
                     foreignScenery.AmbientLights[0].Color = new TwinVec4(c.X, c.Y, c.Z, 0f);
                 }
                 int dirN = Math.Min(lighting.Directional.Count, foreignScenery.DirectionalLights.Count);
                 for (int i = 0; i < dirN; i++)
                 {
                     var (col, dir) = lighting.Directional[i];
-                    var boosted = col; // Amedo 2026-09-21
+                    var boosted = col * lighting.Intensity;
                     var light = foreignScenery.DirectionalLights[i];
                     light.Color = new TwinVec4(boosted.X, boosted.Y, boosted.Z, 0f);
                     light.UnkVec3 = new TwinVec4(-dir.X, dir.Y, dir.Z, 0f);

@@ -234,6 +234,14 @@ public sealed partial class GameScene : Scene
             }
         }
 
+        // Amedo 2026-09-21 -- also drop the per-level World Lighting intensity metas (stale once SavedChunks is gone)
+        try
+        {
+            var wlDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "WorldLighting");
+            if (Directory.Exists(wlDir)) Directory.Delete(wlDir, recursive: true);
+        }
+        catch { }
+
         try
         {
             var buildDir  = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build");
@@ -470,6 +478,52 @@ public sealed partial class GameScene : Scene
         }
     }
 
+    // Amedo 2026-09-21
+    private sealed class WorldLightingMeta { public float Intensity { get; set; } = 1f; }
+
+    private string GetWorldLightingMetaPath()
+    {
+        var root = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "WorldLighting");
+        var rel = _rm2.Replace('/', '\\');
+        if (rel.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase)) rel = rel[..^4];
+        return Path.Combine(root, rel + ".json");
+    }
+
+    private void SaveWorldLightingMeta(WorldLightingSettings settings)
+    {
+        try
+        {
+            var path = GetWorldLightingMetaPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
+                new WorldLightingMeta { Intensity = settings.Intensity }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { }
+    }
+
+    private void RestoreWorldLightingMeta(WorldLightingSettings settings)
+    {
+        try
+        {
+            var path = GetWorldLightingMetaPath();
+            if (!File.Exists(path)) return;
+            var meta = System.Text.Json.JsonSerializer.Deserialize<WorldLightingMeta>(File.ReadAllText(path));
+            if (meta is null) return;
+            float f = meta.Intensity;
+            if (f > 0.001f)
+            {
+                settings.AmbientColor /= f;
+                for (int i = 0; i < settings.Directional.Count; i++)
+                {
+                    var (col, dir) = settings.Directional[i];
+                    settings.Directional[i] = (col / f, dir);
+                }
+            }
+            settings.Intensity = f;
+        }
+        catch { }
+    }
+
     private void SyncWorldLighting(Entity chunkRoot)
     {
         var settings = AllEntities(chunkRoot).Select(c => c.Get<WorldLightingSettings>()).FirstOrDefault(s => s is not null);
@@ -495,7 +549,7 @@ public sealed partial class GameScene : Scene
             });
         }
         {
-            var c = settings.AmbientColor; // Amedo 2026-09-21
+            var c = settings.AmbientColor * settings.Intensity;
             sceneryItem.AmbientLights[0].Color = new TwinVec4(c.X, c.Y, c.Z, 0f);
             ambientSynced = 1;
         }
@@ -523,7 +577,7 @@ public sealed partial class GameScene : Scene
         for (int i = 0; i < n; i++)
         {
             var (col, dir) = settings.Directional[i];
-            var boosted = col; // Amedo 2026-09-21
+            var boosted = col * settings.Intensity;
             var light = sceneryItem.DirectionalLights[i];
             light.Color = new TwinVec4(boosted.X, boosted.Y, boosted.Z, 0f);
             light.UnkVec3 = new TwinVec4(-dir.X, dir.Y, dir.Z, 0f);
@@ -532,7 +586,9 @@ public sealed partial class GameScene : Scene
 
         if (ambientSynced > 0 || directionalSynced > 0) sceneryItem.HasLighting = true;
 
-        _browser.Log($"Synced world lighting: {ambientSynced} ambient + {directionalSynced} directional light(s) (real values), " +
+        SaveWorldLightingMeta(settings); // Amedo 2026-09-21
+
+        _browser.Log($"Synced world lighting: {ambientSynced} ambient + {directionalSynced} directional light(s) (intensity x{settings.Intensity:F2}), " +
                      $"fog = {CrashEngine.Importer.MeshDecoder.FogColorNames[fogIdxToSave]}, HasLighting={sceneryItem.HasLighting}.");
 
         // Amedo 2026-09-19
