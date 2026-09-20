@@ -2368,12 +2368,10 @@ public sealed partial class GameScene : Scene
         var newWallEnt = MakeQuadMarker(_loadScenesRoot, $"LoadScene_{System.IO.Path.GetFileName(targetBasePath)}_new",
             newLink, new Vector4(1f, 0.4f, 0.1f, 0.6f));
 
-        _undoStack.Push(new LoadWallAddAction { Parent = _loadScenesRoot, Entity = newWallEnt, LinkItem = linkItem, Link = newLink });
-
-        _selectedSet.Clear();
-        _selectedSet.Add(newWallEnt);
-        _selected = newWallEnt;
-        _revealSelectionInTree = true;
+        // Amedo 2026-09-20
+        PushAddWithSelectionRestore(
+            new LoadWallAddAction { Parent = _loadScenesRoot, Entity = newWallEnt, LinkItem = linkItem, Link = newLink },
+            newWallEnt);
 
         _browser.Log(aligned
             ? $"Auto-aligned FULL return link -> '{targetBasePath}': it links back to '{thisSceneRel}', so matched its matrices (Object<->Chunk swap), built the aligned preview, AND auto-placed the LoadScene wall = the counterpart's real wall transformed here + normal flipped (matches the real reciprocal). Save Chunk + Build to test; if the crossing ever freezes, use 'Flip Load Wall Normal' on the LoadScene marker."

@@ -669,12 +669,10 @@ public sealed partial class GameScene : Scene
         rdr.Mat.AlphaBlend = true;
         wallEntity.Parent?.AddChild(e);
 
-        _undoStack.Push(new LoadZoneBoxAddAction { Parent = wallEntity.Parent!, Entity = e, Link = wall.Source, Box = linkBox });
-
-        _selectedSet.Clear();
-        _selectedSet.Add(e);
-        _selected = e;
-        _revealSelectionInTree = true;
+        // Amedo 2026-09-20
+        PushAddWithSelectionRestore(
+            new LoadZoneBoxAddAction { Parent = wallEntity.Parent!, Entity = e, Link = wall.Source, Box = linkBox },
+            e);
 
         _browser.Log($"Added a pre-load bounding box for '{wall.Source.Path}' (box {wall.Source.ChunkLinksCollisionData.Count} on this link). " +
                       "Drag it into place (Move gizmo) and use Size X/Y/Z to resize -- click Add Bounding Box again to chain more into an L/U shape. Save Chunk to persist.");

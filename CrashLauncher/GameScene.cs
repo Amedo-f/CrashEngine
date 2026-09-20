@@ -634,6 +634,26 @@ public sealed partial class GameScene : Scene
 		SyncSelSnapshot();
 	}
 
+	// Amedo 2026-09-20
+	private void PushAddWithSelectionRestore(IEditAction addAction, Entity newEntity)
+	{
+		var before = _selectedSet.ToList();
+		_selectedSet.Clear();
+		_selectedSet.Add(newEntity);
+		_selected = newEntity;
+		_revealSelectionInTree = true;
+		_undoStack.Push(new CompositeEditAction
+		{
+			Actions = new IEditAction[]
+			{
+				addAction,
+				new SelectionChangeAction { Before = before, After = new List<Entity> { newEntity }, Apply = ApplySelectionList },
+			},
+			HandlesSelectionItself = true,
+		});
+		SyncSelSnapshot();
+	}
+
 
 	private void SelectRange(Entity from, Entity to)
 	{
