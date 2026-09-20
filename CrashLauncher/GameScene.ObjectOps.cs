@@ -377,14 +377,30 @@ public sealed partial class GameScene : Scene
             return;
         }
 
-        if (actions.Count > 0)
-            _undoStack.Push(actions.Count == 1 ? actions[0] : new CompositeEditAction { Actions = actions });
+        // Amedo 2026-09-20
+        var beforeSel = _selectedSet.ToList();
 
         _selectedSet.Clear();
         foreach (var e in newSelection) _selectedSet.Add(e);
         _selected = newSelection.Count > 0 ? newSelection[0] : null;
         _revealSelectionInTree = true;
-        SyncSelSnapshot(); // Amedo 2026-09-20
+
+        if (actions.Count > 0)
+        {
+            var addAction = actions.Count == 1 ? actions[0] : new CompositeEditAction { Actions = actions };
+            var selAction = new SelectionChangeAction
+            {
+                Before = beforeSel,
+                After  = new List<Entity>(newSelection),
+                Apply  = ApplySelectionList,
+            };
+            _undoStack.Push(new CompositeEditAction
+            {
+                Actions = new IEditAction[] { addAction, selAction },
+                HandlesSelectionItself = true,
+            });
+        }
+        SyncSelSnapshot();
 
         var verb = repeatCount > 1 ? "Array" : "Duplicated";
         _browser.Log($"{verb}: {newSelection.Count} item(s) added (offset next to the original). No collision auto-generated — " +

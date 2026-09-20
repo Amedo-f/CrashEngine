@@ -94,9 +94,13 @@ public sealed class CompositeEditAction : IEditAction
 {
     public required IReadOnlyList<IEditAction> Actions;
 
+    // Amedo 2026-09-20
+    public bool HandlesSelectionItself { get; init; }
+
     public void Undo() { for (int i = Actions.Count - 1; i >= 0; i--) Actions[i].Undo(); }
     public void Redo() { foreach (var a in Actions) a.Redo(); }
-    public IEnumerable<Entity> AffectedEntities => Actions.SelectMany(a => a.AffectedEntities);
+    public IEnumerable<Entity> AffectedEntities =>
+        HandlesSelectionItself ? Array.Empty<Entity>() : Actions.SelectMany(a => a.AffectedEntities);
 }
 
 // Amedo 2026-09-20
