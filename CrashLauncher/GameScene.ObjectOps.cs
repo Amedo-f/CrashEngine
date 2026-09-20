@@ -384,6 +384,7 @@ public sealed partial class GameScene : Scene
         foreach (var e in newSelection) _selectedSet.Add(e);
         _selected = newSelection.Count > 0 ? newSelection[0] : null;
         _revealSelectionInTree = true;
+        SyncSelSnapshot(); // Amedo 2026-09-20
 
         var verb = repeatCount > 1 ? "Array" : "Duplicated";
         _browser.Log($"{verb}: {newSelection.Count} item(s) added (offset next to the original). No collision auto-generated — " +
@@ -799,6 +800,7 @@ public sealed partial class GameScene : Scene
 
         _selectedSet.Clear();
         _selected = null;
+        SyncSelSnapshot(); // Amedo 2026-09-20
         _browser.Log($"Deleted {actions.Count + cubeCount + importCount} object(s)" +
                      (actions.Count > 0 && (cubeCount + importCount) > 0 ? " (mixed — only PS2 objects are undo-able)." : "."));
     }

@@ -456,6 +456,10 @@ public sealed partial class GameScene : Scene
     private readonly Dictionary<Entity, TransformSnapshot> _gizmoDragBefore = new Dictionary<Entity, TransformSnapshot>();
     private TransformSnapshot _inspectorDragBefore;
     private readonly EditorUndoStack _undoStack = new EditorUndoStack();
+    // Amedo 2026-09-20
+    private readonly List<Entity> _selSnapshot = new List<Entity>();
+    private bool _selSnapInit;
+    private int _undoCountAtSync;
     private bool _glueMode;
     private Entity? _glueSource;
     private int _glueAxisLock = -1;
@@ -593,6 +597,41 @@ public sealed partial class GameScene : Scene
 		}
 		_selected = list[0];
 		_revealSelectionInTree = true;
+		SyncSelSnapshot();
+	}
+
+	// Amedo 2026-09-20
+	private void SyncSelSnapshot()
+	{
+		_selSnapshot.Clear();
+		_selSnapshot.AddRange(_selectedSet);
+		_selSnapInit = true;
+		_undoCountAtSync = _undoStack.Count;
+	}
+
+	private void RecordSelectionChangeIfAny()
+	{
+		if (!_selSnapInit) { SyncSelSnapshot(); return; }
+
+		bool selChanged  = !(_selectedSet.Count == _selSnapshot.Count && _selectedSet.All(_selSnapshot.Contains));
+		bool editHappened = _undoStack.Count != _undoCountAtSync;
+
+		if (editHappened) { SyncSelSnapshot(); return; }
+		if (!selChanged) return;
+
+		var before = new List<Entity>(_selSnapshot);
+		var after  = new List<Entity>(_selectedSet);
+		_undoStack.Push(new SelectionChangeAction { Before = before, After = after, Apply = ApplySelectionList });
+		SyncSelSnapshot();
+	}
+
+	private void ApplySelectionList(IReadOnlyList<Entity> sel)
+	{
+		_selectedSet.Clear();
+		foreach (var e in sel) _selectedSet.Add(e);
+		_selected = sel.Count > 0 ? sel[0] : null;
+		_revealSelectionInTree = true;
+		SyncSelSnapshot();
 	}
 
 
@@ -884,6 +923,8 @@ public sealed partial class GameScene : Scene
 
 	protected override void OnUpdate()
 	{
+		RecordSelectionChangeIfAny(); // Amedo 2026-09-20
+
 		if (_pendingOpenLevelPath is not null)
 		{
 			var openPath = _pendingOpenLevelPath;

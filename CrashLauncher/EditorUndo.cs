@@ -19,6 +19,7 @@ public sealed class EditorUndoStack
 
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
+    public int Count => _undo.Count; // Amedo 2026-09-20
 
     public void Clear() { _undo.Clear(); _redo.Clear(); }
 
@@ -96,6 +97,18 @@ public sealed class CompositeEditAction : IEditAction
     public void Undo() { for (int i = Actions.Count - 1; i >= 0; i--) Actions[i].Undo(); }
     public void Redo() { foreach (var a in Actions) a.Redo(); }
     public IEnumerable<Entity> AffectedEntities => Actions.SelectMany(a => a.AffectedEntities);
+}
+
+// Amedo 2026-09-20
+public sealed class SelectionChangeAction : IEditAction
+{
+    public required IReadOnlyList<Entity> Before;
+    public required IReadOnlyList<Entity> After;
+    public required Action<IReadOnlyList<Entity>> Apply;
+
+    public void Undo() => Apply(Before);
+    public void Redo() => Apply(After);
+    public IEnumerable<Entity> AffectedEntities => Array.Empty<Entity>();
 }
 
 public sealed class InverseEditAction : IEditAction
