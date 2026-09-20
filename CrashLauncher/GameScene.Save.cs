@@ -217,29 +217,49 @@ public sealed partial class GameScene : Scene
 
     private void ResetAllLevelsFromDisc()
     {
+        // Amedo 2026-09-20
         var savedChunksDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
-        if (!Directory.Exists(savedChunksDir))
+        if (Directory.Exists(savedChunksDir))
         {
-            _browser.Log("Reset All Levels From Disc: SavedChunks folder doesn't exist -- already pristine, nothing to do.");
-            return;
+            int fileCount = Directory.GetFiles(savedChunksDir, "*", SearchOption.AllDirectories).Length;
+            try
+            {
+                Directory.Delete(savedChunksDir, recursive: true);
+                _browser.Log($"Reset All Levels From Disc: deleted {fileCount} saved edit file(s) across the whole project.");
+            }
+            catch (Exception ex)
+            {
+                _browser.Log("Reset All Levels From Disc: FAILED to delete SavedChunks -- " + ex.Message);
+                return;
+            }
         }
 
-        int fileCount = Directory.GetFiles(savedChunksDir, "*", SearchOption.AllDirectories).Length;
         try
         {
-            Directory.Delete(savedChunksDir, recursive: true);
-            _browser.Log($"Reset All Levels From Disc: deleted {fileCount} saved edit file(s) across the whole " +
-                          "project -- every level now reads straight from the real disc archive again on next open.");
+            var buildDir  = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build");
+            var backupDir = Path.Combine(buildDir, "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')));
+            var backupBd  = Path.Combine(backupDir, "Crash.BD");
+            var backupBh  = Path.Combine(backupDir, "Crash.BH");
+            var liveBd    = Path.Combine(_extractedRoot, "Crash6", "Crash.BD");
+            var liveBh    = Path.Combine(_extractedRoot, "Crash6", "Crash.BH");
+            if (File.Exists(backupBd) && File.Exists(backupBh) && File.Exists(liveBd))
+            {
+                File.Copy(backupBd, liveBd, overwrite: true);
+                File.Copy(backupBh, liveBh, overwrite: true);
+                _browser.Log("Reset All Levels From Disc: restored the disc archive (Crash.BD/BH) from the pristine " +
+                              "original backup -- every level now reads truly original data (including changes Build ISO had baked in).");
+            }
         }
         catch (Exception ex)
         {
-            _browser.Log("Reset All Levels From Disc: FAILED -- " + ex.Message);
-            return;
+            _browser.Log("Reset All Levels From Disc: WARNING -- could not restore disc archive from backup: " + ex.Message);
         }
 
         var openChunk = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
         if (openChunk is not null)
             ReloadLevel(fromDiscOnly: true);
+        else
+            _browser.Log("Reset All Levels From Disc: done. Open any level to see the original data.");
     }
 
     private void DrawResetAllConfirmPopup()
