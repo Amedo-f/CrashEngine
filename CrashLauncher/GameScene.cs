@@ -1990,9 +1990,11 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			{
 				MaybeTooltip("PROJECT-WIDE, not just this level: permanently deletes the entire\nSavedChunks folder (every level's saved edits) so everything reads\nfresh from the real disc archive again. No backup, no Undo — asks\nfor confirmation first.");
 			}
+			EnsureIsoOutputPathLoaded(); // Amedo 2026-09-20
 			ImGui.TextDisabled("ISO output (blank = default path):");
 			ImGui.SetNextItemWidth(-32f);
-			ImGui.InputText("##isoOutPath", ref _isoOutputPath, 512u);
+			if (ImGui.InputText("##isoOutPath", ref _isoOutputPath, 512u))
+				SaveIsoOutputPath();
 			ImGui.SameLine();
 			if (ImGui.Button("...##isoOutBrowse", new System.Numerics.Vector2(-1f, 0f)))
 			{
@@ -2001,6 +2003,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 					if (text3 != null)
 					{
 						_isoOutputPath = text3;
+						SaveIsoOutputPath();
 					}
 				});
 			}

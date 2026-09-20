@@ -298,6 +298,23 @@ public sealed partial class GameScene : Scene
     private readonly List<string> _buildLog = new();
 
     private string _isoOutputPath = "";
+    // Amedo 2026-09-20
+    private bool _isoPathLoaded;
+    private string IsoOutputPathFile =>
+        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, ".iso_output_path.txt");
+
+    private void EnsureIsoOutputPathLoaded()
+    {
+        if (_isoPathLoaded) return;
+        _isoPathLoaded = true;
+        try { if (File.Exists(IsoOutputPathFile)) _isoOutputPath = File.ReadAllText(IsoOutputPathFile).Trim(); }
+        catch { }
+    }
+
+    private void SaveIsoOutputPath()
+    {
+        try { File.WriteAllText(IsoOutputPathFile, _isoOutputPath ?? ""); } catch { }
+    }
 
     private void BuildIso()
     {
