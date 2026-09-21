@@ -1627,6 +1627,18 @@ public sealed partial class GameScene : Scene
                     {
                         if (ImGui.CollapsingHeader("Sounds##soundshdr", ImGuiTreeNodeFlags.DefaultOpen))
                         {
+                            // Amedo 2026-09-21
+                            float previewVolPct = _previewVolume * 100f;
+                            ImGui.SetNextItemWidth(-1f);
+                            if (ImGui.SliderFloat("Preview Volume##previewvol", ref previewVolPct, 0f, 100f, "%.0f%%"))
+                                _previewVolume = Math.Clamp(previewVolPct / 100f, 0f, 1f);
+                            if (ImGui.IsItemHovered())
+                                MaybeTooltip("Editor-only listening level for the Play buttons here and Music\n" +
+                                                  "Preview — scales the previewed audio down before playback so it's\n" +
+                                                  "comfortable on top of your system volume (does NOT change the\n" +
+                                                  "sound's real in-game Volume/gain below). Lower it if previews are\n" +
+                                                  "too loud.");
+
                             var codeSecLive = scriptChunkSrc?.Rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION);
                             var soundIds = thisObj.RefSounds.Concat(thisObj.SoundSlots)
                                 .Where(sid => sid != 0xFFFF).Distinct().ToList();

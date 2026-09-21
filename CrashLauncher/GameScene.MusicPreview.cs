@@ -197,6 +197,44 @@ public sealed partial class GameScene
     private const uint SND_ASYNC     = 0x0001;
     private const uint SND_NODEFAULT = 0x0002;
 
+    // Amedo 2026-09-21
+    private float _previewVolume = 0.5f;
+
+    private bool PlayPreviewWav(byte[] wav)
+    {
+        var scaled = ApplyPreviewVolume(wav, _previewVolume);
+        return PlaySound(scaled, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+    }
+
+    private static byte[] ApplyPreviewVolume(byte[] wav, float factor)
+    {
+        if (factor >= 0.999f || wav.Length < 12) return wav;
+        factor = Math.Clamp(factor, 0f, 1f);
+        var outp = (byte[])wav.Clone();
+        int i = 12;
+        while (i + 8 <= outp.Length)
+        {
+            int chunkId = BitConverter.ToInt32(outp, i);
+            int chunkSize = BitConverter.ToInt32(outp, i + 4);
+            if (chunkId == 0x61746164) // "data"
+            {
+                int start = i + 8;
+                int end = Math.Min(start + chunkSize, outp.Length);
+                for (int p = start; p + 1 < end; p += 2)
+                {
+                    short s = (short)(outp[p] | (outp[p + 1] << 8));
+                    int v = Math.Clamp((int)MathF.Round(s * factor), short.MinValue, short.MaxValue);
+                    outp[p] = (byte)(v & 0xFF);
+                    outp[p + 1] = (byte)((v >> 8) & 0xFF);
+                }
+                break;
+            }
+            if (chunkSize < 0) break;
+            i += 8 + chunkSize + (chunkSize & 1);
+        }
+        return outp;
+    }
+
     private void PreviewMusicTrack(uint id, string label)
     {
         var decoded = DecodeMusicTrackToWav(id);
@@ -205,7 +243,7 @@ public sealed partial class GameScene
         try
         {
             _lastPreviewWav = d.Wav;
-            bool ok = PlaySound(d.Wav, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+            bool ok = PlayPreviewWav(d.Wav); // Amedo 2026-09-21
             if (!ok)
             {
                 int err = Marshal.GetLastWin32Error();
@@ -568,7 +606,7 @@ public sealed partial class GameScene
 
             Task.Delay(50).ContinueWith(_ =>
             {
-                bool ok = PlaySound(wav, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+                bool ok = PlayPreviewWav(wav); // Amedo 2026-09-21
                 if (!ok)
                 {
                     int err = Marshal.GetLastWin32Error();
