@@ -49,10 +49,25 @@ void main()
     resultColor = mix(resultColor, envMapColor, twin_material.env_map);
     resultAlpha = mix(resultAlpha, envMapAlpha, twin_material.env_map);
 
-    if (resultAlpha < twin_material.alpha_test)
+    // Amedo 2026-09-21 -- honor the PS2 GS alpha-test compare method, not a fixed "< ref" discard
     {
-        discard;
-        return;
+        int   f = twin_material.alpha_test_func;
+        float a = resultAlpha;
+        float r = twin_material.alpha_test;
+        bool passed;
+        if      (f == 1) passed = true;              // ALWAYS
+        else if (f == 0) passed = false;             // NEVER
+        else if (f == 2) passed = (a <  r);          // LESS
+        else if (f == 3) passed = (a <= r);          // LEQUAL
+        else if (f == 4) passed = (abs(a - r) < 0.004);   // EQUAL
+        else if (f == 6) passed = (a >  r);          // GREATER
+        else if (f == 7) passed = (abs(a - r) >= 0.004);  // NOTEQUAL
+        else             passed = (a >= r);          // GEQUAL (default)
+        if (!passed)
+        {
+            discard;
+            return;
+        }
     }
 
     // 2026-09-06 -- real bug, confirmed against a real UnlitGlossy scenery tile (Ice Hub,

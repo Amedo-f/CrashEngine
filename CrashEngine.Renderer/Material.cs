@@ -28,6 +28,13 @@ public sealed class Material
     public bool      AlwaysOnTop     { get; set; } = false;
     public bool      IgnoreDepthTest { get; set; } = false;
 
+    // Amedo 2026-09-21 -- faithful PS2 GS ALPHA blend (A-B)*C+D + alpha-test method, resolved at decode
+    public BlendingFactor        BlendSrcFactor     = BlendingFactor.SrcAlpha;
+    public BlendingFactor        BlendDstFactor     = BlendingFactor.OneMinusSrcAlpha;
+    public BlendEquationModeEXT  BlendEquation      = BlendEquationModeEXT.FuncAdd;
+    public float                 BlendConstantAlpha = 1f;
+    public int                   AlphaTestFunc      = 5; // 0=NEVER 1=ALWAYS 2=LESS 3=LEQUAL 4=EQUAL 5=GEQUAL 6=GREATER 7=NOTEQUAL
+
     public bool      Unlit           { get => DoubleColor <= 1.0f; set => DoubleColor = value ? 1.0f : 2.0f; }
 
     public bool      UnlitToggledByUser { get; set; } = false;
@@ -60,29 +67,16 @@ public sealed class Material
         sh.Set("twin_material.alpha_blend",        AlphaBlend ? 1f : 0f);
         sh.Set("twin_material.base_color",         BaseColor);
         sh.Set("twin_material.select_pulse",       1f);
+        sh.Set("twin_material.alpha_test_func",    AlphaTestFunc); // Amedo 2026-09-21
 
         _blendWasOn = gl.IsEnabled(EnableCap.Blend);
         if (AlphaBlend)
         {
+            // Amedo 2026-09-21 -- use the GS-derived (A-B)*C+D factors resolved at decode
             gl.Enable(EnableCap.Blend);
-            switch (Blend)
-            {
-                case BlendMode.Additive:
-                    gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
-                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One,
-                                         BlendingFactor.SrcAlpha, BlendingFactor.One);
-                    break;
-                case BlendMode.Subtractive:
-                    gl.BlendEquation(BlendEquationModeEXT.FuncReverseSubtract);
-                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One,
-                                         BlendingFactor.SrcAlpha, BlendingFactor.One);
-                    break;
-                default:
-                    gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
-                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha,
-                                         BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
-                    break;
-            }
+            gl.BlendColor(0f, 0f, 0f, BlendConstantAlpha);
+            gl.BlendEquation(BlendEquation);
+            gl.BlendFuncSeparate(BlendSrcFactor, BlendDstFactor, BlendSrcFactor, BlendDstFactor);
         }
         else gl.Disable(EnableCap.Blend);
 

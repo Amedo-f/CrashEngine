@@ -4925,12 +4925,8 @@ public static class MeshDecoder
             deform.Y = shader.FloatParam[1];
         }
 
-        var blend = shader.AlphaRegSettingsIndex switch
-        {
-            TwinShader.AlphaBlendPresets.Add => Material.BlendMode.Additive,
-            TwinShader.AlphaBlendPresets.Sub => Material.BlendMode.Subtractive,
-            _                                => Material.BlendMode.Standard,
-        };
+        // Amedo 2026-09-21
+        ResolveGsBlend(shader, out var blendSrc, out var blendDst, out var blendEq, out var blendConstA);
 
         return new Material
         {
@@ -4940,6 +4936,11 @@ public static class MeshDecoder
             AlphaBlend      = shader.ABlending == TwinShader.AlphaBlending.ON,
             AlphaTest       = shader.ATest == TwinShader.AlphaTest.ON
                                   ? shader.AlphaValueToBeComparedTo / 255f : 0f,
+            AlphaTestFunc   = shader.ATest == TwinShader.AlphaTest.ON ? (int)shader.ATestMethod : 1,
+            BlendSrcFactor  = blendSrc,
+            BlendDstFactor  = blendDst,
+            BlendEquation   = blendEq,
+            BlendConstantAlpha = blendConstA,
             BillboardRender = shader.ShaderType == TwinShader.Type.UnlitBillboard,
             ReflectDist     = shader.ShaderType == TwinShader.Type.LitReflectionSurface
                                   ? new SysVec2(1f, shader.FloatParam[0]) : SysVec2.Zero,
@@ -4948,13 +4949,61 @@ public static class MeshDecoder
             DeformSpeed     = deform,
             EnvMap          = envMap ? 1f : 0f,
             UvScrollSpeed   = uvScroll,
-            Blend           = blend,
             DepthWrite      = shader.ZValueDrawingMask == TwinShader.ZValueDrawMask.UPDATE,
             FogEnabled      = shader.Fog == TwinShader.Fogging.ON,
             ShaderType      = shader.ShaderType.ToString(),
             SourceShader    = shader,
             SourceSubModel  = sourceSubModel,
         };
+    }
+
+    // Amedo 2026-09-21 -- PS2 GS ALPHA: out = (A-B)*C + D. A,B,D = colour {Cs,Cd,0}; C = alpha {As,Ad,Fix}.
+    // Translate the resolved sources to the closest OpenGL blend for the common transparency shapes.
+    private static void ResolveGsBlend(TwinShader shader,
+        out Silk.NET.OpenGL.BlendingFactor src, out Silk.NET.OpenGL.BlendingFactor dst,
+        out Silk.NET.OpenGL.BlendEquationModeEXT eq, out float constAlpha)
+    {
+        var CS = TwinShader.ColorSpecMethod.SOURCE;
+        var FB = TwinShader.ColorSpecMethod.FB;
+        var Z  = TwinShader.ColorSpecMethod.ZERO;
+
+        TwinShader.ColorSpecMethod a, b, d;
+        TwinShader.AlphaSpecMethod c;
+        if (shader.UseCustomAlphaRegSettings)
+        {
+            a = shader.SpecOfColA; b = shader.SpecOfColB; c = shader.SpecOfAlphaC; d = shader.SpecOfColD;
+        }
+        else
+        {
+            switch (shader.AlphaRegSettingsIndex)
+            {
+                case TwinShader.AlphaBlendPresets.Add: a = CS; b = Z;  c = TwinShader.AlphaSpecMethod.SOURCE; d = FB; break;
+                case TwinShader.AlphaBlendPresets.Sub: a = Z;  b = CS; c = TwinShader.AlphaSpecMethod.SOURCE; d = FB; break;
+                case TwinShader.AlphaBlendPresets.Source:      a = CS; b = Z; c = TwinShader.AlphaSpecMethod.FIX; d = Z; break;
+                case TwinShader.AlphaBlendPresets.Zero:
+                case TwinShader.AlphaBlendPresets.Destination: a = Z; b = Z; c = TwinShader.AlphaSpecMethod.SOURCE; d = FB; break;
+                case TwinShader.AlphaBlendPresets.Alpha:       a = CS; b = FB; c = TwinShader.AlphaSpecMethod.FB; d = FB; break;
+                default:                                       a = CS; b = FB; c = TwinShader.AlphaSpecMethod.SOURCE; d = FB; break; // Mix
+            }
+        }
+
+        constAlpha = Math.Clamp(shader.FixedAlphaValue / 128f, 0f, 1f);
+
+        Silk.NET.OpenGL.BlendingFactor cf, cInv;
+        switch (c)
+        {
+            case TwinShader.AlphaSpecMethod.FB:  cf = Silk.NET.OpenGL.BlendingFactor.DstAlpha;      cInv = Silk.NET.OpenGL.BlendingFactor.OneMinusDstAlpha; break;
+            case TwinShader.AlphaSpecMethod.FIX: cf = Silk.NET.OpenGL.BlendingFactor.ConstantAlpha; cInv = Silk.NET.OpenGL.BlendingFactor.OneMinusConstantAlpha; break;
+            default:                             cf = Silk.NET.OpenGL.BlendingFactor.SrcAlpha;      cInv = Silk.NET.OpenGL.BlendingFactor.OneMinusSrcAlpha; break;
+        }
+
+        eq = Silk.NET.OpenGL.BlendEquationModeEXT.FuncAdd;
+        if      (a == CS && b == FB && d == FB) { src = cf; dst = cInv; }                                                  // Mix (standard over)
+        else if (a == CS && b == Z  && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; }                    // Add
+        else if (a == Z  && b == CS && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; eq = Silk.NET.OpenGL.BlendEquationModeEXT.FuncReverseSubtract; } // Sub
+        else if (a == Z  && b == Z  && d == FB) { src = Silk.NET.OpenGL.BlendingFactor.Zero; dst = Silk.NET.OpenGL.BlendingFactor.One; } // keep dest
+        else if (a == CS && d == Z)             { src = Silk.NET.OpenGL.BlendingFactor.One;  dst = Silk.NET.OpenGL.BlendingFactor.Zero; } // opaque replace
+        else                                    { src = Silk.NET.OpenGL.BlendingFactor.SrcAlpha; dst = Silk.NET.OpenGL.BlendingFactor.OneMinusSrcAlpha; } // fallback
     }
 
     private static (SysVec3, Quaternion) Frame0Transform(
