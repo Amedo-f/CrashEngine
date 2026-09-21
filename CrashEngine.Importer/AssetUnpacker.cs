@@ -72,7 +72,10 @@ public static class AssetUnpacker
 
         void ProcessRecord(BHRecord rec)
         {
-            pauseGate?.Wait(ct);
+            // Amedo 2026-09-22
+            if (pauseGate != null)
+                while (!pauseGate.Wait(100) && !ct.IsCancellationRequested) { }
+            if (ct.IsCancellationRequested) return;
             if (skip is not null && skip.Contains(rec.Path))
             {
                 Interlocked.Increment(ref skipped);
@@ -127,14 +130,14 @@ public static class AssetUnpacker
         var firstPart  = records.Take(splitIndex).ToList();
         var secondPart = records.Skip(splitIndex).ToList();
 
+        // Amedo 2026-09-22
         var multiCoreOptions = new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)),
-            CancellationToken = ct,
         };
         Parallel.ForEach(firstPart, multiCoreOptions, ProcessRecord);
 
-        var singleCoreOptions = new ParallelOptions { MaxDegreeOfParallelism = 1, CancellationToken = ct };
+        var singleCoreOptions = new ParallelOptions { MaxDegreeOfParallelism = 1 };
         Parallel.ForEach(secondPart, singleCoreOptions, ProcessRecord);
 
         return new Result(files, chunks, assets, textures, errors, skipped);

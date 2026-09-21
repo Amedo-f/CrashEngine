@@ -61,6 +61,20 @@ public sealed class Texture2D : IDisposable
         catch { return null; }
     }
 
+    // Amedo 2026-09-22
+    public static byte[]? LoadRgba(string path, out int width, out int height)
+    {
+        width = 0; height = 0;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var img = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+            width = img.Width; height = img.Height;
+            return img.Data;
+        }
+        catch { return null; }
+    }
+
     public unsafe void UpdateData(ReadOnlySpan<byte> rgba, uint w, uint h)
     {
         Width  = w;

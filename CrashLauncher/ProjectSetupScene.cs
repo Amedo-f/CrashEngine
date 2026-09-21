@@ -332,6 +332,8 @@ public sealed class ProjectSetupScene : Scene
                     try { File.Delete(manifestPath); } catch {  }
                 }
 
+                ct.ThrowIfCancellationRequested(); // Amedo 2026-09-22
+
                 WLog("Serializing project...");
                 project.Completed = true;
                 project.Save();

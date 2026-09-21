@@ -64,9 +64,23 @@ public sealed class Engine
     public void Run()  => _win.Run();
     public void Quit() => _win.Close();
 
+    // Amedo 2026-09-22
+    private (int W, int H, byte[] Rgba)[]? _pendingIcons;
+    public void SetWindowIcon(params (int W, int H, byte[] Rgba)[] icons) => _pendingIcons = icons;
+
     private void OnLoad()
     {
         _gl    = GL.GetApi(_win);
+
+        // Amedo 2026-09-22
+        if (_pendingIcons is { Length: > 0 })
+        {
+            var raws = new Silk.NET.Core.RawImage[_pendingIcons.Length];
+            for (int i = 0; i < raws.Length; i++)
+                raws[i] = new Silk.NET.Core.RawImage(_pendingIcons[i].W, _pendingIcons[i].H, _pendingIcons[i].Rgba);
+            try { _win.SetWindowIcon(raws); } catch { }
+        }
+
         _input = _win.CreateInput();
         Input.Initialize(_input);
 
@@ -76,7 +90,7 @@ public sealed class Engine
         Win32Clipboard.Hook(io);
 
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
-        // Amedo 2026-09-21 -- edge-resize needs BOTH of these
+        // Amedo 2026-09-21
         io.ConfigWindowsResizeFromEdges = true;
         io.BackendFlags |= ImGuiBackendFlags.HasMouseCursors;
 
@@ -136,6 +150,16 @@ public sealed class Engine
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         _imgui?.Update((float)dt);
+
+        // Amedo 2026-09-22
+        unsafe
+        {
+            var colors = ImGui.GetStyle().Colors;
+            colors[(int)ImGuiCol.WindowBg].W = 1f;
+            colors[(int)ImGuiCol.ChildBg].W  = 1f;
+            colors[(int)ImGuiCol.PopupBg].W  = 1f;
+        }
+
         var io = ImGui.GetIO();
         Win32Clipboard.Hook(io);
 

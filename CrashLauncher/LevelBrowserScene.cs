@@ -137,6 +137,7 @@ public sealed class LevelBrowserScene : Scene
                 _project.Save();
                 if (_project.IsNewGame)
                 {
+                    ScanLevels(); // Amedo 2026-09-22
                     Log("New Game mode: ON — Build ISO will now exclude every original level not claimed via \"Add Scene...\".");
                     if (_project.ExcludedCutscenes.Count == 0)
                     {

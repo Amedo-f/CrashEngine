@@ -1716,6 +1716,11 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			_showAbout = !_showAbout;
 		}
 		ImGui.SameLine();
+		if (ImGui.SmallButton("Shortcuts##shortcutsbtn")) // Amedo 2026-09-22
+		{
+			_showShortcuts = !_showShortcuts;
+		}
+		ImGui.SameLine();
 		if (ImGui.SmallButton("Reset Layout##resetlayoutbtn"))
 		{
 			ImGui.LoadIniSettingsFromMemory(DefaultDockLayout); // Amedo 2026-09-19
@@ -1782,6 +1787,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		DrawGameSettings();
 		DrawGlobalDataWindow();
 		DrawAbout();
+		DrawShortcuts();
 		DrawUvEditorWindow();
 		DrawTexturePickerWindow();
 		DrawVertexColorPickerWindow();
