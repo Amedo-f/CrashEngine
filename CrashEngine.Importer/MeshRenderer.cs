@@ -16,7 +16,17 @@ public sealed class MeshRenderer : Component
 
     public static int DrawCallsThisFrame = 0;
 
-    public override bool IsTranslucent => Material is { } m && (m.AlphaBlend || !m.DepthWrite);
+    // Amedo 2026-09-21
+    // renders as opaque (solid backdrop), so 2-layer water composites right (caustics over base).
+    public override bool IsTranslucent
+    {
+        get
+        {
+            if (Material is not { } m) return false;
+            if (m.AlphaBlend && (m.Albedo?.IsOpaque ?? false)) return false;
+            return m.AlphaBlend || !m.DepthWrite;
+        }
+    }
 
     public override void OnRender(GL gl)
     {

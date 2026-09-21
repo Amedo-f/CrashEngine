@@ -122,14 +122,22 @@ public sealed class ProjectSetupScene : Scene
             }
         }
 
+        // Amedo 2026-09-21
+        ImGui.BeginDisabled(_creating);
         Row("Project name: ", ref _name, "name");
         Row("Project path: ", ref _projPath, "ppath");
-        Row("PS2 Disc content path: ", ref _discPath, "dpath", browse: true,
-            browseFilter: "PS2 disc root (SYSTEM.CNF)\0system.cnf\0All Files\0*.*\0\0",
-            pickFolderOfFile: true, onBrowsed: v => _discPath = v);
+        Row("PS2 disc (.iso file or extracted folder): ", ref _discPath, "dpath", browse: true,
+            browseFilter: "PS2 disc image (*.iso)\0*.iso\0Disc root (SYSTEM.CNF)\0system.cnf\0All Files\0*.*\0\0",
+            pickFolderOfFile: false, onBrowsed: v =>
+            {
+                _discPath = v.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                    ? v
+                    : (Directory.Exists(v) ? v : System.IO.Path.GetDirectoryName(v) ?? v);
+            });
+        ImGui.EndDisabled();
 
-        ImGui.TextDisabled("Disc contents are always copied into the project's own folder —");
-        ImGui.TextDisabled("each project keeps its own pristine, isolated copy of the source disc.");
+        ImGui.TextDisabled("Pick the game's .iso directly (we read it in) — or an already-extracted disc folder.");
+        ImGui.TextDisabled("Either way, the disc is copied into the project's own isolated folder.");
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -211,6 +219,8 @@ public sealed class ProjectSetupScene : Scene
         ImGui.Separator();
         ImGui.TextDisabled("Open existing project");
 
+        // Amedo 2026-09-21
+        ImGui.BeginDisabled(_creating);
         if (ImGui.Button("Open Project (.tson)...", new Vector2(220f, 0f)))
         {
             ShowOpenFileDialog("Open Project", "TT Lab / CrashEngine Project\0*.tson\0All Files\0*.*\0\0",
@@ -222,6 +232,7 @@ public sealed class ProjectSetupScene : Scene
             if (ImGui.Selectable($"  {recent}"))
                 OpenProject(recent);
         }
+        ImGui.EndDisabled();
 
         ImGui.End();
     }
@@ -231,8 +242,11 @@ public sealed class ProjectSetupScene : Scene
         if (_name.Trim().Length == 0 || _projPath.Trim().Length == 0)
         { _status = "ERROR: Project name and path are required!"; return; }
 
-        if (!CrashProject.ValidateDiscPS2(_discPath))
-        { _status = "ERROR: Improper PS2 disc content provided!"; return; }
+        // Amedo 2026-09-21
+        bool isIso = File.Exists(_discPath) && _discPath.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                     && Ps2IsoReader.IsIso(_discPath);
+        if (!isIso && !CrashProject.ValidateDiscPS2(_discPath))
+        { _status = "ERROR: Select a PS2 .iso file, or an extracted disc folder that has SYSTEM.CNF."; return; }
 
         var project = new CrashProject
         {
@@ -277,8 +291,22 @@ public sealed class ProjectSetupScene : Scene
 
                 project.Save();
 
-                WLog("Copying disc contents to project...");
-                project.CopyDiscContents(p => _progress = p * 0.5f, ct, gate);
+                // Amedo 2026-09-21
+                var discSource = project.DiscContentPathPS2 ?? "";
+                if (File.Exists(discSource) && discSource.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+                {
+                    var target = Path.Combine(project.ProjectPath, "disc", "ps2");
+                    Directory.CreateDirectory(target);
+                    WLog("Extracting the disc image into the project (this can take a minute)...");
+                    int n = Ps2IsoReader.Extract(discSource, target, (file, p) => _progress = p * 0.5f);
+                    WLog($"Extracted {n} file(s) from the ISO.");
+                    project.DiscContentPathPS2 = target;
+                }
+                else
+                {
+                    WLog("Copying disc contents to project...");
+                    project.CopyDiscContents(p => _progress = p * 0.5f, ct, gate);
+                }
 
                 WLog("Reading game archives...");
                 using (var pkg = PackageReader.Open(project.DiscContentPathPS2!))

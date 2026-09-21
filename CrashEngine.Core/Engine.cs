@@ -76,6 +76,9 @@ public sealed class Engine
         Win32Clipboard.Hook(io);
 
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+        // Amedo 2026-09-21 -- edge-resize needs BOTH of these
+        io.ConfigWindowsResizeFromEdges = true;
+        io.BackendFlags |= ImGuiBackendFlags.HasMouseCursors;
 
         ImGui.StyleColorsDark();
         var style = ImGui.GetStyle();

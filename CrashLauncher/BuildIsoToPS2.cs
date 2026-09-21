@@ -185,20 +185,33 @@ public static class BuildIsoToPS2
 
     // Amedo 2026-09-20
     private const int FmvSkipLoadBias   = 0xFF000;
-    private const int FmvSkipCallOffset = 0x78588;
-    private const int FmvSkipStubOffset = 0x82C1C;
-    private const int FmvTableOffset    = 0x1E7D60;
-    private const int FmvTableCount     = 21;
-    private static readonly byte[] FmvSkipOrigCall = { 0xD8, 0xCA, 0x05, 0x0C };
-    private static readonly byte[] FmvSkipStubCall = { 0x07, 0x07, 0x06, 0x0C };
+
+    // Amedo 2026-09-21
+    private readonly record struct FmvRegion(
+        string ExeName, int TableOffset, int TableCount, int CallOffset, int StubOffset,
+        byte[] OrigCall, byte[] StubCall, uint StubJumpWord);
+
+    private static readonly FmvRegion[] FmvRegions =
+    {
+        new("SLUS_209.09", 0x1E7D60, 21, 0x78588, 0x82C1C,
+            new byte[] { 0xD8, 0xCA, 0x05, 0x0C }, new byte[] { 0x07, 0x07, 0x06, 0x0C }, 0x0805CAD8u),
+        new("SLES_525.68", 0x1E80F8, 20, 0x78698, 0x833AC,
+            new byte[] { 0xBA, 0xCA, 0x05, 0x0C }, new byte[] { 0xEB, 0x08, 0x06, 0x0C }, 0x0805CABAu),
+    };
 
     internal static void ApplyCutsceneSkipPatch(string discContentPath, IReadOnlyCollection<string>? excludedCutscenes, Action<string> log)
     {
-        var exePath = Path.Combine(discContentPath, "SLUS_209.09");
-        if (!File.Exists(exePath))
+        // Amedo 2026-09-21
+        FmvRegion? regionOpt = null;
+        string exePath = "";
+        foreach (var r in FmvRegions)
         {
-            if (File.Exists(Path.Combine(discContentPath, "SLES_525.68")))
-                log("Cutscene-skip: PAL (SLES_525.68) not reverse-engineered for this yet — excluded cutscenes could hang. Keep them included, or use an NTSC-U disc.");
+            var candidate = Path.Combine(discContentPath, r.ExeName);
+            if (File.Exists(candidate)) { regionOpt = r; exePath = candidate; break; }
+        }
+        if (regionOpt is not { } region)
+        {
+            log("Cutscene-skip: no known EE executable (SLUS_209.09 / SLES_525.68) found — nothing patched.");
             return;
         }
 
@@ -212,9 +225,9 @@ public static class BuildIsoToPS2
                 excludedCutscenes.Select(p => Path.GetFileNameWithoutExtension(p)),
                 StringComparer.OrdinalIgnoreCase);
 
-            for (int i = 0; i < FmvTableCount; i++)
+            for (int i = 0; i < region.TableCount; i++)
             {
-                int entryOff = FmvTableOffset + i * 8;
+                int entryOff = region.TableOffset + i * 8;
                 if (entryOff + 4 > bytes.Length) break;
                 uint namePtr = BitConverter.ToUInt32(bytes, entryOff);
                 int nameOff = (int)(namePtr - (uint)FmvSkipLoadBias);
@@ -231,21 +244,21 @@ public static class BuildIsoToPS2
 
         if (mask == 0)
         {
-            if (BytesEqualAt(bytes, FmvSkipCallOffset, FmvSkipStubCall))
+            if (BytesEqualAt(bytes, region.CallOffset, region.StubCall))
             {
-                Array.Copy(FmvSkipOrigCall, 0, bytes, FmvSkipCallOffset, 4);
+                Array.Copy(region.OrigCall, 0, bytes, region.CallOffset, 4);
                 File.WriteAllBytes(exePath, bytes);
                 log("Cutscene-skip: no excluded cutscenes — in-game cutscene player restored to normal.");
             }
             return;
         }
 
-        bool caveOurs = BytesEqualAt(bytes, FmvSkipCallOffset, FmvSkipStubCall);
+        bool caveOurs = BytesEqualAt(bytes, region.CallOffset, region.StubCall);
         bool caveFree = true;
-        for (int k = 0; k < 44; k++) if (bytes[FmvSkipStubOffset + k] != 0) { caveFree = false; break; }
+        for (int k = 0; k < 44; k++) if (bytes[region.StubOffset + k] != 0) { caveFree = false; break; }
         if (!caveFree && !caveOurs)
         {
-            log("Cutscene-skip: ABORTED — code cave at 0x82C1C is not free (unexpected). Excluded cutscenes were NOT patched to skip.");
+            log($"Cutscene-skip: ABORTED — code cave at 0x{region.StubOffset:X} is not free (unexpected). Excluded cutscenes were NOT patched to skip.");
             return;
         }
 
@@ -254,11 +267,11 @@ public static class BuildIsoToPS2
             0x3C010000u | (mask >> 16),
             0x34210000u | (mask & 0xFFFF),
             0x34030001u, 0x00E31804u, 0x00611824u, 0x14600003u, 0x00000000u,
-            0x0805CAD8u, 0x00000000u, 0x03E00008u, 0x34020001u,
+            region.StubJumpWord, 0x00000000u, 0x03E00008u, 0x34020001u,
         };
         for (int i = 0; i < words.Length; i++)
-            BitConverter.GetBytes(words[i]).CopyTo(bytes, FmvSkipStubOffset + i * 4);
-        Array.Copy(FmvSkipStubCall, 0, bytes, FmvSkipCallOffset, 4);
+            BitConverter.GetBytes(words[i]).CopyTo(bytes, region.StubOffset + i * 4);
+        Array.Copy(region.StubCall, 0, bytes, region.CallOffset, 4);
         File.WriteAllBytes(exePath, bytes);
 
         log($"Cutscene-skip: patched {skipped.Count} excluded cutscene(s) to skip in-game (no hang): {string.Join(", ", skipped)}.");
@@ -317,21 +330,13 @@ public static class BuildIsoToPS2
             var linkItem = sm2.GetItem<PS2AnyLink>((uint)TwinConstants.SCENERY_LINK_ITEM);
             if (linkItem is null || linkItem.LinksList.Count == 0) continue;
 
-            bool changed = false;
-            foreach (var link in linkItem.LinksList)
-            {
-                var targetPath = link.Path.Replace('/', '\\').TrimStart('\\');
-                if (keepSet.Contains(targetPath)) continue;
-                if (!link.IsLoadWallActive && !link.IsRendered && !link.KeepLoaded) continue;
-
-                link.IsLoadWallActive = false;
-                link.IsRendered       = false;
-                link.KeepLoaded       = false;
-                changed = true;
-                linksNeutered++;
-            }
-
-            if (!changed) continue;
+            // Amedo 2026-09-22
+            int beforeCount = linkItem.LinksList.Count;
+            linkItem.LinksList.RemoveAll(link =>
+                !keepSet.Contains(link.Path.Replace('/', '\\').TrimStart('\\')));
+            int removed = beforeCount - linkItem.LinksList.Count;
+            if (removed == 0) continue;
+            linksNeutered += removed;
 
             Directory.CreateDirectory(Path.GetDirectoryName(stagedPath)!);
             using var fs = File.Create(stagedPath);
@@ -339,6 +344,6 @@ public static class BuildIsoToPS2
             sm2.Write(writer);
         }
 
-        log($"New Game: checked {levelsChecked} kept level(s), neutered {linksNeutered} dangling link(s) pointing at excluded levels.");
+        log($"New Game: checked {levelsChecked} kept level(s), removed {linksNeutered} dangling link(s) (upcoming scenes + load walls) pointing at excluded levels.");
     }
 }

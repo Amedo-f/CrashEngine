@@ -113,7 +113,7 @@ public sealed partial class GameScene
 
         try
         {
-            var savedChunksDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            var savedChunksDir = SavedChunksDir;
             if (Directory.Exists(savedChunksDir))
                 foreach (var f in Directory.GetFiles(savedChunksDir, "*.rm2", SearchOption.AllDirectories))
                 {
@@ -171,7 +171,7 @@ public sealed partial class GameScene
         try
         {
             using var pkg = PackageReader.Open(GetPristineArchiveSource());
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             using var stream = pkg.OpenByPath($"{levelBasePath}.sm2");
             if (stream is not null)
             {

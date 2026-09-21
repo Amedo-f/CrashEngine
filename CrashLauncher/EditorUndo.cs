@@ -343,21 +343,41 @@ public sealed class SceneryAddAction : IEditAction
     public required Twinsanity.TwinsanityInterchange.Common.Matrix4 Matrix;
     public required Twinsanity.TwinsanityInterchange.Common.Vector4[] BoundingBox;
 
+    public bool IndependentLeaf { get; init; }
+
+    // Amedo 2026-09-21
     public void Undo()
     {
         Parent.RemoveChild(Entity);
-        if (IsLod)
+
+        // Remove from the tile's CURRENT leaf (a later duplicate's re-graft can move it to a new
+        // leaf, orphaning the leaf captured at creation) — same robust path the Delete button uses.
+        var tile  = Entity.Get<CrashEngine.Importer.SceneryTile>();
+        var node  = tile?.Node   ?? Node;
+        var mat   = tile?.Source ?? Matrix;
+        bool isLod = tile?.IsLod ?? IsLod;
+
+        if (isLod)
         {
-            int i = Node.LodModelMatrices.IndexOf(Matrix);
-            if (i >= 0) { Node.LodModelMatrices.RemoveAt(i); Node.LodIDs.RemoveAt(i); }
+            int i = node.LodModelMatrices.IndexOf(mat);
+            if (i >= 0)
+            {
+                node.LodModelMatrices.RemoveAt(i);
+                node.LodIDs.RemoveAt(i);
+                int bi = node.MeshIDs.Count + i;
+                if (bi >= 0 && bi < node.BoundingBoxes.Count) node.BoundingBoxes.RemoveAt(bi);
+            }
         }
         else
         {
-            int i = Node.MeshModelMatrices.IndexOf(Matrix);
-            if (i >= 0) { Node.MeshModelMatrices.RemoveAt(i); Node.MeshIDs.RemoveAt(i); }
+            int i = node.MeshModelMatrices.IndexOf(mat);
+            if (i >= 0)
+            {
+                node.MeshModelMatrices.RemoveAt(i);
+                node.MeshIDs.RemoveAt(i);
+                if (i < node.BoundingBoxes.Count) node.BoundingBoxes.RemoveAt(i);
+            }
         }
-        int bi = Node.BoundingBoxes.IndexOf(BoundingBox);
-        if (bi >= 0) Node.BoundingBoxes.RemoveAt(bi);
     }
 
     public void Redo()
@@ -367,6 +387,9 @@ public sealed class SceneryAddAction : IEditAction
         else       { Node.MeshIDs.Add(SourceId); Node.MeshModelMatrices.Add(Matrix); }
         int insertAt = IsLod ? Node.BoundingBoxes.Count : Node.MeshIDs.Count - 1;
         Node.BoundingBoxes.Insert(Math.Clamp(insertAt, 0, Node.BoundingBoxes.Count), BoundingBox);
+
+        // Amedo 2026-09-21
+        if (Entity.Get<CrashEngine.Importer.SceneryTile>() is { } t) { t.Node = Node; t.Source = Matrix; }
     }
 
     public IEnumerable<Entity> AffectedEntities { get { yield return Entity; } }

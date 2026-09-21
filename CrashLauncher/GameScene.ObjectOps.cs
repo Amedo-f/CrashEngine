@@ -92,6 +92,10 @@ public sealed partial class GameScene : Scene
                 }
             }
 
+            // Amedo 2026-09-21
+            if (!Matrix4x4.Invert(parent.Transform.World, out var invParentWorld)) invParentWorld = Matrix4x4.Identity;
+            var localOffset = Vector3.TransformNormal(offset, invParentWorld);
+
             if (original.Get<InstanceData>() is { } data && chunkSource.MeshTables is not null)
             {
                 ChunkExporter.SyncInstance(original, data);
@@ -126,9 +130,9 @@ public sealed partial class GameScene : Scene
                     clone.RotationZ.SetRotation(orig.RotationZ.GetRotation() + rotDeltaDeg.Z);
                 }
                 clone.SetID(GenerateUniqueInstanceId(data.Section));
-                clone.Position.X += offset.X;
-                clone.Position.Y += offset.Y;
-                clone.Position.Z += offset.Z;
+                clone.Position.X += localOffset.X;
+                clone.Position.Y += localOffset.Y;
+                clone.Position.Z += localOffset.Z;
 
                 data.Section.AddItem(clone);
 
@@ -152,7 +156,7 @@ public sealed partial class GameScene : Scene
                     Column1 = new TwinVec4(origMat.Column1.X, origMat.Column1.Y, origMat.Column1.Z, origMat.Column1.W),
                     Column2 = new TwinVec4(origMat.Column2.X, origMat.Column2.Y, origMat.Column2.Z, origMat.Column2.W),
                     Column3 = new TwinVec4(origMat.Column3.X, origMat.Column3.Y, origMat.Column3.Z, origMat.Column3.W),
-                    Column4 = new TwinVec4(origMat.Column4.X + offset.X, origMat.Column4.Y + offset.Y, origMat.Column4.Z + offset.Z, origMat.Column4.W),
+                    Column4 = new TwinVec4(origMat.Column4.X + localOffset.X, origMat.Column4.Y + localOffset.Y, origMat.Column4.Z + localOffset.Z, origMat.Column4.W),
                 };
                 if (rotDeltaDeg != Vector3.Zero)
                 {
@@ -292,6 +296,7 @@ public sealed partial class GameScene : Scene
                 {
                     Parent = parent, Entity = newEntity, Node = dupNode,
                     IsLod = tile.IsLod, SourceId = tile.SourceId, Matrix = newMat, BoundingBox = newBbox,
+                    IndependentLeaf = scenery is not null, // Amedo 2026-09-21
                 };
 
                 actions.Add(sceneryAction);

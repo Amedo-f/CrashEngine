@@ -1193,7 +1193,8 @@ public sealed partial class GameScene
         float rawVal = BitConverter.UInt32BitsToSingle(cmd.Arguments[0]);
         ImGui.TextDisabled($"Current raw radius: {rawVal:F2} world units");
 
-        if (_selected is not null && _camera is not null)
+        // Amedo 2026-09-21
+        if (_selected is not null && _camera is not null && !ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup))
         {
             var center = _selected.Transform.World.Translation;
             int sw = Engine.Instance.Width, sh = Engine.Instance.Height;

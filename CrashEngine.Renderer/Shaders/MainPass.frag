@@ -49,25 +49,10 @@ void main()
     resultColor = mix(resultColor, envMapColor, twin_material.env_map);
     resultAlpha = mix(resultAlpha, envMapAlpha, twin_material.env_map);
 
-    // Amedo 2026-09-21
+    if (resultAlpha < twin_material.alpha_test)
     {
-        int   f = twin_material.alpha_test_func;
-        float a = resultAlpha;
-        float r = twin_material.alpha_test;
-        bool passed;
-        if      (f == 1) passed = true;
-        else if (f == 0) passed = false;
-        else if (f == 2) passed = (a <  r);
-        else if (f == 3) passed = (a <= r);
-        else if (f == 4) passed = (abs(a - r) < 0.004);
-        else if (f == 6) passed = (a >  r);
-        else if (f == 7) passed = (abs(a - r) >= 0.004);
-        else             passed = (a >= r);
-        if (!passed)
-        {
-            discard;
-            return;
-        }
+        discard;
+        return;
     }
 
     // 2026-09-06 -- real bug, confirmed against a real UnlitGlossy scenery tile (Ice Hub,

@@ -1838,7 +1838,7 @@ public sealed partial class GameScene : Scene
                     {
                         if (subItem is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel sub) continue;
                         if (sub.Colors is null || lighting.SceneryBaseColors.ContainsKey(sub)) continue;
-                        // Amedo 2026-09-21 -- colours on disk are already baked at SceneryBakedBrightness; recover the true base
+                        // Amedo 2026-09-21
                         float unbake = lighting.SceneryBakedBrightness > 0.001f ? lighting.SceneryBakedBrightness : 1f;
                         lighting.SceneryBaseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X / unbake, c.Y / unbake, c.Z / unbake, c.W)).ToList();
                     }
@@ -1950,7 +1950,7 @@ public sealed partial class GameScene : Scene
         if (links is null || links.LinksList.Count == 0)
         { _browser.Log("Apply to Linked Scenes: this level has no Links -- nothing to apply to."); return; }
 
-        var outDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+        var outDir = SavedChunksDir;
         int levelsUpdated = 0, levelsSkipped = 0;
 
         foreach (var link in links.LinksList)

@@ -252,7 +252,7 @@ public sealed partial class GameScene
             PS2AnyTwinsanityRM2 sourceRm2;
             using (var pkg = PackageReader.Open(_extractedRoot))
             {
-                pkg.ShadowDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+                pkg.ShadowDir = SavedChunksDir;
                 using var stream = pkg.OpenByPath($"{entry.SourceLevel}.rm2");
                 if (stream is null) { _browser.Log($"Import Object: source level '{entry.SourceLevel}.rm2' not found."); return; }
                 sourceRm2 = new PS2AnyTwinsanityRM2();

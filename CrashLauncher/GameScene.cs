@@ -408,6 +408,10 @@ public sealed partial class GameScene : Scene
     private GpuMesh? _cubeMesh;
     private GpuMesh? _cubeWireMesh;
     private Texture2D? _cameraIconTexture;
+
+    // Amedo 2026-09-21
+    private Texture2D? _rotateIconTexture;
+    private Texture2D? _moveIconTexture;
     private Texture2D? _lightIconTexture; // Amedo 2026-09-19
     private GpuMesh? _quadMesh;
     private GpuMesh? _boxZoneMesh;
@@ -739,6 +743,8 @@ public sealed partial class GameScene : Scene
 			EnsureQuadMesh(gL);
 			EnsureLightIconQuad(gL); // Amedo 2026-09-19
 			_cameraIconTexture = Texture2D.FromFile(gL, Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", "camera_marker.png"));
+			_rotateIconTexture = Texture2D.FromFile(gL, Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", "sync-icon-128.png"));
+			_moveIconTexture = Texture2D.FromFile(gL, Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", "move-icon-512.png"));
 			_gizmoMesh = BuildGizmoMesh(gL);
 			_dupGizmoMesh = BuildDuplicateGizmoMesh(gL);
 			Entity entity = new Entity("RenderPipeline");
@@ -793,7 +799,7 @@ public sealed partial class GameScene : Scene
 			using PackageReader packageReader = PackageReader.Open(text);
 			if (useShadowDir)
 			{
-				packageReader.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+				packageReader.ShadowDir = SavedChunksDir;
 			}
 			_browser.Log($"{packageReader.Records.Count} files indexed" + (useShadowDir ? "" : "  [ignoring any saved edits — true pristine disc data]"));
 			_browser.Log("Dumping scripts...");
@@ -815,6 +821,7 @@ public sealed partial class GameScene : Scene
 			_pristineRm2RecoveryFailed = false;
 			ScriptDumper.ChunkScripts scripts;
 			Entity entity = ChunkImporter.LoadChunk(gl, packageReader, _rm2, _sm2, out scripts);
+			StripDanglingLinksForNewGamePreview(entity); // Amedo 2026-09-22
 			System.Numerics.Vector3? lastFogColor = MeshDecoder.LastFogColor;
 			if (lastFogColor.HasValue)
 			{
@@ -1803,142 +1810,64 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		ImGui.SetNextWindowSize(new System.Numerics.Vector2(280f, y), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSizeConstraints(new System.Numerics.Vector2(180f, 120f), new System.Numerics.Vector2(float.MaxValue, float.MaxValue));
 		ImGui.Begin("Scene##panel", ImGuiWindowFlags.NoCollapse);
-		if (ImGui.Selectable("Move Gizmo", _gizmoMode == GizmoMode.Move, ImGuiSelectableFlags.None, new System.Numerics.Vector2(-1f, 0f)))
+		// Amedo 2026-09-21
 		{
-			_gizmoMode = GizmoMode.Move;
-		}
-		if (ImGui.Selectable("Rotate Gizmo", _gizmoMode == GizmoMode.Rotate, ImGuiSelectableFlags.None, new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_gizmoMode = GizmoMode.Rotate;
+			float gizmoHalf = (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) * 0.5f;
+			bool gizmoIsMove = _gizmoMode == GizmoMode.Move;
+			System.Numerics.Vector4 gizmoActiveCol = ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive];
+			float gizmoIconSz = ImGui.GetFontSize();
+			if (gizmoIsMove) ImGui.PushStyleColor(ImGuiCol.Button, gizmoActiveCol);
+			bool moveClicked;
+			if (_moveIconTexture != null)
+			{
+				moveClicked = ImGui.ImageButton("##movegizmo", (nint)_moveIconTexture.GlId,
+					new System.Numerics.Vector2(gizmoIconSz, gizmoIconSz),
+					new System.Numerics.Vector2(0f, 0f), new System.Numerics.Vector2(1f, 1f),
+					new System.Numerics.Vector4(0f, 0f, 0f, 0f), new System.Numerics.Vector4(1f, 1f, 1f, 1f));
+			}
+			else
+			{
+				moveClicked = ImGui.Button("Position", new System.Numerics.Vector2(gizmoHalf, 0f));
+			}
+			if (gizmoIsMove) ImGui.PopStyleColor();
+			if (ImGui.IsItemHovered())
+			{
+				ImGui.SetTooltip("Position");
+			}
+			if (moveClicked)
+			{
+				_gizmoMode = GizmoMode.Move;
+			}
+			ImGui.SameLine();
+			if (!gizmoIsMove) ImGui.PushStyleColor(ImGuiCol.Button, gizmoActiveCol);
+			float rotIconSz = ImGui.GetFontSize();
+			bool rotClicked;
+			if (_rotateIconTexture != null)
+			{
+				rotClicked = ImGui.ImageButton("##rotgizmo", (nint)_rotateIconTexture.GlId,
+					new System.Numerics.Vector2(rotIconSz, rotIconSz),
+					new System.Numerics.Vector2(0f, 0f), new System.Numerics.Vector2(1f, 1f),
+					new System.Numerics.Vector4(0f, 0f, 0f, 0f), new System.Numerics.Vector4(1f, 1f, 1f, 1f));
+			}
+			else
+			{
+				rotClicked = ImGui.Button("Rotation", new System.Numerics.Vector2(gizmoHalf, 0f));
+			}
+			if (!gizmoIsMove) ImGui.PopStyleColor();
+			if (ImGui.IsItemHovered())
+			{
+				ImGui.SetTooltip("Rotation");
+			}
+			if (rotClicked)
+			{
+				_gizmoMode = GizmoMode.Rotate;
+			}
 		}
 		ImGui.Separator();
-		if (ImGui.Button("+ Cube", new System.Numerics.Vector2(134f, 0f)))
-		{
-			_pendingSpawn = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("A real, unit-sized (1x1x1) box baked as a genuine PS2 RigidModel/\nOGI/Object and placed as a normal Instance at the camera's current\nposition — same real pipeline \"+ Add Model\" uses, procedural geometry\ninstead of an imported file. Starts with a real, opaque solid-gray\ntexture+material, so Import Texture (Inspector) can replace it with\nanything afterward, exactly like any other real object (max 512x512).\nSave Chunk to keep it, then Build ISO + test.");
-		}
-		ImGui.SameLine();
 		if (ImGui.Button("Deselect", new System.Numerics.Vector2(-1f, 0f)))
 		{
 			SelectClicked(null, additive: false);
 		}
-		if (ImGui.Button("+ Wumpa", new System.Numerics.Vector2(89.333336f, 0f)))
-		{
-			AddGlobalObjectInstance(1u, "Wumpa");
-		}
-		ImGui.SameLine();
-		if (ImGui.Button("+ Nitro Crate", new System.Numerics.Vector2(89.333336f, 0f)))
-		{
-			AddGlobalObjectInstance(4u, "Nitro Crate");
-		}
-		ImGui.SameLine();
-		if (ImGui.Button("+ Aku Aku Crate", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			AddGlobalObjectInstance(297u, "Aku Aku Crate");
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Places a real instance of the shared object at the camera's current\nposition (Startup\\Default.rm2 ids: Wumpa=0x0001, NitroCrate=0x0004,\nAkuAkuCrate=0x0129) — no cross-level transplant needed, every level\ncan already reference these directly. Save Chunk to keep it.");
-		}
-		if (ImGui.Button("+ Add Crash (full, with scripts)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_showCrashPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Crash is defined LOCALLY per-level (not shared like Wumpa/Nitro) —\nthis does a real full transplant (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references) from a\nlevel that already has a real, working Crash. First attempt at a\nfull script transplant this session — not guaranteed to work\nperfectly the first try, see the Add Crash log message.");
-		}
-		if (ImGui.Button("+ Add Object (full, from another level)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_objectTransplantLevelFilter = "";
-			_showObjectTransplantLevelPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Same full transplant as Add Crash (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references), but for ANY\nobject in ANY level — pick the source level, then pick the object by\nname. Copies the source's own Instance config (StateFlags/ParamLists)\ntoo, same as Add Crash — needed for it to behave correctly, not just\nrender. Save Chunk to keep it, then Build ISO + test.");
-		}
-		if (ImGui.Button("+ Add Trigger (from another level)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_triggerTransplantLevelFilter = "";
-			_showTriggerTransplantLevelPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Same source-level browse as Add Object, but for a Trigger volume —\npick the source level, then pick the trigger by id/messages. Copies\nits volume shape + TriggerMessages. If you added an object with\n\"Add Object\" FIRST (same session, not saved/reloaded since), the new\ntrigger's own Instances list is automatically pointed at THAT\nobject's new instance id, so touching it fires the same messages the\nobject's script listens for — do Add Object, then Add Trigger, in\nthat order. Otherwise the source trigger's own (likely wrong once\ncopied) Instances list is kept as-is and logged as a warning. Save\nChunk to keep it, then Build ISO + test.");
-		}
-		if (ImGui.Button("+ Model (GLB/FBX/OBJ...)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_importError = null;
-			ShowOpenFileDialog("Import 3D Model", ModelImporter.FileFilter, text4 =>
-			{
-				if (text4 != null)
-				{
-					GL gL = Engine.Instance.GL;
-					Entity entity = ModelImporter.Load(gL, text4);
-					if (entity != null)
-					{
-						LoadAndAddRoot(entity);
-						_importedRoots.Add(entity);
-						SelectClicked(entity, additive: false);
-						_camera?.FocusOn(entity.Transform.World.Translation, 8f);
-					}
-					else
-					{
-						_importError = "Failed to load: " + Path.GetFileName(text4);
-					}
-				}
-			});
-		}
-		if (_importError != null)
-		{
-			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.4f, 0.4f, 1f), _importError);
-		}
-		float flipW = ImGui.CalcTextSize("Flip X (fix mirror)").X + ImGui.GetFrameHeight()
-		              + ImGui.GetStyle().ItemInnerSpacing.X + ImGui.GetStyle().ItemSpacing.X;
-		if (ImGui.Button("+ Add Model (real, as Object)", new System.Numerics.Vector2(-flipW, 0f)))
-		{
-			_importError = null;
-			bool flipX = _flipModelX;
-			ShowOpenFileDialog("Import 3D Model (real)", ModelImporter.FileFilter, modelPath =>
-			{
-				if (modelPath != null) BakeExternalModel(modelPath, flipX);
-			});
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Unlike \"+ Model\" above (editor preview only, never reaches the real\ngame), this bakes the mesh into a real PS2 RigidModel/OGI/Object and\nplaces it as a normal Instance — same pipeline Add Object (full)\nalready uses live in PCSX2. One real PS2 texture per submesh\n(diffuse only). Save Chunk to keep it, then Build ISO + test.");
-		}
-		ImGui.SameLine();
-		ImGui.Checkbox("Flip X (fix mirror)##flipModelX", ref _flipModelX);
-
-		if (ImGui.Button("+ Add Scenery (real)", new System.Numerics.Vector2(-flipW, 0f)))
-		{
-			_importError = null;
-			bool flipX = _flipModelX;
-			ShowOpenFileDialog("Import 3D Model as Scenery (real)", ModelImporter.FileFilter, modelPath =>
-			{
-				if (modelPath != null) BakeExternalModelAsScenery(modelPath, flipX);
-			});
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Bakes the mesh into real, independent PS2 SCENERY (a new scenery leaf\nreferencing a freshly-baked SM2 mesh) placed at the world origin (0,0,0)\n-- behaves like any scenery tile you add: move it, Ctrl+D, Delete. Unlike\n\"+ Add Model\", no Object/Instance is created. Save Chunk to keep it,\nthen Build ISO + test.");
-		}
-		ImGui.SameLine();
-		ImGui.Checkbox("Flip X (fix mirror)##flipSceneryX", ref _flipModelX);
-
-		if (ImGui.Button("+ AI Position", new System.Numerics.Vector2(134f, 0f)))
-			AddAiPositionAt(System.Numerics.Vector3.Zero);
-		if (ImGui.IsItemHovered())
-			MaybeTooltip("Drops a new AI position (red nav point) at the world origin (0,0,0),\nlike everything else you add. Enemies roam among nearby AI positions.\nCtrl+D copies it next to itself, drag to move, Delete removes. Connect\nthem with \"+ AI Path\". Save Chunk to keep.");
-		ImGui.SameLine();
-		if (ImGui.Button("+ AI Path (link all selected)", new System.Numerics.Vector2(-1f, 0f)))
-			AddAiPathBetweenSelected();
-		if (ImGui.IsItemHovered())
-			MaybeTooltip("Select ALL the AI positions you want linked (Ctrl+click), then this\nconnects them in one click: 2 -> a single edge, 3+ -> a closed loop\n(nearest-neighbour order, follows the terrain). Enemies route between\nconnected nodes; without paths they only wander to the nearest. Save Chunk.");
 
 		if (ImGui.Button("Show Scripts (names)", new System.Numerics.Vector2(-1f, 0f)))
 		{
@@ -2046,6 +1975,90 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			ImGui.Unindent();
 		}
 
+		if (ImGui.CollapsingHeader("Add"))
+		{
+		if (ImGui.Button("+ Cube", new System.Numerics.Vector2(134f, 0f)))
+		{
+			_pendingSpawn = true;
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("A real, unit-sized (1x1x1) box baked as a genuine PS2 RigidModel/\nOGI/Object and placed as a normal Instance at the camera's current\nposition — same real pipeline \"+ Add Model\" uses, procedural geometry\ninstead of an imported file. Starts with a real, opaque solid-gray\ntexture+material, so Import Texture (Inspector) can replace it with\nanything afterward, exactly like any other real object (max 512x512).\nSave Chunk to keep it, then Build ISO + test.");
+		}
+		if (ImGui.Button("+ Add Crash (full, with scripts)", new System.Numerics.Vector2(-1f, 0f)))
+		{
+			_showCrashPicker = true;
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("Crash is defined LOCALLY per-level (not shared like Wumpa/Nitro) —\nthis does a real full transplant (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references) from a\nlevel that already has a real, working Crash. First attempt at a\nfull script transplant this session — not guaranteed to work\nperfectly the first try, see the Add Crash log message.");
+		}
+		if (ImGui.Button("+ Add Object (full, from another level)", new System.Numerics.Vector2(-1f, 0f)))
+		{
+			_objectTransplantLevelFilter = "";
+			_showObjectTransplantLevelPicker = true;
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("Same full transplant as Add Crash (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references), but for ANY\nobject in ANY level — pick the source level, then pick the object by\nname. Copies the source's own Instance config (StateFlags/ParamLists)\ntoo, same as Add Crash — needed for it to behave correctly, not just\nrender. Save Chunk to keep it, then Build ISO + test.");
+		}
+		if (ImGui.Button("+ Add Trigger (from another level)", new System.Numerics.Vector2(-1f, 0f)))
+		{
+			_triggerTransplantLevelFilter = "";
+			_showTriggerTransplantLevelPicker = true;
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("Same source-level browse as Add Object, but for a Trigger volume —\npick the source level, then pick the trigger by id/messages. Copies\nits volume shape + TriggerMessages. If you added an object with\n\"Add Object\" FIRST (same session, not saved/reloaded since), the new\ntrigger's own Instances list is automatically pointed at THAT\nobject's new instance id, so touching it fires the same messages the\nobject's script listens for — do Add Object, then Add Trigger, in\nthat order. Otherwise the source trigger's own (likely wrong once\ncopied) Instances list is kept as-is and logged as a warning. Save\nChunk to keep it, then Build ISO + test.");
+		}
+		if (_importError != null)
+		{
+			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.4f, 0.4f, 1f), _importError);
+		}
+		float flipW = ImGui.CalcTextSize("Flip X (fix mirror)").X + ImGui.GetFrameHeight()
+		              + ImGui.GetStyle().ItemInnerSpacing.X + ImGui.GetStyle().ItemSpacing.X;
+		if (ImGui.Button("+ Add Model (real, as Object)", new System.Numerics.Vector2(-flipW, 0f)))
+		{
+			_importError = null;
+			bool flipX = _flipModelX;
+			ShowOpenFileDialog("Import 3D Model (real)", ModelImporter.FileFilter, modelPath =>
+			{
+				if (modelPath != null) BakeExternalModel(modelPath, flipX);
+			});
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("Bakes the mesh into a real PS2 RigidModel/OGI/Object and places it\nas a normal Instance — same pipeline Add Object (full) already uses\nlive in PCSX2. One real PS2 texture per submesh (diffuse only).\nSave Chunk to keep it, then Build ISO + test.");
+		}
+		ImGui.SameLine();
+		ImGui.Checkbox("Flip X (fix mirror)##flipModelX", ref _flipModelX);
+
+		if (ImGui.Button("+ Add Scenery (real)", new System.Numerics.Vector2(-flipW, 0f)))
+		{
+			_importError = null;
+			bool flipX = _flipModelX;
+			ShowOpenFileDialog("Import 3D Model as Scenery (real)", ModelImporter.FileFilter, modelPath =>
+			{
+				if (modelPath != null) BakeExternalModelAsScenery(modelPath, flipX);
+			});
+		}
+		if (ImGui.IsItemHovered())
+		{
+			MaybeTooltip("Bakes the mesh into real, independent PS2 SCENERY (a new scenery leaf\nreferencing a freshly-baked SM2 mesh) placed at the world origin (0,0,0)\n-- behaves like any scenery tile you add: move it, Ctrl+D, Delete. Unlike\n\"+ Add Model\", no Object/Instance is created. Save Chunk to keep it,\nthen Build ISO + test.");
+		}
+		ImGui.SameLine();
+		ImGui.Checkbox("Flip X (fix mirror)##flipSceneryX", ref _flipModelX);
+
+		if (ImGui.Button("+ AI Position", new System.Numerics.Vector2(134f, 0f)))
+			AddAiPositionAt(System.Numerics.Vector3.Zero);
+		if (ImGui.IsItemHovered())
+			MaybeTooltip("Drops a new AI position (red nav point) at the world origin (0,0,0),\nlike everything else you add. Enemies roam among nearby AI positions.\nCtrl+D copies it next to itself, drag to move, Delete removes. Connect\nthem with \"+ AI Path\". Save Chunk to keep.");
+		ImGui.SameLine();
+		if (ImGui.Button("+ AI Path (link all selected)", new System.Numerics.Vector2(-1f, 0f)))
+			AddAiPathBetweenSelected();
+		if (ImGui.IsItemHovered())
+			MaybeTooltip("Select ALL the AI positions you want linked (Ctrl+click), then this\nconnects them in one click: 2 -> a single edge, 3+ -> a closed loop\n(nearest-neighbour order, follows the terrain). Enemies route between\nconnected nodes; without paths they only wander to the nearest. Save Chunk.");
+		}
 		if (ImGui.CollapsingHeader("Collision"))
 		{
 			ImGui.Indent();
@@ -2266,7 +2279,10 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		}
 		ImGui.End();
 
-		if (_selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move)
+		// Amedo 2026-09-21
+		bool blockingUi = ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup);
+
+		if (!blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move)
 		{
 			System.Numerics.Vector3 vector = GizmoPivot();
 			float num = 2.25f * GizmoScale();
@@ -2293,7 +2309,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (_selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Rotate)
+		if (!blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Rotate)
 		{
 			System.Numerics.Vector3 vector2 = GizmoPivot();
 			float num3 = 2.25f * GizmoScale();
@@ -2338,7 +2354,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (_choosingDuplicateDirection && _camera != null)
+		if (!blockingUi && _choosingDuplicateDirection && _camera != null)
 		{
 			float num5 = 2.25f * GizmoScale();
 			ImDrawListPtr foregroundDrawList3 = ImGui.GetForegroundDrawList();
@@ -2370,7 +2386,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (_camera != null)
+		if (!blockingUi && _camera != null)
 		{
 			Entity camerasRoot = _camerasRoot;
 			if (camerasRoot != null && camerasRoot.Active)

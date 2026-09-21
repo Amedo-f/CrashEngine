@@ -70,7 +70,7 @@ public sealed partial class GameScene : Scene
             SyncWorldLighting(chunkRoot);
             SyncParticleEmitters(chunkRoot);
             SaveSoundGainBaselines(chunkRoot);
-            var outDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            var outDir = SavedChunksDir;
             var result = ChunkExporter.SaveChunk(chunkRoot, outDir);
             SaveCollisionMarkers(chunkRoot);
             var msg = $"Saved {result.InstancesSynced} instance(s), {result.SceneryTilesSynced} scenery tile(s) → {result.Rm2Path}" +
@@ -218,7 +218,7 @@ public sealed partial class GameScene : Scene
     private void ResetAllLevelsFromDisc()
     {
         // Amedo 2026-09-20
-        var savedChunksDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+        var savedChunksDir = SavedChunksDir;
         if (Directory.Exists(savedChunksDir))
         {
             int fileCount = Directory.GetFiles(savedChunksDir, "*", SearchOption.AllDirectories).Length;
@@ -234,10 +234,10 @@ public sealed partial class GameScene : Scene
             }
         }
 
-        // Amedo 2026-09-21 -- also drop the per-level World Lighting intensity metas (stale once SavedChunks is gone)
+        // Amedo 2026-09-21
         try
         {
-            var wlDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "WorldLighting");
+            var wlDir = ModeDir("WorldLighting");
             if (Directory.Exists(wlDir)) Directory.Delete(wlDir, recursive: true);
         }
         catch { }
@@ -358,7 +358,7 @@ public sealed partial class GameScene : Scene
         }
 
         var workDir        = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build");
-        var savedChunksDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+        var savedChunksDir = SavedChunksDir;
         var outPathOverride = string.IsNullOrWhiteSpace(_isoOutputPath) ? null : _isoOutputPath;
         BLog($"Build ISO: starting on disc '{_extractedRoot}' — merges every chunk saved this session, not just the one open now.");
 
@@ -487,7 +487,7 @@ public sealed partial class GameScene : Scene
 
     private string GetWorldLightingMetaPath()
     {
-        var root = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "WorldLighting");
+        var root = ModeDir("WorldLighting");
         var rel = _rm2.Replace('/', '\\');
         if (rel.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase)) rel = rel[..^4];
         return Path.Combine(root, rel + ".json");

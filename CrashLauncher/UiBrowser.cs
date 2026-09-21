@@ -202,7 +202,7 @@ public sealed partial class GameScene
                                  "game, so it never hangs waiting for the missing video. The file is\n" +
                                  "moved out for that build only and restored right after. Only the\n" +
                                  "checked cutscenes are skipped — the rest still play normally.\n" +
-                                 "(In-game skip is NTSC-U / SLUS_209.09 only for now.)");
+                                 "(Works on both NTSC-U / SLUS_209.09 and PAL / SLES_525.68.)");
             }
 
             ImGui.PopID();

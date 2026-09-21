@@ -12,11 +12,20 @@ public sealed class Texture2D : IDisposable
 
     public uint GlId => _id;
 
+    // Amedo 2026-09-21
+    public bool IsOpaque { get; private set; }
+
     public unsafe Texture2D(GL gl, ReadOnlySpan<byte> rgba, uint w, uint h)
     {
         _gl    = gl;
         Width  = w;
         Height = h;
+
+        // Amedo 2026-09-21
+        IsOpaque = true;
+        for (int i = 3; i < rgba.Length; i += 4)
+            if (rgba[i] < 254) { IsOpaque = false; break; }
+
         _id    = gl.GenTexture();
         gl.BindTexture(TextureTarget.Texture2D, _id);
 

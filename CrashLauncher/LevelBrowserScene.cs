@@ -106,12 +106,25 @@ public sealed class LevelBrowserScene : Scene
             ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize |
             ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoBringToFrontOnFocus);
 
-        if (_projectPath is not null &&
-            ImGui.Button("All Assets", new Vector2(-1f, 0f)))
+        // Amedo 2026-09-21
+        if (ImGui.Button("< Back to Projects", new Vector2(-1f, 0f)))
         {
-            Engine.Instance.ActiveScene = new AssetBrowserScene(_projectPath, this);
+            Engine.Instance.ActiveScene = new ProjectSetupScene(_scriptOut);
             ImGui.End();
             return;
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Close the current project and return to the project menu (New / Open).\nNothing is lost -- saved edits stay in this project's folder.");
+        }
+        ImGui.Separator();
+
+        // Amedo 2026-09-21
+        if (_projectPath is not null)
+        {
+            ImGui.BeginDisabled();
+            ImGui.Button("All Assets  —  Under development", new Vector2(-1f, 0f));
+            ImGui.EndDisabled();
         }
 
         if (_project is not null)
@@ -777,11 +790,14 @@ public sealed class LevelBrowserScene : Scene
 
     public IReadOnlyList<string> GetLog() { lock (_logLock) return _log.ToArray(); }
 
+    // Amedo 2026-09-22
     private string SavedChunksDir =>
-        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot,
+            _project is { IsNewGame: true } ? "SavedChunks_NewGame" : "SavedChunks");
 
     private string CollisionMarkersDir =>
-        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "CollisionMarkers");
+        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot,
+            _project is { IsNewGame: true } ? "CollisionMarkers_NewGame" : "CollisionMarkers");
 
     private string BackupBdPath =>
         Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build",

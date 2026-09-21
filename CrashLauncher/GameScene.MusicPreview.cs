@@ -62,7 +62,7 @@ public sealed partial class GameScene
     }
 
     private string CustomMusicNamesPath =>
-        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks", "MusicNames.json");
+        Path.Combine(SavedChunksDir, "MusicNames.json");
 
     private void LoadCustomMusicNames()
     {
@@ -726,7 +726,7 @@ public sealed partial class GameScene
     private readonly Dictionary<(string Rm2, int SectionId), BaseTwinSection?> _pristineSoundSecCache = new();
 
     private string SoundGainBaselineDir =>
-        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks", "_SoundGainBaselines");
+        Path.Combine(SavedChunksDir, "_SoundGainBaselines");
 
     private string SoundGainBaselinePath(uint sid, string rm2Scope,
         int sectionId = TwinConstants.CODE_SOUND_EFFECTS_SECTION)

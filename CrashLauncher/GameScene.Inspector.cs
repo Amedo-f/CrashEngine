@@ -2187,7 +2187,7 @@ public sealed partial class GameScene : Scene
         try
         {
             using var pkg = PackageReader.Open(_extractedRoot);
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             if (!ChunkImporter.RetargetLinkedScenery(Engine.Instance.GL, pkg, linkEnt, basePath, out string log))
             {
                 _browser.Log($"Linked Scenery: {log}");
@@ -2211,7 +2211,7 @@ public sealed partial class GameScene : Scene
         try
         {
             using var pkg = PackageReader.Open(_extractedRoot);
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             using var stream = pkg.OpenByPath($"{basePath}.sm2");
             if (stream is null) { _browser.Log($"Swap Skydome: '{basePath}.sm2' not found."); return; }
 
@@ -2237,7 +2237,7 @@ public sealed partial class GameScene : Scene
         try
         {
             using var pkg = PackageReader.Open(_extractedRoot);
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             using var stream = pkg.OpenByPath($"{basePath}.sm2");
             if (stream is null) { _browser.Log($"Copy Lighting: '{basePath}.sm2' not found."); return; }
 
@@ -2310,7 +2310,7 @@ public sealed partial class GameScene : Scene
         try
         {
             using var pkg = PackageReader.Open(_extractedRoot);
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             using var stream = pkg.OpenByPath($"{targetBasePath}.sm2");
             if (stream is not null)
             {
@@ -2461,6 +2461,13 @@ public sealed partial class GameScene : Scene
         return _gameProject;
     }
 
+    // Amedo 2026-09-22
+    private string ModeDir(string name) =>
+        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot,
+            GetGameProject() is { IsNewGame: true } ? name + "_NewGame" : name);
+
+    private string SavedChunksDir => ModeDir("SavedChunks");
+
     private bool IsLinkTargetKeptInNewGame(string targetPath)
     {
         var project = GetGameProject();
@@ -2469,6 +2476,29 @@ public sealed partial class GameScene : Scene
         if (normalized.StartsWith(@"Levels\Custom\", StringComparison.OrdinalIgnoreCase)) return true;
         if (normalized.Equals(@"Levels\Earth\Hub\beach", StringComparison.OrdinalIgnoreCase)) return true;
         return project.ClaimedLevels.Any(p => p.Replace('/', '\\').TrimStart('\\').Equals(normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Amedo 2026-09-22
+    private void StripDanglingLinksForNewGamePreview(Entity chunkRoot)
+    {
+        if (GetGameProject() is not { IsNewGame: true }) return;
+        var sm2 = chunkRoot.Get<ChunkSource>()?.Sm2;
+        var linkItem = sm2?.GetItem<PS2AnyLink>((uint)TwinConstants.SCENERY_LINK_ITEM);
+        if (linkItem is null || linkItem.LinksList.Count == 0) return;
+
+        int removed = linkItem.LinksList.RemoveAll(l => !IsLinkTargetKeptInNewGame(l.Path));
+        if (removed == 0) return;
+
+        var linksRoot = chunkRoot.Children.FirstOrDefault(c => c.Name == "LinkedScenery");
+        if (linksRoot is not null)
+        {
+            var stale = linksRoot.Children
+                .Where(c => c.Get<CrashEngine.Importer.LinkedSceneryLink>() is { } ls
+                            && !IsLinkTargetKeptInNewGame(ls.Source.Path))
+                .ToList();
+            foreach (var c in stale) linksRoot.RemoveChild(c);
+        }
+        _browser.Log($"New Game: removed {removed} upcoming-scene link(s) to excluded levels from this scene.");
     }
 
     private List<string> GetLinkRedirectTargets()
@@ -2506,7 +2536,7 @@ public sealed partial class GameScene : Scene
 
         try
         {
-            var savedChunksDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            var savedChunksDir = SavedChunksDir;
             if (Directory.Exists(savedChunksDir))
             {
                 foreach (var file in Directory.GetFiles(savedChunksDir, "*.rm2", SearchOption.AllDirectories))
@@ -2530,7 +2560,7 @@ public sealed partial class GameScene : Scene
         try
         {
             using var pkg = PackageReader.Open(_extractedRoot);
-            pkg.ShadowDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "SavedChunks");
+            pkg.ShadowDir = SavedChunksDir;
             var rm2 = ChunkImporter.ParseRm2Only(pkg, rm2Path);
             _foreignRm2Cache[rm2Path] = rm2;
             return rm2;

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Amedo 2026-09-21 -->
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+</Project>

@@ -28,14 +28,6 @@ public sealed class Material
     public bool      AlwaysOnTop     { get; set; } = false;
     public bool      IgnoreDepthTest { get; set; } = false;
 
-    // Amedo 2026-09-21
-    public bool                  TextureNearest     = false;
-    public BlendingFactor        BlendSrcFactor     = BlendingFactor.SrcAlpha;
-    public BlendingFactor        BlendDstFactor     = BlendingFactor.OneMinusSrcAlpha;
-    public BlendEquationModeEXT  BlendEquation      = BlendEquationModeEXT.FuncAdd;
-    public float                 BlendConstantAlpha = 1f;
-    public int                   AlphaTestFunc      = 5;
-
     public bool      Unlit           { get => DoubleColor <= 1.0f; set => DoubleColor = value ? 1.0f : 2.0f; }
 
     public bool      UnlitToggledByUser { get; set; } = false;
@@ -52,14 +44,7 @@ public sealed class Material
 
     public void Apply(GL gl, TwinShaderProgram sh)
     {
-        if (Albedo != null)
-        {
-            Albedo.Bind(0);
-            // Amedo 2026-09-21
-            int f = TextureNearest ? (int)TextureMinFilter.Nearest : (int)TextureMinFilter.Linear;
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, f);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, f);
-        }
+        if (Albedo != null) Albedo.Bind(0);
 
         sh.Set("twin_material.use_texture",        Albedo != null ? 1f : 0f);
         sh.Set("twin_material.double_color",       DoubleColor);
@@ -75,22 +60,36 @@ public sealed class Material
         sh.Set("twin_material.alpha_blend",        AlphaBlend ? 1f : 0f);
         sh.Set("twin_material.base_color",         BaseColor);
         sh.Set("twin_material.select_pulse",       1f);
-        sh.Set("twin_material.alpha_test_func",    AlphaTestFunc); // Amedo 2026-09-21
 
         _blendWasOn = gl.IsEnabled(EnableCap.Blend);
         if (AlphaBlend)
         {
             gl.Enable(EnableCap.Blend);
-            gl.BlendColor(0f, 0f, 0f, BlendConstantAlpha);
-            gl.BlendEquation(BlendEquation);
-            gl.BlendFuncSeparate(BlendSrcFactor, BlendDstFactor, BlendSrcFactor, BlendDstFactor);
+            switch (Blend)
+            {
+                case BlendMode.Additive:
+                    gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
+                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One,
+                                         BlendingFactor.SrcAlpha, BlendingFactor.One);
+                    break;
+                case BlendMode.Subtractive:
+                    gl.BlendEquation(BlendEquationModeEXT.FuncReverseSubtract);
+                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One,
+                                         BlendingFactor.SrcAlpha, BlendingFactor.One);
+                    break;
+                default:
+                    gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
+                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha,
+                                         BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                    break;
+            }
         }
         else gl.Disable(EnableCap.Blend);
 
         if (Culling == CullMode.Both) gl.Disable(EnableCap.CullFace);
         else { gl.Enable(EnableCap.CullFace); gl.CullFace(Culling == CullMode.Back ? TriangleFace.Front : TriangleFace.Back); }
 
-        gl.DepthMask(DepthWrite);
+        gl.DepthMask(DepthWrite && !AlphaBlend); // Amedo 2026-09-21
         gl.DepthFunc(DepthFunction.Lequal);
         if (IgnoreDepthTest) gl.Disable(EnableCap.DepthTest);
 
