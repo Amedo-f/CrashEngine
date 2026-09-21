@@ -4957,8 +4957,7 @@ public static class MeshDecoder
         };
     }
 
-    // Amedo 2026-09-21 -- PS2 GS ALPHA: out = (A-B)*C + D. A,B,D = colour {Cs,Cd,0}; C = alpha {As,Ad,Fix}.
-    // Translate the resolved sources to the closest OpenGL blend for the common transparency shapes.
+    // Amedo 2026-09-21
     private static void ResolveGsBlend(TwinShader shader,
         out Silk.NET.OpenGL.BlendingFactor src, out Silk.NET.OpenGL.BlendingFactor dst,
         out Silk.NET.OpenGL.BlendEquationModeEXT eq, out float constAlpha)
@@ -4998,12 +4997,12 @@ public static class MeshDecoder
         }
 
         eq = Silk.NET.OpenGL.BlendEquationModeEXT.FuncAdd;
-        if      (a == CS && b == FB && d == FB) { src = cf; dst = cInv; }                                                  // Mix (standard over)
-        else if (a == CS && b == Z  && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; }                    // Add
-        else if (a == Z  && b == CS && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; eq = Silk.NET.OpenGL.BlendEquationModeEXT.FuncReverseSubtract; } // Sub
-        else if (a == Z  && b == Z  && d == FB) { src = Silk.NET.OpenGL.BlendingFactor.Zero; dst = Silk.NET.OpenGL.BlendingFactor.One; } // keep dest
-        else if (a == CS && d == Z)             { src = Silk.NET.OpenGL.BlendingFactor.One;  dst = Silk.NET.OpenGL.BlendingFactor.Zero; } // opaque replace
-        else                                    { src = Silk.NET.OpenGL.BlendingFactor.SrcAlpha; dst = Silk.NET.OpenGL.BlendingFactor.OneMinusSrcAlpha; } // fallback
+        if      (a == CS && b == FB && d == FB) { src = cf; dst = cInv; }
+        else if (a == CS && b == Z  && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; }
+        else if (a == Z  && b == CS && d == FB) { src = cf; dst = Silk.NET.OpenGL.BlendingFactor.One; eq = Silk.NET.OpenGL.BlendEquationModeEXT.FuncReverseSubtract; }
+        else if (a == Z  && b == Z  && d == FB) { src = Silk.NET.OpenGL.BlendingFactor.Zero; dst = Silk.NET.OpenGL.BlendingFactor.One; }
+        else if (a == CS && d == Z)             { src = Silk.NET.OpenGL.BlendingFactor.One;  dst = Silk.NET.OpenGL.BlendingFactor.Zero; }
+        else                                    { src = Silk.NET.OpenGL.BlendingFactor.SrcAlpha; dst = Silk.NET.OpenGL.BlendingFactor.OneMinusSrcAlpha; }
     }
 
     private static (SysVec3, Quaternion) Frame0Transform(

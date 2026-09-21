@@ -34,7 +34,7 @@ struct TwinMaterial {
     float metalic_specular;
     float env_map; // 0 is off, 1 is on
     int blend_func;
-    int alpha_test_func; // Amedo 2026-09-21 -- 0=NEVER 1=ALWAYS 2=LESS 3=LEQUAL 4=EQUAL 5=GEQUAL 6=GREATER 7=NOTEQUAL
+    int alpha_test_func; // Amedo 2026-09-21
     float select_pulse; // brightness multiplier for the editor's selection highlight; 1.0 = no effect
     // 2026-09-04 -- real bug fix: Material.BaseColor (C#) was set on every DirectCubeRenderer
     // debug marker (Triggers/Cameras/Positions/AI Positions/collision boxes/load-wall zones/
