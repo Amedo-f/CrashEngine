@@ -304,6 +304,8 @@ public sealed partial class GameScene : Scene
 		public float Intensity = 1f;
 
 		public float SceneryBrightness = 1f;
+		// Amedo 2026-09-21
+		public float SceneryBakedBrightness = 1f;
 
 		public Dictionary<object, List<Twinsanity.TwinsanityInterchange.Common.Vector4>>? SceneryBaseColors;
 

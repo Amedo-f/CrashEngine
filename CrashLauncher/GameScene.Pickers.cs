@@ -1838,7 +1838,9 @@ public sealed partial class GameScene : Scene
                     {
                         if (subItem is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel sub) continue;
                         if (sub.Colors is null || lighting.SceneryBaseColors.ContainsKey(sub)) continue;
-                        lighting.SceneryBaseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X, c.Y, c.Z, c.W)).ToList();
+                        // Amedo 2026-09-21 -- colours on disk are already baked at SceneryBakedBrightness; recover the true base
+                        float unbake = lighting.SceneryBakedBrightness > 0.001f ? lighting.SceneryBakedBrightness : 1f;
+                        lighting.SceneryBaseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X / unbake, c.Y / unbake, c.Z / unbake, c.W)).ToList();
                     }
                 }
             }
@@ -1874,11 +1876,11 @@ public sealed partial class GameScene : Scene
             }
         }
 
+        lighting.SceneryBakedBrightness = lighting.SceneryBrightness; // Amedo 2026-09-21
+
         _browser.Log($"Scenery brightness set to {lighting.SceneryBrightness:F2}x ({lighting.SceneryBaseColors.Count} real submodel(s), " +
-                      "every LOD detail level included). 3D preview updates immediately now, no reload needed. " +
-                      "Save Chunk to keep it, then Build ISO + test. Note: reloading the level resets this SLIDER's " +
-                      "number back to 1.0x (there's no way to recover 'what multiplier got you here' from the saved " +
-                      "colors alone) -- but the level itself stays exactly as dark/bright as you left it.");
+                      "every LOD detail level included). 3D preview updates immediately, no reload needed. " +
+                      "Save Chunk to keep it — the slider number is remembered per level (persists on reload).");
     }
 
     private void ApplySkydomeBrightness(Entity chunkRoot, SkydomeMarker marker)

@@ -479,7 +479,11 @@ public sealed partial class GameScene : Scene
     }
 
     // Amedo 2026-09-21
-    private sealed class WorldLightingMeta { public float Intensity { get; set; } = 1f; }
+    private sealed class WorldLightingMeta
+    {
+        public float Intensity { get; set; } = 1f;
+        public float SceneryBrightness { get; set; } = 1f;
+    }
 
     private string GetWorldLightingMetaPath()
     {
@@ -496,7 +500,8 @@ public sealed partial class GameScene : Scene
             var path = GetWorldLightingMetaPath();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
-                new WorldLightingMeta { Intensity = settings.Intensity }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                new WorldLightingMeta { Intensity = settings.Intensity, SceneryBrightness = settings.SceneryBrightness },
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
     }
@@ -520,6 +525,9 @@ public sealed partial class GameScene : Scene
                 }
             }
             settings.Intensity = f;
+
+            settings.SceneryBrightness = meta.SceneryBrightness;
+            settings.SceneryBakedBrightness = meta.SceneryBrightness;
         }
         catch { }
     }
