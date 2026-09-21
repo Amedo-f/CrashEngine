@@ -4937,6 +4937,7 @@ public static class MeshDecoder
             AlphaTest       = shader.ATest == TwinShader.AlphaTest.ON
                                   ? shader.AlphaValueToBeComparedTo / 255f : 0f,
             AlphaTestFunc   = shader.ATest == TwinShader.AlphaTest.ON ? (int)shader.ATestMethod : 1,
+            TextureNearest  = shader.TextureFilterWhenTextureIsExpanded == TwinShader.TextureFilter.NEAREST,
             BlendSrcFactor  = blendSrc,
             BlendDstFactor  = blendDst,
             BlendEquation   = blendEq,

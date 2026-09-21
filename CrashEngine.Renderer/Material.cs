@@ -29,6 +29,7 @@ public sealed class Material
     public bool      IgnoreDepthTest { get; set; } = false;
 
     // Amedo 2026-09-21
+    public bool                  TextureNearest     = false;
     public BlendingFactor        BlendSrcFactor     = BlendingFactor.SrcAlpha;
     public BlendingFactor        BlendDstFactor     = BlendingFactor.OneMinusSrcAlpha;
     public BlendEquationModeEXT  BlendEquation      = BlendEquationModeEXT.FuncAdd;
@@ -51,7 +52,14 @@ public sealed class Material
 
     public void Apply(GL gl, TwinShaderProgram sh)
     {
-        if (Albedo != null) Albedo.Bind(0);
+        if (Albedo != null)
+        {
+            Albedo.Bind(0);
+            // Amedo 2026-09-21
+            int f = TextureNearest ? (int)TextureMinFilter.Nearest : (int)TextureMinFilter.Linear;
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, f);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, f);
+        }
 
         sh.Set("twin_material.use_texture",        Albedo != null ? 1f : 0f);
         sh.Set("twin_material.double_color",       DoubleColor);
