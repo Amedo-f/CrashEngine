@@ -39,7 +39,7 @@ public sealed class PreviewFbo : IDisposable
                                  TextureTarget.Texture2D, _color, 0);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
                                     RenderbufferTarget.Renderbuffer, _depth);
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, CrashEngine.Core.Engine.Instance.SceneFramebuffer); // Amedo
     }
 
     public void Resize(int w, int h)
@@ -49,20 +49,25 @@ public sealed class PreviewFbo : IDisposable
         Allocate(w, h);
     }
 
+    private int _savedFramebuffer; // Amedo
+    private readonly int[] _savedViewport = new int[4];
+
     public void Begin(System.Numerics.Vector3 clearColor)
     {
+        _gl.GetInteger(GetPName.DrawFramebufferBinding, out _savedFramebuffer); // Amedo
+        _gl.GetInteger(GetPName.Viewport, _savedViewport);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.Viewport(0, 0, (uint)Width, (uint)Height);
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.DepthFunc(DepthFunction.Lequal);
+        GlState.DepthTest(_gl, true); // Amedo 2026-10-01
+        GlState.DepthFunc(_gl, DepthFunction.Lequal);
         _gl.ClearColor(clearColor.X, clearColor.Y, clearColor.Z, 1f);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
     }
 
     public void End(int screenW, int screenH)
     {
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        _gl.Viewport(0, 0, (uint)screenW, (uint)screenH);
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)_savedFramebuffer); // Amedo
+        _gl.Viewport(_savedViewport[0], _savedViewport[1], (uint)_savedViewport[2], (uint)_savedViewport[3]);
     }
 
     public unsafe byte[] ReadPixels()

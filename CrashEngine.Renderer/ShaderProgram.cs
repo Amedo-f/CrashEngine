@@ -37,7 +37,13 @@ public sealed class ShaderProgram : IDisposable
 
     public void Use() => _gl.UseProgram(_id);
 
-    private int Loc(string n) => _gl.GetUniformLocation(_id, n);
+    private readonly Dictionary<string, int> _locations = new(); // Amedo 2026-10-01
+
+    private int Loc(string n)
+    {
+        if (!_locations.TryGetValue(n, out int l)) _locations[n] = l = _gl.GetUniformLocation(_id, n);
+        return l;
+    }
 
     public void Set(string n, int     v) => _gl.Uniform1(Loc(n), v);
     public void Set(string n, float   v) => _gl.Uniform1(Loc(n), v);

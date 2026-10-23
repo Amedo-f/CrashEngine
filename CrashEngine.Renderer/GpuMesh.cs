@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace CrashEngine.Renderer;
 
-public sealed class GpuMesh : IDisposable
+public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09-29
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct Vertex
@@ -15,10 +15,16 @@ public sealed class GpuMesh : IDisposable
         public Vector4 Color;
         public Vector3 BoneIndices;
         public Vector3 BoneWeights;
+        public Vector3 SmoothNormal; // Amedo
     }
 
     private readonly GL            _gl;
-    private readonly uint          _vao, _vbo, _ebo;
+    private uint                   _vao, _vbo, _ebo; // Amedo 2026-09-29
+    private MeshPool.Page?         _page; // Amedo 2026-10-01
+    private int                    _baseVertex, _firstIndex;
+    private Vertex[]?              _pendingVerts;
+    private uint[]?                _pendingIndices;
+    public bool Uploaded { get; private set; }
     private readonly PrimitiveType _prim;
     private readonly bool          _useElements;
     public  readonly int           IndexCount;
@@ -29,7 +35,66 @@ public sealed class GpuMesh : IDisposable
 
     public readonly Vertex[]? RaycastVertices;
 
-    public unsafe GpuMesh(GL gl, Vertex[] verts, uint[] indices)
+    // Amedo 2026-09-29
+    public bool Dynamic { get; private set; }
+    private int _bounds;
+    private Vector3 _min, _max;
+
+    public bool LocalBounds(out Vector3 min, out Vector3 max)
+    {
+        if (_bounds == 0)
+        {
+            _bounds = 2;
+            if (RaycastVertices is { Length: > 0 } verts)
+            {
+                bool weighted = false;
+                var lo = verts[0].Position;
+                var hi = lo;
+                foreach (ref readonly var v in verts.AsSpan())
+                {
+                    lo = Vector3.Min(lo, v.Position);
+                    hi = Vector3.Max(hi, v.Position);
+                    if (v.BoneWeights != Vector3.Zero) weighted = true;
+                }
+                if (!weighted)
+                {
+                    _min = lo;
+                    _max = hi;
+                    _bounds = 1;
+                }
+            }
+        }
+        min = _min;
+        max = _max;
+        return _bounds == 1 && !Dynamic;
+    }
+
+    // Amedo: bounds of the stored (bind pose) positions, also for skinned meshes (LocalBounds refuses those)
+    private bool _bindBounds;
+    private Vector3 _bindMin, _bindMax;
+
+    public bool BindBounds(out Vector3 min, out Vector3 max)
+    {
+        if (!_bindBounds && RaycastVertices is { Length: > 0 } verts)
+        {
+            _bindBounds = true;
+            _bindMin = _bindMax = verts[0].Position;
+            foreach (ref readonly var v in verts.AsSpan())
+            {
+                _bindMin = Vector3.Min(_bindMin, v.Position);
+                _bindMax = Vector3.Max(_bindMax, v.Position);
+            }
+        }
+        min = _bindMin;
+        max = _bindMax;
+        return _bindBounds;
+    }
+
+    public GpuMesh(GL gl, Vertex[] verts, uint[] indices) : this(gl, verts, indices, false) { } // Amedo 2026-09-29
+
+    public static GpuMesh FromOwned(GL gl, Vertex[] verts, uint[] indices) => new(gl, verts, indices, true); // Amedo 2026-09-29
+
+    private unsafe GpuMesh(GL gl, Vertex[] verts, uint[] indices, bool owned) // Amedo 2026-09-29
     {
         _gl          = gl;
         _prim        = PrimitiveType.Triangles;
@@ -39,29 +104,18 @@ public sealed class GpuMesh : IDisposable
 
         RaycastPositions = new Vector3[verts.Length];
         for (int i = 0; i < verts.Length; i++) RaycastPositions[i] = verts[i].Position;
-        RaycastIndices  = (uint[])indices.Clone();
-        RaycastVertices = (Vertex[])verts.Clone();
+        RaycastIndices  = owned ? indices : (uint[])indices.Clone(); // Amedo 2026-09-29
+        RaycastVertices = owned ? verts : (Vertex[])verts.Clone();
+        if (!HasSmoothNormals(RaycastVertices)) SmoothNormals([RaycastVertices], [RaycastIndices]); // Amedo
 
-        _vao = gl.GenVertexArray();
-        _vbo = gl.GenBuffer();
-        _ebo = gl.GenBuffer();
-
-        gl.BindVertexArray(_vao);
-
-        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-        fixed (Vertex* p = verts)
-            gl.BufferData(BufferTargetARB.ArrayBuffer,
-                          (nuint)(verts.Length * sizeof(Vertex)), p,
-                          BufferUsageARB.StaticDraw);
-
-        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
-        fixed (uint* p = indices)
-            gl.BufferData(BufferTargetARB.ElementArrayBuffer,
-                          (nuint)(indices.Length * sizeof(uint)), p,
-                          BufferUsageARB.StaticDraw);
-
-        SetAttribs(gl);
-        gl.BindVertexArray(0);
+        if (GpuUploadQueue.Current is { } queue) // Amedo 2026-09-29
+        {
+            _pendingVerts   = RaycastVertices; // Amedo 2026-09-29
+            _pendingIndices = RaycastIndices;
+            queue.Add(this);
+            return;
+        }
+        Create(RaycastVertices, RaycastIndices); // Amedo
     }
 
     public unsafe GpuMesh(GL gl, Vertex[] verts, PrimitiveType prim)
@@ -72,11 +126,42 @@ public sealed class GpuMesh : IDisposable
         IndexCount   = 0;
         VertexCount  = verts.Length;
 
-        _vao = gl.GenVertexArray();
-        _vbo = gl.GenBuffer();
-        _ebo = 0;
+        if (GpuUploadQueue.Current is { } queue) // Amedo 2026-09-29
+        {
+            _pendingVerts = (Vertex[])verts.Clone();
+            queue.Add(this);
+            return;
+        }
+        Create(verts, null);
+    }
 
-        gl.BindVertexArray(_vao);
+    // Amedo 2026-09-29
+    private unsafe void Create(Vertex[] verts, uint[]? indices)
+    {
+        GpuUploadQueue.RequireMainThread("GpuMesh");
+        var gl = _gl;
+        _bytes = (long)verts.Length * sizeof(Vertex) + (indices?.Length ?? 0) * sizeof(uint); // Amedo 2026-10-01
+        if (indices is not null && !Dynamic && MeshPool.Allocate(gl, verts, indices, out _baseVertex, out _firstIndex) is { } page)
+        {
+            _page = page;
+            _vao = page.Vao;
+            Uploaded = true;
+            GpuStats.MeshBytes += _bytes;
+            GpuStats.Meshes++;
+            return;
+        }
+        Own(verts, indices);
+    }
+
+    // Amedo 2026-10-01
+    private unsafe void Own(ReadOnlySpan<Vertex> verts, uint[]? indices)
+    {
+        var gl = _gl;
+        _vao = GlNames.VertexArray(gl); // Amedo 2026-09-30
+        _vbo = GlNames.Buffer(gl);
+        _ebo = indices is null ? 0 : GlNames.Buffer(gl);
+
+        GlState.VertexArray(gl, _vao); // Amedo 2026-10-01
 
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         fixed (Vertex* p = verts)
@@ -84,11 +169,50 @@ public sealed class GpuMesh : IDisposable
                           (nuint)(verts.Length * sizeof(Vertex)), p,
                           BufferUsageARB.StaticDraw);
 
+        if (indices is not null)
+        {
+            gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
+            fixed (uint* p = indices)
+                gl.BufferData(BufferTargetARB.ElementArrayBuffer,
+                              (nuint)(indices.Length * sizeof(uint)), p,
+                              BufferUsageARB.StaticDraw);
+        }
+
         SetAttribs(gl);
-        gl.BindVertexArray(0);
+        GlState.VertexArray(gl, 0); // Amedo 2026-10-01
+        if (Uploaded) return;
+        Uploaded = true;
+        GpuStats.MeshBytes += _bytes;
+        GpuStats.Meshes++;
     }
 
-    private static unsafe void SetAttribs(GL gl)
+    // Amedo 2026-10-01
+    private void Unpool()
+    {
+        if (_page is not { } page) return;
+        _page = null;
+        MeshPool.Free(_gl, page, _baseVertex, VertexCount, _firstIndex, IndexCount);
+        Own(RaycastVertices, RaycastIndices);
+    }
+
+    private long _bytes; // Amedo 2026-09-30
+
+    public void Warm() => LocalBounds(out _, out _); // Amedo 2026-09-29
+
+    public long PendingBytes => _pendingVerts is { } pv ? (long)pv.Length * System.Runtime.CompilerServices.Unsafe.SizeOf<Vertex>() + (_pendingIndices?.Length ?? 0) * sizeof(uint) : 0; // Amedo
+
+    public string Describe() => $"mesh {VertexCount} vertices {IndexCount} indices {_bytes / 1024} KB{(_page is null ? " own" : "")}"; // Amedo
+
+    // Amedo 2026-09-29
+    public void Upload()
+    {
+        if (Uploaded || _pendingVerts is not { } verts) return;
+        Create(verts, _pendingIndices);
+        _pendingVerts = null;
+        _pendingIndices = null;
+    }
+
+    internal static unsafe void SetAttribs(GL gl) // Amedo 2026-10-01
     {
         uint stride = (uint)sizeof(Vertex);
         gl.EnableVertexAttribArray(0); gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
@@ -97,10 +221,14 @@ public sealed class GpuMesh : IDisposable
         gl.EnableVertexAttribArray(3); gl.VertexAttribPointer(3, 3, VertexAttribPointerType.Float, false, stride, (void*)12);
         gl.EnableVertexAttribArray(5); gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, stride, (void*)48);
         gl.EnableVertexAttribArray(6); gl.VertexAttribPointer(6, 3, VertexAttribPointerType.Float, false, stride, (void*)60);
+        gl.EnableVertexAttribArray(11); gl.VertexAttribPointer(11, 3, VertexAttribPointerType.Float, false, stride, (void*)72); // Amedo
     }
 
     public unsafe void UpdateVertices(GL gl, ReadOnlySpan<Vertex> verts)
     {
+        Dynamic = true; // Amedo 2026-09-29
+        if (!Uploaded) Upload();
+        Unpool(); // Amedo 2026-10-01
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         fixed (Vertex* p = verts)
             gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, (nuint)(verts.Length * sizeof(Vertex)), p);
@@ -108,12 +236,32 @@ public sealed class GpuMesh : IDisposable
 
     public unsafe void Draw(GL gl)
     {
-        gl.BindVertexArray(_vao);
-        if (_useElements)
+        if (!Uploaded) Upload(); // Amedo 2026-09-29
+        GlState.VertexArray(gl, _vao); // Amedo 2026-10-01
+        if (_page is not null)
+            gl.DrawElementsBaseVertex(PrimitiveType.Triangles, (uint)IndexCount, DrawElementsType.UnsignedInt, (void*)((long)_firstIndex * sizeof(uint)), _baseVertex);
+        else if (_useElements)
             gl.DrawElements(PrimitiveType.Triangles, (uint)IndexCount,
                             DrawElementsType.UnsignedInt, (void*)0);
         else
             gl.DrawArrays(_prim, 0, (uint)VertexCount);
+        GpuStats.Draws++; // Amedo 2026-09-30
+        GpuStats.Triangles += (_useElements ? IndexCount : VertexCount) / 3;
+    }
+
+    // Amedo 2026-10-01
+    public unsafe void DrawInstanced(GL gl, int count)
+    {
+        if (!Uploaded) Upload();
+        GlState.VertexArray(gl, _vao);
+        if (_page is not null)
+            gl.DrawElementsInstancedBaseVertex(PrimitiveType.Triangles, (uint)IndexCount, DrawElementsType.UnsignedInt, (void*)((long)_firstIndex * sizeof(uint)), (uint)count, _baseVertex);
+        else if (_useElements)
+            gl.DrawElementsInstanced(PrimitiveType.Triangles, (uint)IndexCount, DrawElementsType.UnsignedInt, (void*)0, (uint)count);
+        else
+            gl.DrawArraysInstanced(_prim, 0, (uint)VertexCount, (uint)count);
+        GpuStats.Draws++;
+        GpuStats.Triangles += (_useElements ? IndexCount : VertexCount) / 3 * count;
     }
 
     public bool RaycastTriangles(Vector3 orig, Vector3 dir, out float t)
@@ -145,6 +293,19 @@ public sealed class GpuMesh : IDisposable
 
     public void Dispose()
     {
+        _pendingVerts = null; // Amedo 2026-09-29
+        _pendingIndices = null;
+        if (!Uploaded) return;
+        Uploaded = false;
+        GpuStats.MeshBytes -= _bytes; // Amedo 2026-09-30
+        GpuStats.Meshes--;
+        if (_page is { } page) // Amedo 2026-10-01
+        {
+            _page = null;
+            MeshPool.Free(_gl, page, _baseVertex, VertexCount, _firstIndex, IndexCount);
+            return;
+        }
+        GlState.ForgetVertexArray();
         _gl.DeleteVertexArray(_vao);
         _gl.DeleteBuffer(_vbo);
         if (_ebo != 0) _gl.DeleteBuffer(_ebo);

@@ -76,12 +76,92 @@ public sealed class TwinShaderProgram : IDisposable
         return l;
     }
 
-    public void Set(string n, int v)     { var l = Loc(n); if (l >= 0) _gl.Uniform1(l, v); }
-    public void Set(string n, float v)   { var l = Loc(n); if (l >= 0) _gl.Uniform1(l, v); }
-    public void Set(string n, Vector2 v) { var l = Loc(n); if (l >= 0) _gl.Uniform2(l, v.X, v.Y); }
-    public void Set(string n, Vector3 v) { var l = Loc(n); if (l >= 0) _gl.Uniform3(l, v.X, v.Y, v.Z); }
-    public void Set(string n, Vector4 v) { var l = Loc(n); if (l >= 0) _gl.Uniform4(l, v.X, v.Y, v.Z, v.W); }
-    public void Set(string n, Matrix4x4 m) { var l = Loc(n); if (l >= 0) _gl.UniformMatrix4(l, 1, false, in m.M11); }
+    // Amedo 2026-10-01
+    public sealed class Slot
+    {
+        internal int Loc;
+        internal int Kind;
+        internal int I;
+        internal Vector4 V;
+        internal Matrix4x4 M;
+    }
+
+    // Amedo 2026-10-01
+    public Slot Uniform(string n) => S(n);
+
+    private readonly Dictionary<Type, object> _cached = new();
+
+    public T Cached<T>(Func<TwinShaderProgram, T> make) where T : class
+    {
+        if (_cached.TryGetValue(typeof(T), out var o)) return (T)o;
+        var made = make(this);
+        _cached[typeof(T)] = made;
+        return made;
+    }
+
+    private readonly Dictionary<string, Slot> _slots = new();
+    private readonly Dictionary<string, Slot> _literal = new(ReferenceEqualityComparer.Instance); // Amedo 2026-09-29
+
+    private Slot S(string n)
+    {
+        if (_literal.TryGetValue(n, out var s)) return s; // Amedo 2026-09-29
+        if (!_slots.TryGetValue(n, out s))
+        {
+            s = new Slot { Loc = Loc(n) };
+            _slots[n] = s;
+        }
+        if (ReferenceEquals(string.IsInterned(n), n)) _literal[n] = s;
+        return s;
+    }
+
+    private static bool Same(Vector4 a, Vector4 b) =>
+        BitConverter.SingleToInt32Bits(a.X) == BitConverter.SingleToInt32Bits(b.X) &&
+        BitConverter.SingleToInt32Bits(a.Y) == BitConverter.SingleToInt32Bits(b.Y) &&
+        BitConverter.SingleToInt32Bits(a.Z) == BitConverter.SingleToInt32Bits(b.Z) &&
+        BitConverter.SingleToInt32Bits(a.W) == BitConverter.SingleToInt32Bits(b.W);
+
+    private bool Changed(Slot s, int kind, Vector4 v)
+    {
+        if (s.Loc < 0 || (s.Kind == kind && Same(s.V, v))) return false;
+        s.Kind = kind;
+        s.V = v;
+        return true;
+    }
+
+    public void Set(string n, int v) => Set(S(n), v); // Amedo 2026-10-01
+
+    // Amedo 2026-10-01
+    public void Set(Slot s, int v)
+    {
+        if (s.Loc < 0 || (s.Kind == 1 && s.I == v)) return;
+        s.Kind = 1;
+        s.I = v;
+        _gl.Uniform1(s.Loc, v);
+    }
+
+    public void Set(string n, float v)   => Set(S(n), v); // Amedo 2026-10-01
+    public void Set(string n, Vector2 v) => Set(S(n), v);
+    public void Set(string n, Vector3 v) => Set(S(n), v);
+    public void Set(string n, Vector4 v) => Set(S(n), v);
+
+    // Amedo 2026-10-01
+    public void Set(Slot s, float v)   { if (Changed(s, 2, new Vector4(v, 0f, 0f, 0f))) _gl.Uniform1(s.Loc, v); }
+    public void Set(Slot s, Vector2 v) { if (Changed(s, 3, new Vector4(v, 0f, 0f))) _gl.Uniform2(s.Loc, v.X, v.Y); }
+    public void Set(Slot s, Vector3 v) { if (Changed(s, 4, new Vector4(v, 0f))) _gl.Uniform3(s.Loc, v.X, v.Y, v.Z); }
+    public void Set(Slot s, Vector4 v) { if (Changed(s, 5, v)) _gl.Uniform4(s.Loc, v.X, v.Y, v.Z, v.W); }
+
+    public void Set(string n, Matrix4x4 m) => Set(S(n), m); // Amedo 2026-10-01
+
+    // Amedo 2026-10-01
+    public void Set(Slot s, Matrix4x4 m)
+    {
+        if (s.Loc < 0) return;
+        if (s.Kind == 6 && System.Runtime.InteropServices.MemoryMarshal.AsBytes(new ReadOnlySpan<Matrix4x4>(in s.M))
+                .SequenceEqual(System.Runtime.InteropServices.MemoryMarshal.AsBytes(new ReadOnlySpan<Matrix4x4>(in m)))) return;
+        s.Kind = 6;
+        s.M = m;
+        _gl.UniformMatrix4(s.Loc, 1, false, in m.M11);
+    }
 
     public unsafe void SetMatrixArray(string n, ReadOnlySpan<Matrix4x4> mats)
     {
@@ -89,6 +169,24 @@ public sealed class TwinShaderProgram : IDisposable
         if (l < 0 || mats.Length == 0) return;
         fixed (Matrix4x4* p = mats)
             _gl.UniformMatrix4(l, (uint)mats.Length, false, (float*)p);
+    }
+
+    // Amedo 2026-09-26
+    public unsafe void SetVector3Array(string n, ReadOnlySpan<Vector3> v)
+    {
+        var l = Loc(n);
+        if (l < 0 || v.Length == 0) return;
+        fixed (Vector3* p = v)
+            _gl.Uniform3(l, (uint)v.Length, (float*)p);
+    }
+
+    // Amedo
+    public unsafe void SetVector4Array(string n, ReadOnlySpan<Vector4> v)
+    {
+        var l = Loc(n);
+        if (l < 0 || v.Length == 0) return;
+        fixed (Vector4* p = v)
+            _gl.Uniform4(l, (uint)v.Length, (float*)p);
     }
 
     public void Dispose() => _gl.DeleteProgram(_id);

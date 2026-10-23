@@ -41,7 +41,7 @@ public sealed class PositionChainRenderer : Component
         sh.Set("twin_material.two_sided_lighting", 1);
         sh.Set("twin_material.perform_fog", 0f);
 
-        gl.Disable(EnableCap.CullFace);
+        GlState.Culling(gl, false); // Amedo 2026-10-01
         _mesh.Draw(gl);
     }
 

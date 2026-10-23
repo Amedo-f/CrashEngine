@@ -28,6 +28,13 @@ struct TwinMaterial {
     float billboard_render;
     float double_color;
     vec2 uv_scroll_speed;
+    vec2 uv_scroll_mode; // Amedo 2026-09-26
+    vec2 uv_scroll_phase; // Amedo 2026-09-26
+    float cloth_kind; // Amedo 2026-09-26
+    float cloth_mode; // Amedo 2026-09-26
+    float cloth_phase; // Amedo 2026-09-26
+    vec3 cloth_amp; // Amedo 2026-09-26
+    vec3 cloth_p0[16]; // Amedo 2026-09-26
     vec2 reflect_dist; // x is 1 or 0 for enabled/disabled, y is for actual distance
     float alpha_test;
     float alpha_blend; // 0 is off, 1 is on
@@ -46,6 +53,7 @@ struct TwinMaterial {
     // colour or alpha C# assigned. Defaults to (1,1,1,1) — a real decoded game material (which
     // never sets BaseColor) multiplies by this and is completely unaffected.
     vec4 base_color;
+    vec3 gs_lod; // Amedo
 };
 
 #endif

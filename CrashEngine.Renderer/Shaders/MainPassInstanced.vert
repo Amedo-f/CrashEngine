@@ -38,7 +38,11 @@ void main()
 
     // Billboard
     mat4 invView = inverse(StartView);
-    viewModel = viewModel * (1.0 - twin_material.billboard_render) + StartView * mat4(vec4(normalize(cross(vec3(0.0, 1.0, 0.0), invView[2].xyz)), 0.0), vec4(0.0, 1.0, 0.0, 0.0), vec4(normalize(cross(invView[0].xyz, vec3(0.0, 1.0, 0.0))), 0.0), modelMatrix[3]) * twin_material.billboard_render;
+    vec3 toCamera = vec3(invView[3].x - modelMatrix[3].x, 0.0, invView[3].z - modelMatrix[3].z); // Amedo 2026-09-30
+    vec3 facing = dot(toCamera, toCamera) > 1e-6 ? normalize(toCamera) : normalize(cross(invView[0].xyz, vec3(0.0, 1.0, 0.0)));
+    float handed = determinant(mat3(modelMatrix)) < 0.0 ? -1.0 : 1.0;
+    vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), facing)) * handed;
+    viewModel = viewModel * (1.0 - twin_material.billboard_render) + StartView * mat4(vec4(side, 0.0), vec4(0.0, 1.0, 0.0, 0.0), vec4(facing, 0.0), modelMatrix[3]) * twin_material.billboard_render;
 
     // Vertex based animation
     processedPosition = BlendVertex(processedPosition, Morphs, gl_VertexID, MorphWeights);
@@ -65,5 +69,8 @@ void main()
     gl_Position = StartProjection * viewModel * vec4(processedPosition, 1.0);
     Texpos = in_Texpos;
     Normal = mat3(modelMatrix) * skinnedNormal;
+    SmoothNormal = vec3(0.0); // Amedo
+    GameLit = 0.0; // Amedo
+    ShapeNormal = vec3(0.0); // Amedo
     Color = in_Color * twin_material.double_color * twin_material.base_color;
 }
