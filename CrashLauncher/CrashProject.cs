@@ -20,6 +20,15 @@ public sealed class CrashProject
 
     public List<string> ExcludedCutscenes { get; set; } = new();
 
+    public uint?        DoubleJumpMask    { get; set; } // Amedo 2026-09-25
+    public int?         AkuAkuInvincibilitySeconds { get; set; } // Amedo 2026-09-25
+    public bool         AkuAkuTouchBreak  { get; set; } // Amedo 2026-09-25
+    public uint?        AkuAkuGoldenMusicId { get; set; } // Amedo 2026-09-25
+    public int?         AkuAkuGoldenMusicVolume { get; set; } // Amedo 2026-09-25
+    public bool         ClassicAkuAku     { get; set; } // Amedo 2026-09-25
+    public string?      Language          { get; set; } // Amedo 2026-10-01
+    public bool         CratesReceiveShadows { get; set; } // Amedo
+
     [JsonIgnore]
     public string ProjectPath => System.IO.Path.Combine(Path, Name);
 

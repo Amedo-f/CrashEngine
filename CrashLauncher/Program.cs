@@ -11,6 +11,7 @@ using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 string SCRIPT_OUT = Path.Combine(AppContext.BaseDirectory, "Scripts");
 
 const bool CUSTOM_FONT_ENABLED = false;
+Engine.CustomStyleSetup = EditorTheme.Apply; // Amedo
 Engine.CustomFontSetup = atlas =>
 {
     try
@@ -22,7 +23,7 @@ Engine.CustomFontSetup = atlas =>
         {
             unsafe
             {
-                ushort[] rangesManaged = { 0x0020, 0x00FF, 0x2010, 0x2027, 0x2030, 0x2044, 0 };
+                ushort[] rangesManaged = { 0x0020, 0x00FF, 0x0600, 0x06FF, 0x0750, 0x077F, 0x2010, 0x2027, 0x2030, 0x2044, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0 }; // Amedo 2026-10-01
                 var rangesPtr = (ushort*)Marshal.AllocHGlobal(rangesManaged.Length * sizeof(ushort));
                 for (int i = 0; i < rangesManaged.Length; i++) rangesPtr[i] = rangesManaged[i];
                 atlas.AddFontFromFileTTF(sysFont, 16f, default, (IntPtr)rangesPtr);
@@ -97,6 +98,7 @@ Engine.CustomFontSetup = atlas =>
     }
 };
 
+GraphicsSettings.UseFile(null); // Amedo
 var engine = new Engine("CrashEngine", 1280, 720);
 
 // Amedo 2026-09-22
@@ -112,6 +114,9 @@ try
     if (icons.Count > 0) engine.SetWindowIcon(icons.ToArray());
 }
 catch { }
+
+JitWarmup.Start(typeof(CrashEngine.Runtime.SceneSimulation).Assembly, typeof(MeshDecoder).Assembly, // Amedo 2026-10-01
+    typeof(CrashEngine.Renderer.RenderPipeline).Assembly, typeof(Engine).Assembly, typeof(Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2).Assembly); // Amedo
 
 engine.ActiveScene = new ProjectSetupScene(SCRIPT_OUT);
 engine.Run();

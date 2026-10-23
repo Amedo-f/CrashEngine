@@ -71,6 +71,7 @@ public sealed class LevelBrowserScene : Scene
 
         if (_projectPath is not null)
         {
+            GraphicsSettings.UseFile(Path.Combine(_projectPath, "graphics.json")); // Amedo
             _project = CrashProject.Open(_projectPath);
             if (_project is { IsNewGame: true })
                 Log($"New Game mode: ON — {_project.ClaimedLevels.Count} level slot(s) claimed. Build ISO will exclude every other original level.");

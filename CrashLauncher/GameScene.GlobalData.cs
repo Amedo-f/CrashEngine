@@ -53,7 +53,7 @@ public sealed partial class GameScene : Scene
                 }
             }
             if (_gdPreviewOgi is not null)
-                _gdBoneMatrices = MeshDecoder.SampleAnimationPose(_gdPreviewOgi, _gdAnimData, _gdAnimFrame);
+                _gdBoneMatrices = MeshDecoder.SampleAnimationPose(_gdPreviewOgi, _gdAnimData, _gdAnimFrame, _gdAnimLoop); // Amedo 2026-09-26
         }
 
         ImGui.SetNextWindowSize(new Vector2(1040f, 560f), ImGuiCond.FirstUseEver);
@@ -215,17 +215,10 @@ public sealed partial class GameScene : Scene
                     string bType = bItem is TwinBehaviourStarter ? "Starter" : bItem is PS2BehaviourGraph ? "Graph" : "?";
                     bool clicked = ImGui.Selectable($"{evName,-28} 0x{bid:X4}  [{bType,-7}]  {bLabel}##gobjslot{i}");
                     if (clicked && bItem is PS2BehaviourGraph clickedGraph)
-                    {
-                        _inspectedBehaviourId = bid;
-                        _inspectedBehaviourGraph = clickedGraph;
-                        _inspectedBehaviourManual = true;
-                        _inspectedBehaviourText = GraphToEditableText(clickedGraph);
-                        _inspectedBehaviourOriginalText = GetPristineBehaviourGraphText(true, bid) ?? _inspectedBehaviourText;
-                        _inspectedBehaviourApplyMsg = "";
-                    }
+                        OpenBehaviourInTab(bid, clickedGraph, isGlobal: true, manual: true); // Amedo 2026-09-25
                 }
                 ImGui.EndChild();
-                ImGui.TextDisabled("Click a row to open it in the Behaviours editor above.");
+                ImGui.TextDisabled("Click a row to open it in the Behaviour tab."); // Amedo 2026-09-25
             }
         }
 
@@ -461,7 +454,7 @@ public sealed partial class GameScene : Scene
             sh.Set("DiffuseOnly", 0f);
             sh.SetMatrixArray("BoneMatrices", _gdBoneMatrices);
 
-            gl.Disable(Silk.NET.OpenGL.EnableCap.Blend);
+            CrashEngine.Renderer.GlBlend.Force(gl, false); // Amedo 2026-09-30
             foreach (var (mesh, mat, local) in _gdSkelParts)
             {
                 sh.Set("StartModel", local);

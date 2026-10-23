@@ -1536,6 +1536,7 @@ public sealed partial class GameScene : Scene
         var chunkRoot   = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
         var chunkSource = chunkRoot?.Get<ChunkSource>();
         if (chunkRoot is null || chunkSource?.Rm2 is null) { _browser.Log("Add Model: no level currently loaded."); return; }
+        if (CrashEngine.Assets.CharacterImporter.HasSkeleton(modelPath) && ImportCharacter(modelPath, flipX)) return; // Amedo 2026-10-05
 
         var raw = CrashEngine.Assets.ModelImporter.ExtractRawSubmeshes(modelPath);
         if (raw is null || raw.Count == 0) { _browser.Log($"Add Model: couldn't read any meshes from {Path.GetFileName(modelPath)}."); return; }
@@ -1573,6 +1574,10 @@ public sealed partial class GameScene : Scene
                 Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState.ShadowActive);
 
             var spawnPos = _camera?.Transform.Position ?? Vector3.Zero;
+            float extent = 0f; // Amedo 2026-10-02
+            foreach (var sm in raw)
+                foreach (var p in sm.Positions) extent = MathF.Max(extent, MathF.Max(MathF.Abs(p.X), MathF.Max(MathF.Abs(p.Y), MathF.Abs(p.Z))));
+            if (_camera is not null) spawnPos += _camera.Forward * MathF.Max(3f, extent * 2.5f);
             var inst = new PS2AnyInstance
             {
                 Position              = new TwinVec4(spawnPos.X, spawnPos.Y, spawnPos.Z, 1f),
@@ -1595,7 +1600,8 @@ public sealed partial class GameScene : Scene
             var newEntity = AddOrReuseInstance(section, inst, instRoot, chunkSource);
 
             SelectClicked(newEntity, false);
-            _browser.Log($"Add Model: {log} Placed at the camera position " +
+            if (CrashEngine.Assets.ModelImporter.LastReport is { Length: > 0 } importNotes) _browser.Log($"Add Model: {importNotes}"); // Amedo 2026-10-02
+            _browser.Log($"Add Model: {log} Placed {MathF.Max(3f, extent * 2.5f):0.#} m in front of the camera " + // Amedo 2026-10-02
                           $"(StateFlags 0x{templateStateFlags:X}, fixed Visible+ShadowActive — independent of this level's own content). " +
                           "Not on the Undo stack yet, but Delete Selected removes it normally. Save Chunk to keep it, then Build ISO + test.");
         }
@@ -1670,6 +1676,7 @@ public sealed partial class GameScene : Scene
                 c.Get<SceneryTile>() is { } t && newIds.Contains(t.SourceId));
             if (justAdded is not null) SelectClicked(justAdded, false);
 
+            if (CrashEngine.Assets.ModelImporter.LastReport is { Length: > 0 } importNotes) _browser.Log($"Add Scenery: {importNotes}"); // Amedo 2026-10-02
             _browser.Log($"Add Scenery: {log} Placed at the world origin (0,0,0) as an independent scenery leaf. " +
                           "Not on the Undo stack, but Delete Selected removes it normally. Save Chunk to keep it, then Build ISO + test.");
         }

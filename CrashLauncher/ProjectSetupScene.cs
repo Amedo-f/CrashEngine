@@ -39,6 +39,7 @@ public sealed class ProjectSetupScene : Scene
 
     protected override void Build()
     {
+        GraphicsSettings.UseFile(null); // Amedo
         var pipeEnt = new Entity("RenderPipeline");
         var pipe    = pipeEnt.Add(new RenderPipeline());
         pipe.FogColor = new Vector3(0.09f, 0.09f, 0.11f);

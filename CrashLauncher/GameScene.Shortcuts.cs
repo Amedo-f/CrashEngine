@@ -55,6 +55,12 @@ public sealed partial class GameScene
         Row("Mouse",             "Look around");
         Row("Shift",             "Move faster");
 
+        // Amedo 2026-09-29
+        ImGui.Spacing();
+        ImGui.TextUnformatted("View");
+        ImGui.Separator();
+        Row("F3",                "Frame rate: VSync / 60 / 144 / Unlimited"); // Amedo 2026-09-30
+
         ImGui.End();
     }
 }

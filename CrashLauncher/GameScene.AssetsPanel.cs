@@ -36,7 +36,7 @@ public sealed partial class GameScene
         ImGui.SetNextWindowPos(new Vector2(sw - 420f, (float)sh - 180f), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSize(new Vector2(420f, 180f), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSizeConstraints(new Vector2(240f, 120f), new Vector2(float.MaxValue, float.MaxValue));
-        ImGui.Begin("Assets", ImGuiWindowFlags.NoCollapse);
+        ImGui.Begin("Project##panel", ImGuiWindowFlags.NoCollapse); // Amedo
 
         if (ImGui.SmallButton("Assets"))
         {
@@ -306,7 +306,7 @@ public sealed partial class GameScene
             sh.Set("DiffuseOnly", 0f);
             sh.SetMatrixArray("BoneMatrices", RenderPipeline.IdentityBoneMatrices);
 
-            gl.Disable(EnableCap.Blend);
+            CrashEngine.Renderer.GlBlend.Force(gl, false); // Amedo 2026-09-30
             foreach (var (mesh, mat, model) in parts)
             {
                 sh.Set("StartModel", model);

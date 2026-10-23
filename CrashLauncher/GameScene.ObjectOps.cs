@@ -130,9 +130,11 @@ public sealed partial class GameScene : Scene
                     clone.RotationZ.SetRotation(orig.RotationZ.GetRotation() + rotDeltaDeg.Z);
                 }
                 clone.SetID(GenerateUniqueInstanceId(data.Section));
-                clone.Position.X += localOffset.X;
-                clone.Position.Y += localOffset.Y;
-                clone.Position.Z += localOffset.Z;
+                var clonePos = clone.Position; // Amedo
+                clonePos.X += localOffset.X;
+                clonePos.Y += localOffset.Y;
+                clonePos.Z += localOffset.Z;
+                clone.Position = clonePos; // Amedo
 
                 data.Section.AddItem(clone);
 
@@ -369,7 +371,7 @@ public sealed partial class GameScene : Scene
                 clone.SetID(newId);
                 aiSec.AddItem(clone);
 
-                var newEntity = MakePointMarker(_aiPosRoot, $"AiPosition_{newId:X4}", clone.Position, new Vector4(1f, 0.25f, 0.25f, 0.7f));
+                var newEntity = MakeAiPositionMarker(_aiPosRoot, $"AiPosition_{newId:X4}", clone.Position); // Amedo
                 newEntity.Add(new CrashEngine.Importer.AiPositionMarker { Source = clone });
                 newSelection.Add(newEntity);
             }
@@ -564,7 +566,7 @@ public sealed partial class GameScene : Scene
     {
         foreach (var reset in _pulseResetters) reset(1f);
         _pulseResetters.Clear();
-        if (_selectedSet.Count == 0) return;
+        if (_selectedSet.Count == 0 || PlayFullView) return; // Amedo 2026-09-28
 
         float pulse = 1f + MathF.Sin(EngineTime.Total * 4.5f) * 0.3f;
 

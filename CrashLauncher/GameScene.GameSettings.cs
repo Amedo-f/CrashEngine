@@ -23,19 +23,11 @@ public sealed partial class GameScene
     private const uint PristineDamageType       = 0x0000000D;
     private const uint CrateExplodeBehaviourId  = 0x002F;
 
-    private static ITwinBehaviourCommand? FindBigBlastCommand(PS2BehaviourGraph graph)
-    {
-        foreach (var state in graph.ScriptStates)
-            foreach (var body in state.Bodies)
-            {
-                if (!body.Commands.Any(c => c.CommandIndex == TriggerBalancedCrateFallingCommandIndex))
-                    continue;
-                var dmg = body.Commands.FirstOrDefault(c =>
-                    c.CommandIndex == CreateDamageCommandIndex && c.Arguments.Count > DamageAmountArgIndex);
-                if (dmg is not null) return dmg;
-            }
-        return null;
-    }
+    private static ITwinBehaviourCommand? FindBigBlastCommand(PS2BehaviourGraph graph) => CrashEngine.Runtime.PlaySettings.FindBigBlast(graph); // Amedo 2026-10-04
+
+    // Amedo 2026-09-25
+    private bool? ReadClassicAkuAku() =>
+        CrashEngine.Runtime.PlaySettings.ClassicFromData(Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.GlobalRm2); // Amedo 2026-10-04
 
     private static List<ITwinBehaviourCommand> FindAllCreateDamageCommands(PS2BehaviourGraph graph)
     {
@@ -83,6 +75,11 @@ public sealed partial class GameScene
             {
                 bool isClassic = bigBlast.Arguments[DamageAmountArgIndex] == ClassicBlastAmount;
                 bool isVanilla = bigBlast.Arguments[DamageAmountArgIndex] == VanillaBlastAmount;
+                if (GetGameProject() is { } classicProj && classicProj.ClassicAkuAku != isClassic) // Amedo 2026-09-25
+                {
+                    classicProj.ClassicAkuAku = isClassic;
+                    classicProj.Save();
+                }
 
                 bool classicAkuAku = isClassic;
                 if (ImGui.Checkbox("Classic Aku Aku##classicakuaku", ref classicAkuAku))
@@ -101,6 +98,11 @@ public sealed partial class GameScene
                                  "(matching TheBetaM/CrateModLoader's real, decompiled fix — small\n" +
                                  "enough for Aku Aku to actually absorb). Edits the shared Nitro/TNT\n" +
                                  "explosion script (Startup\\Default.rm2) — affects every level.\n" +
+                                 "Also fixes the golden Aku Aku glow disappearing after Crash walks\n" +
+                                 "into another level (the glow now follows him), and the golden\n" +
+                                 "invincibility ending after an in-game cutscene (its timer now keeps\n" +
+                                 "running during the cutscene: the rest continues afterwards, or it\n" +
+                                 "ends on time mid-cutscene). Both applied on Build ISO.\n" +
                                  "Save Chunk to persist, then Build ISO + test.");
                 }
 
@@ -108,12 +110,206 @@ public sealed partial class GameScene
                     ImGui.TextColored(new Vector4(1f, 0.75f, 0.2f, 1f),
                         "Mixed/unexpected state — the initial-blast damage amount doesn't match\neither known value; check manually before relying on this checkbox.");
             }
-
-            ImGui.Separator();
-            DrawAkuAkuHealthProbe(chunkSource);
         }
 
+        DrawAkuAkuInvincibility(); // Amedo 2026-09-25
+
+        ImGui.Separator();
+        DrawDoubleJumpRules(); // Amedo 2026-09-25
+
+        if (chunkSource is not null) // Amedo
+        {
+            ImGui.Separator();
+            DrawCratesReceiveShadows(chunkSource);
+        }
+
+        ImGui.Separator(); // Amedo 2026-10-01
+        DrawLanguage();
+
         ImGui.End();
+    }
+
+    // Amedo 2026-09-25
+    private void DrawAkuAkuInvincibility()
+    {
+        var proj = GetGameProject();
+        if (proj is null || !BuildIsoToPS2.HasPatchableExe(_extractedRoot)) return; // Amedo
+
+        bool infinite = proj.AkuAkuInvincibilitySeconds == BuildIsoToPS2.AkuAkuInfinite;
+        int seconds = infinite ? BuildIsoToPS2.AkuAkuDefaultSeconds
+            : proj.AkuAkuInvincibilitySeconds ?? BuildIsoToPS2.AkuAkuDefaultSeconds;
+
+        ImGui.BeginDisabled(infinite);
+        ImGui.SetNextItemWidth(100f);
+        if (ImGui.InputInt("Golden Aku Aku (seconds)##akusecs", ref seconds))
+            SetAkuAkuInvincibility(proj, Math.Clamp(seconds, 1, BuildIsoToPS2.AkuAkuMaxSeconds));
+        ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            MaybeTooltip("Original game: 8 seconds. How long the golden invincibility lasts after\n" +
+                         "collecting the 3rd Aku Aku mask (1-255).");
+        ImGui.SameLine();
+        if (ImGui.Checkbox("Infinite##akuinfinite", ref infinite))
+            SetAkuAkuInvincibility(proj, infinite ? BuildIsoToPS2.AkuAkuInfinite : BuildIsoToPS2.AkuAkuDefaultSeconds);
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("The golden invincibility never runs out.");
+
+        bool touchBreak = proj.AkuAkuTouchBreak;
+        if (ImGui.Checkbox("Golden Aku Aku breaks crates and enemies on touch##akutouchbreak", ref touchBreak))
+        {
+            proj.AkuAkuTouchBreak = touchBreak;
+            proj.Save();
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF. While the golden invincibility lasts, touching a crate or an\n" +
+                         "enemy counts as a spin (crates break, enemies get hit). Landing on top works as\n" +
+                         "usual, and wumpa are still collected.");
+
+        DrawAkuAkuGoldenMusic(proj); // Amedo 2026-09-25
+    }
+
+    // Amedo 2026-09-25
+    private void DrawAkuAkuGoldenMusic(CrashProject proj)
+    {
+        LoadCustomMusicNames();
+        uint? musicId = proj.AkuAkuGoldenMusicId;
+        string musicLabel = musicId is not { } mid ? "None (original game)"
+            : _customMusicNames.TryGetValue(mid, out var customName) ? $"{customName} (id {mid})"
+            : MusicNames.TryGetValue(mid, out var name) ? $"{name} (id {mid})"
+            : $"id {mid}";
+        ImGui.TextDisabled($"Golden Aku Aku music: {musicLabel}");
+
+        ImGui.BeginDisabled(_musicReplaceInProgress);
+        if (ImGui.Button("Import WAV/MP3...##akumusicimport"))
+            ReplaceMusicTrackAudio(musicId ?? 0, "Golden Aku Aku music", newId =>
+            {
+                proj.AkuAkuGoldenMusicId = newId;
+                proj.Save();
+            });
+        ImGui.EndDisabled();
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: no music. Pick a WAV or MP3 to play while the golden invincibility\n" +
+                         "lasts. It starts right away when the 3rd mask is collected and keeps playing if\n" +
+                         "another mask is collected or Crash walks into another level. When the golden\n" +
+                         "invincibility ends, the current level's music fades back in.\n" +
+                         "Added to MUSIC.MB as a new track. MP3 is resampled to 32000Hz automatically; a WAV\n" +
+                         "is used as-is, so save it at 32000Hz (the game's rate). Applied on the next Build ISO.");
+
+        if (musicId is { } playId)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Preview##akumusicpreview")) PreviewMusicTrack(playId, musicLabel);
+            ImGui.SameLine();
+            if (ImGui.Button("Stop##akumusicstop")) StopMusicPreview();
+            ImGui.SameLine();
+            ImGui.BeginDisabled(_musicReplaceInProgress);
+            if (ImGui.Button("Remove##akumusicremove"))
+            {
+                proj.AkuAkuGoldenMusicId = null;
+                proj.Save();
+            }
+            ImGui.EndDisabled();
+            if (ImGui.IsItemHovered())
+                MaybeTooltip("Back to the original game: no music during the golden invincibility.");
+
+            int volume = proj.AkuAkuGoldenMusicVolume ?? BuildIsoToPS2.AkuAkuMusicDefaultVolume;
+            ImGui.SetNextItemWidth(200f);
+            if (ImGui.SliderInt("Golden music volume (%)##akumusicvol", ref volume, 1, 100))
+                proj.AkuAkuGoldenMusicVolume = volume == BuildIsoToPS2.AkuAkuMusicDefaultVolume ? null : volume;
+            if (ImGui.IsItemDeactivatedAfterEdit()) proj.Save();
+            if (ImGui.IsItemHovered())
+                MaybeTooltip("The in-game volume of the golden music. 75% = the game's own music volume\n" +
+                             "(most level tracks play at 75%). 100% = the loudest the PS2 can play a track.\n" +
+                             "The audio itself isn't changed. Applied on the next Build ISO.");
+        }
+
+        if (_musicReplaceInProgress)
+            ImGui.TextColored(new Vector4(0.4f, 0.8f, 1f, 1f),
+                "Working — reading/writing the ~200MB MUSIC.MB archive, this can take several seconds...");
+    }
+
+    private static void SetAkuAkuInvincibility(CrashProject proj, int seconds)
+    {
+        proj.AkuAkuInvincibilitySeconds = seconds == BuildIsoToPS2.AkuAkuDefaultSeconds ? null : seconds;
+        proj.Save();
+    }
+
+    // Amedo 2026-09-25
+    private void DrawDoubleJumpRules()
+    {
+        if (!ImGui.CollapsingHeader("Jump Rules##doublejumprules")) return;
+        var proj = GetGameProject();
+        if (proj is null) { ImGui.TextDisabled("No project loaded."); return; }
+        if (!BuildIsoToPS2.HasPatchableExe(_extractedRoot)) // Amedo
+        {
+            ImGui.TextDisabled("Only available for NTSC-U (SLUS_209.09) and PAL (SLES_525.68) discs.");
+            return;
+        }
+
+        uint mask = proj.DoubleJumpMask ?? BuildIsoToPS2.DoubleJumpDefaultMask;
+
+        bool single = (mask & 0x44) == 0;
+        if (ImGui.Checkbox("Single jump only##djnormal", ref single))
+        {
+            mask = single ? mask & ~0x44u : mask | 0x44;
+            SetDoubleJumpMask(proj, mask);
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF (the normal jump, standing or running, allows a double jump).\n" +
+                         "Turn it on and the normal jump becomes a single jump.");
+
+        bool slide = (mask & 0x20) != 0;
+        if (ImGui.Checkbox("Allow double jump after slide jump##djslide", ref slide))
+        {
+            mask = slide ? mask | 0x20 : mask & ~0x20u;
+            SetDoubleJumpMask(proj, mask);
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF (the slide jump is a single jump).\n" +
+                         "The double jump after a slide jump also turns Crash to face the stick,\n" +
+                         "like a normal double jump.");
+
+        bool spin = (mask & BuildIsoToPS2.DoubleJumpSpinBit) != 0;
+        if (ImGui.Checkbox("Allow double jump while spinning##djspin", ref spin))
+        {
+            mask = spin ? mask | BuildIsoToPS2.DoubleJumpSpinBit : mask & ~BuildIsoToPS2.DoubleJumpSpinBit;
+            SetDoubleJumpMask(proj, mask);
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF (jumping while spinning is a single jump, and the spin keeps\n" +
+                         "the double jump blocked until Crash lands). Turn it on to allow a double jump\n" +
+                         "during and after the spin.");
+
+        bool slideSpin = (mask & BuildIsoToPS2.SlideJumpSpinBit) != 0;
+        if (ImGui.Checkbox("Allow spin during slide jump##spinslide", ref slideSpin))
+        {
+            mask = slideSpin ? mask | BuildIsoToPS2.SlideJumpSpinBit : mask & ~BuildIsoToPS2.SlideJumpSpinBit;
+            SetDoubleJumpMask(proj, mask);
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF (the spin is cancelled during a slide jump).");
+
+        bool slideSlam = (mask & BuildIsoToPS2.SlideJumpBodySlamBit) != 0;
+        if (ImGui.Checkbox("Allow body slam during slide jump##bsslide", ref slideSlam))
+        {
+            mask = slideSlam ? mask | BuildIsoToPS2.SlideJumpBodySlamBit : mask & ~BuildIsoToPS2.SlideJumpBodySlamBit;
+            SetDoubleJumpMask(proj, mask);
+        }
+        if (ImGui.IsItemHovered())
+            MaybeTooltip("Original game: OFF (the body slam button does nothing during a slide jump).");
+
+        bool isDefault = mask == BuildIsoToPS2.DoubleJumpDefaultMask;
+        ImGui.BeginDisabled(isDefault);
+        if (ImGui.Button("Reset to original rules##djreset")) SetDoubleJumpMask(proj, BuildIsoToPS2.DoubleJumpDefaultMask);
+        ImGui.EndDisabled();
+    }
+
+    private void SetDoubleJumpMask(CrashProject proj, uint mask)
+    {
+        proj.DoubleJumpMask = mask == BuildIsoToPS2.DoubleJumpDefaultMask ? null : mask;
+        proj.Save();
+        _browser.Log(proj.DoubleJumpMask is null
+            ? "Jump rules: back to the original game rules (applied on next Build ISO)."
+            : $"Jump rules: saved (mask 0x{mask:X2}) — applied on next Build ISO.");
     }
 
     private const uint BeginMusicCommandId = 88;
@@ -1004,9 +1200,9 @@ public sealed partial class GameScene
     private float _tntSpeedMultiplier = 1f;
     private bool _tntMultiplierActive;
 
-    private void DrawTntCountdownSpeed(ChunkSource chunkSource, BaseTwinSection? behSec)
+    private void DrawTntCountdownSpeed(Entity e, ChunkSource chunkSource, Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject obj) // Amedo
     {
-        var tntGraph = behSec?.GetItem<PS2BehaviourGraph>(TntCountdownBehaviourId);
+        var tntGraph = ObjectGraph(chunkSource, obj, TntCountdownBehaviourId, out bool own);
         if (tntGraph is null)
         {
             ImGui.TextDisabled("Couldn't find the TNT countdown behaviour (0x3F) in Startup\\Default.rm2.");
@@ -1030,13 +1226,14 @@ public sealed partial class GameScene
             _tntSpeedMultiplier = _tntOriginalDelays[0] / liveDelay0;
 
         ImGui.Text("TNT Countdown Speed");
+        if (DrawScriptScope(e, own, "every TNT crate")) return; // Amedo
         bool changed = ImGui.SliderFloat("Speed Multiplier##tntspeed", ref _tntSpeedMultiplier, 0.1f, 5f, "%.2fx");
         _tntMultiplierActive = ImGui.IsItemActive();
         if (changed)
         {
             for (int i = 0; i < packets.Count; i++)
                 SetDelay(packets[i], _tntOriginalDelays[i] / _tntSpeedMultiplier);
-            chunkSource.GlobalRm2Dirty = true;
+            if (!own) chunkSource.GlobalRm2Dirty = true; // Amedo
         }
         if (ImGui.IsItemHovered())
         {
@@ -1139,9 +1336,9 @@ public sealed partial class GameScene
     private float  _nitroBlastRadiusMultiplier = 1f;
     private bool   _nitroBlastRadiusActive;
 
-    private void DrawNitroBlastRadius(ChunkSource chunkSource, BaseTwinSection? behSec)
+    private void DrawNitroNoiseRadius(Entity e, ChunkSource chunkSource, Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject obj) // Amedo
     {
-        var nitroGraph = behSec?.GetItem<PS2BehaviourGraph>(NitroCrateBehaviourId);
+        var nitroGraph = ObjectGraph(chunkSource, obj, NitroCrateBehaviourId, out bool own);
         if (nitroGraph is null)
         {
             ImGui.TextDisabled("Couldn't find COM_NITRO_CRATE_DEFAULT (0x37) in Startup\\Default.rm2.");
@@ -1163,55 +1360,176 @@ public sealed partial class GameScene
             _nitroBlastRadiusMultiplier = liveVal / orig0;
         }
 
-        ImGui.Text("Nitro Blast Radius");
+        ImGui.Text("Nitro Hop Noise Radius"); // Amedo
+        if (DrawScriptScope(e, own, "every Nitro crate")) return;
         bool changed = ImGui.SliderFloat("Radius Multiplier##nitroblast", ref _nitroBlastRadiusMultiplier, 0.1f, 5f, "%.2fx");
         _nitroBlastRadiusActive = ImGui.IsItemActive();
         if (changed)
         {
             cmd.Arguments[0] = BitConverter.SingleToUInt32Bits((_nitroOriginalBlastRadius ?? 10f) * _nitroBlastRadiusMultiplier);
-            chunkSource.GlobalRm2Dirty = true;
+            if (!own) chunkSource.GlobalRm2Dirty = true; // Amedo
         }
         if (ImGui.IsItemHovered())
         {
-            MaybeTooltip("Scales AgentLab command 117 (ApplyBlastRadius) inside\n" +
-                         "COM_NITRO_CRATE_DEFAULT (Startup\\Default.rm2) — the real world-unit\n" +
-                         "radius the game passes straight into its area-of-effect blast scan,\n" +
-                         "confirmed live via PCSX2 disassembly + Ghidra this session (see\n" +
-                         "project_crashengine_collision memory for the full call chain).\n" +
-                         "Affects EVERY Nitro Crate in the game (shared script data), not just\n" +
-                         "one placement. 1.00x = original (10.0 units). Save Chunk to persist,\n" +
-                         "then Build ISO + test.");
+            MaybeTooltip("Scales command 117 (MakeNoise, 0x2549E0) in the idle hop of\n" + // Amedo
+                         "COM_NITRO_CRATE_DEFAULT (Startup\\Default.rm2): the radius of the\n" +
+                         "noise each hop makes. Agents inside it hear the crate (look at it /\n" +
+                         "get their noise message). It does NOT damage anything; the kill\n" +
+                         "radius is 'Crate Explosion Radius' below.\n" +
+                         "Shared script = every Nitro Crate; own script = this object only.\n" +
+                         "1.00x = original\n" +
+                         "(10.0 units). Save Chunk to persist.");
         }
         ImGui.SameLine();
         if (ImGui.Button("Reset##nitroblastreset"))
         {
             _nitroBlastRadiusMultiplier = 1f;
             cmd.Arguments[0] = BitConverter.SingleToUInt32Bits(_nitroOriginalBlastRadius ?? 10f);
-            chunkSource.GlobalRm2Dirty = true;
+            if (!own) chunkSource.GlobalRm2Dirty = true; // Amedo
         }
 
         float rawVal = BitConverter.UInt32BitsToSingle(cmd.Arguments[0]);
-        ImGui.TextDisabled($"Current raw radius: {rawVal:F2} world units");
+        ImGui.TextDisabled($"Current noise radius: {rawVal:F2} world units"); // Amedo
+        DrawSelectedSphereRings(rawVal, new System.Numerics.Vector4(0.35f, 0.7f, 1f, 0.6f), 1.5f); // Amedo
+    }
 
-        // Amedo 2026-09-21
-        if (_selected is not null && _camera is not null && !ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup))
+    // Amedo 2026-09-21
+    private void DrawSelectedSphereRings(float radius, System.Numerics.Vector4 color, float thickness)
+    {
+        if (_selected is null || _camera is null || ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup)) return;
+        var center = _selected.Transform.World.Translation;
+        int sw = ViewW, sh = ViewH; // Amedo
+        var dl = ImGui.GetForegroundDrawList();
+        uint ringColor = ImGui.ColorConvertFloat4ToU32(color);
+        foreach (var axis in new[] { System.Numerics.Vector3.UnitX, System.Numerics.Vector3.UnitY, System.Numerics.Vector3.UnitZ })
         {
-            var center = _selected.Transform.World.Translation;
-            int sw = Engine.Instance.Width, sh = Engine.Instance.Height;
-            var dl = ImGui.GetForegroundDrawList();
-            uint ringColor = ImGui.ColorConvertFloat4ToU32(new System.Numerics.Vector4(1f, 0.55f, 0.1f, 0.9f));
-            foreach (var axis in new[] { System.Numerics.Vector3.UnitX, System.Numerics.Vector3.UnitY, System.Numerics.Vector3.UnitZ })
+            var pts = RingPoints(center, axis, radius);
+            System.Numerics.Vector2? prev = null;
+            for (int i = 0; i <= pts.Length; i++)
             {
-                var pts = RingPoints(center, axis, rawVal);
-                System.Numerics.Vector2? prev = null;
-                for (int i = 0; i <= pts.Length; i++)
-                {
-                    if (!WorldToScreen(pts[i % pts.Length], sw, sh, out var sp)) { prev = null; continue; }
-                    if (prev is { } pv) dl.AddLine(pv, sp, ringColor, 2f);
-                    prev = sp;
-                }
+                if (!WorldToScreen(pts[i % pts.Length], sw, sh, out var sp)) { prev = null; continue; }
+                if (prev is { } pv) dl.AddLine(pv, sp, ringColor, thickness);
+                prev = sp;
             }
         }
+    }
+
+    // Amedo
+    private List<float>? _crateExplodeOriginalRadii;
+    private float _crateExplodeMultiplier = 1f;
+    private bool  _crateExplodeActive;
+
+    // Amedo
+    private static bool IsLiteralFloatWord(uint w) => (w & 1) == 0 && ((w >> 1) & 3) == 2;
+    private static float LiteralFloat(uint w) => BitConverter.Int32BitsToSingle((int)(w & ~7u));
+    private static uint ToLiteralFloat(float f) => (BitConverter.SingleToUInt32Bits(f) & ~7u) | 4u;
+
+    // Amedo
+    private static List<PS2BehaviourCommand> FindCrateDamageCommands(PS2BehaviourGraph graph)
+    {
+        var list = new List<PS2BehaviourCommand>();
+        foreach (var state in graph.ScriptStates)
+            foreach (var body in state.Bodies)
+                foreach (var cmd in body.Commands)
+                    if (cmd.CommandIndex is 514 or 546 or 563 && cmd.Arguments.Count > 10 && IsLiteralFloatWord(cmd.Arguments[10]))
+                        list.Add((PS2BehaviourCommand)cmd);
+        return list;
+    }
+
+    // Amedo
+    private void DrawCrateExplosionRadius(Entity e, ChunkSource chunkSource, Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject obj)
+    {
+        var graph = ObjectGraph(chunkSource, obj, CrateExplodeBehaviourId, out bool own);
+        if (graph is null)
+        {
+            ImGui.TextDisabled("Couldn't find COM_GENERIC_CRATE_EXPLODE (47) in Startup\\Default.rm2.");
+            return;
+        }
+        var cmds = FindCrateDamageCommands(graph);
+        if (cmds.Count == 0)
+        {
+            ImGui.TextDisabled("No CreateDamage (514) command found in COM_GENERIC_CRATE_EXPLODE.");
+            return;
+        }
+
+        if (_crateExplodeOriginalRadii is null || _crateExplodeOriginalRadii.Count != cmds.Count)
+        {
+            var orig = LoadCrateExplodeOriginalRadii();
+            _crateExplodeOriginalRadii = orig is not null && orig.Count == cmds.Count
+                ? orig
+                : cmds.Select(c => LiteralFloat(c.Arguments[10])).ToList();
+        }
+        var origRadii = _crateExplodeOriginalRadii;
+
+        int main = 0;
+        for (int i = 1; i < origRadii.Count; i++) if (origRadii[i] > origRadii[main]) main = i;
+        if (!_crateExplodeActive && origRadii[main] != 0f)
+            _crateExplodeMultiplier = LiteralFloat(cmds[main].Arguments[10]) / origRadii[main];
+
+        ImGui.Text("Crate Explosion Radius");
+        if (DrawScriptScope(e, own, "every Nitro and TNT crate")) return;
+        bool changed = ImGui.SliderFloat("Radius Multiplier##crateexplode", ref _crateExplodeMultiplier, 0.1f, 5f, "%.2fx");
+        _crateExplodeActive = ImGui.IsItemActive();
+        if (changed)
+        {
+            for (int i = 0; i < cmds.Count; i++)
+                cmds[i].Arguments[10] = ToLiteralFloat(origRadii[i] * _crateExplodeMultiplier);
+            if (!own) chunkSource.GlobalRm2Dirty = true;
+        }
+        if (ImGui.IsItemHovered())
+        {
+            MaybeTooltip("Scales every CreateDamage (514) radius inside\n" +
+                         "COM_GENERIC_CRATE_EXPLODE (47, Startup\\Default.rm2): the real\n" +
+                         "area that kills Crash / breaks things when a crate explodes.\n" +
+                         "Shared script = every Nitro and TNT crate; own script = this object only.\n" +
+                         "1.00x = original.\n" +
+                         "Save Chunk to persist.");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Reset##crateexplodereset"))
+        {
+            _crateExplodeMultiplier = 1f;
+            for (int i = 0; i < cmds.Count; i++) cmds[i].Arguments[10] = ToLiteralFloat(origRadii[i]);
+            if (!own) chunkSource.GlobalRm2Dirty = true;
+        }
+
+        float mainVal = LiteralFloat(cmds[main].Arguments[10]);
+        ImGui.TextDisabled($"Kill radius: {mainVal:F2} world units (original {origRadii[main]:F2})");
+        DrawSelectedSphereRings(mainVal, new System.Numerics.Vector4(1f, 0.25f, 0.1f, 0.95f), 2.5f);
+    }
+
+    // Amedo
+    private bool DrawScriptScope(Entity e, bool own, string sharedBy)
+    {
+        if (own)
+        {
+            ImGui.TextColored(new System.Numerics.Vector4(0.4f, 1f, 0.4f, 1f), "Applies to: this object only (own script)");
+            return false;
+        }
+        ImGui.TextColored(new System.Numerics.Vector4(1f, 0.75f, 0.3f, 1f), $"Applies to: {sharedBy} (shared script)");
+        ImGui.SameLine();
+        if (!ImGui.SmallButton("Only this object##ownscriptscope")) return false;
+        return MakeSelectionOwnScripts(e);
+    }
+
+    // Amedo
+    private List<float>? LoadCrateExplodeOriginalRadii()
+    {
+        try
+        {
+            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
+            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
+                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
+            using var reader = new BinaryReader(stream);
+            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
+            freshDefault.Read(reader, (int)stream.Length);
+
+            var freshGraph = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
+                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION)
+                ?.GetItem<PS2BehaviourGraph>(CrateExplodeBehaviourId);
+            return freshGraph is null ? null : FindCrateDamageCommands(freshGraph).Select(c => LiteralFloat(c.Arguments[10])).ToList();
+        }
+        catch { return null; }
     }
 
     private float? LoadNitroOriginalBlastRadius()
@@ -1234,72 +1552,5 @@ public sealed partial class GameScene
             return freshCmd is null ? null : BitConverter.UInt32BitsToSingle(freshCmd.Arguments[0]);
         }
         catch { return null; }
-    }
-
-    private const uint TextMasterBehaviourId = 0x12E9;
-    private const int  PlayerHitPointsConditionIndex = 512;
-    private const uint DisplayBottomTextCommandIndex = 603;
-    private const uint ShowBottomTextCommandIndex = 619;
-
-    private void DrawAkuAkuHealthProbe(ChunkSource chunkSource)
-    {
-        var behSec = chunkSource.Rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
-        var textMaster = behSec?.GetItem<PS2BehaviourGraph>(TextMasterBehaviourId);
-
-        ImGui.TextDisabled("One-off test — not a real feature yet:");
-        if (textMaster is null)
-        {
-            ImGui.TextDisabled("COM_UTIL_TEXTMASTER_DEFAULT (0x12E9) not found in this level.");
-            return;
-        }
-
-        bool alreadyInjected = textMaster.ScriptStates[0].Bodies
-            .Any(b => b.Condition is { ConditionIndex: PlayerHitPointsConditionIndex, NotGate: false });
-
-        if (alreadyInjected)
-        {
-            ImGui.TextColored(new Vector4(0.5f, 1f, 0.5f, 1f), "Test body already injected in this level — Save Chunk, Build ISO, and go check in PCSX2.");
-            return;
-        }
-
-        if (ImGui.Button("Debug: inject Aku-Aku-health on-screen test"))
-        {
-            var condition = new TwinBehaviourCondition
-            {
-                ConditionIndex = PlayerHitPointsConditionIndex,
-                Parameter = 0,
-                NotGate = false,
-                CheckInterval = 0f,
-                ReturnCheck = 2.5f,
-                ConditionPowerMultiplier = 0f,
-            };
-            var showText = new PS2BehaviourCommand
-            {
-                CommandIndex = (ushort)DisplayBottomTextCommandIndex,
-                Arguments = new List<uint> { 0x00000021, 0x3F000000, 0x3F6B851F, 0x3F800000, 0x3F800000, 0x3F800000, 0x00000000 },
-            };
-            var showBottom = new PS2BehaviourCommand
-            {
-                CommandIndex = (ushort)ShowBottomTextCommandIndex,
-                Arguments = new List<uint> { 0x3F800000 },
-            };
-            var testBody = new PS2BehaviourStateBody
-            {
-                Condition = condition,
-                Commands = new List<ITwinBehaviourCommand> { showText, showBottom },
-                HasStateJump = false,
-                Unknown = false,
-            };
-            textMaster.ScriptStates[0].Bodies.Insert(0, testBody);
-        }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip("Adds a body to this level's own text-display script: whenever\n" +
-                         "PlayerHitPoints(0) >= 2.5, show some on-screen text. If it appears\n" +
-                         "exactly when you're holding 3 Aku Aku masks (and not before), that\n" +
-                         "confirms PlayerHitPoints tracks the mask count 1:1.\n" +
-                         "Save Chunk after clicking, then Build ISO + test in PCSX2.");
-        }
     }
 }

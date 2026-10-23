@@ -200,10 +200,20 @@ public sealed partial class GameScene
     // Amedo 2026-09-21
     private float _previewVolume = 0.5f;
 
+    // Amedo 2026-09-25
+    private readonly object _previewSoundLock = new();
+    private GCHandle _previewSoundPin;
+
     private bool PlayPreviewWav(byte[] wav)
     {
         var scaled = ApplyPreviewVolume(wav, _previewVolume);
-        return PlaySound(scaled, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+        lock (_previewSoundLock) // Amedo 2026-09-25
+        {
+            PlaySound(null, IntPtr.Zero, 0);
+            if (_previewSoundPin.IsAllocated) _previewSoundPin.Free();
+            _previewSoundPin = GCHandle.Alloc(scaled, GCHandleType.Pinned);
+            return PlaySound(scaled, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+        }
     }
 
     private static byte[] ApplyPreviewVolume(byte[] wav, float factor)
@@ -267,7 +277,11 @@ public sealed partial class GameScene
 
     private void StopMusicPreview()
     {
-        try { PlaySound(null, IntPtr.Zero, 0); } catch {  }
+        lock (_previewSoundLock) // Amedo 2026-09-25
+        {
+            try { PlaySound(null, IntPtr.Zero, 0); } catch {  }
+            if (_previewSoundPin.IsAllocated) _previewSoundPin.Free();
+        }
         _musicPreviewPlaying = false;
     }
 

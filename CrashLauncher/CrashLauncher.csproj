@@ -7,12 +7,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
+  <!-- Amedo 2026-09-29 -->
+  <PropertyGroup>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <GarbageCollectionAdaptationMode>0</GarbageCollectionAdaptationMode>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
     <ProjectReference Include="..\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
     <ProjectReference Include="..\CrashEngine.Assets\CrashEngine.Assets.csproj" />
     <ProjectReference Include="..\CrashEngine.Stealth\CrashEngine.Stealth.csproj" />
     <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
+    <ProjectReference Include="..\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
   </ItemGroup>
 
   <!-- 2026-08-22 — MP3 import support: NLayer is a fully-managed C# MP3 decoder (no native code,
@@ -30,6 +37,7 @@
        working directory. -->
   <ItemGroup>
     <None Include="Assets\Icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\Models\**\*.glb" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs).

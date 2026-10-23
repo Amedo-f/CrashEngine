@@ -91,19 +91,9 @@ public sealed partial class GameScene : Scene
 
     private void DrawInspector(Entity e)
     {
-        bool active = e.Active;
-        if (ImGui.Checkbox("##active", ref active)) e.Active = active;
-        ImGui.SameLine();
-        ImGui.TextColored(new Vector4(1f, 1f, 0.4f, 1f), e.Name);
-
-        if (ImGui.Button("Export Object (OBJ + textures)...", new Vector2(-1f, 0f)))
-        {
-            ExportSelectedObjectToObj();
-        }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip("Exports this object (and every child part) as a real Wavefront .obj +\n.mtl + .png texture files, ready to open directly in Blender — full shape,\nUVs, and textures, not just raw positions like Export Collision to OBJ.");
-        }
+        DrawInspectorHeader(e); // Amedo
+        DrawReceiveShadows(e); // Amedo
+        DrawShadowShape(e); // Amedo
 
         if (e.Get<SceneryTile>() is not null)
         {
@@ -147,7 +137,6 @@ public sealed partial class GameScene : Scene
             var pos = lmForPos is { } m0 ? new Vector3(m0.M41, m0.M42, m0.M43) : e.Transform.Position;
             ImGui.SetNextItemWidth(-1f);
             bool posChanged = ImGui.DragFloat3("Pos##t", ref pos, 0.05f);
-            if (ImGui.IsItemActivated()) _inspectorDragBefore = new TransformSnapshot(e.Transform);
             if (posChanged)
             {
                 if (lmForPos is { } m1)
@@ -157,7 +146,6 @@ public sealed partial class GameScene : Scene
                 }
                 else e.Transform.Position = pos;
             }
-            PushInspectorUndoIfDeactivated(e);
 
             var lmForRot = e.Transform.LocalMatrix;
             bool haveRot = true;
@@ -180,7 +168,6 @@ public sealed partial class GameScene : Scene
             if (!haveRot && ImGui.IsItemHovered())
                 MaybeTooltip("This object's transform is a mirrored/degenerate matrix — rotation\n" +
                              "can't be cleanly separated from its scale to show as angles.");
-            if (ImGui.IsItemActivated()) _inspectorDragBefore = new TransformSnapshot(e.Transform);
             if (rotChanged)
             {
                 var newQuat = EulerXYZToQuaternion(eulerDeg * (MathF.PI / 180f));
@@ -192,7 +179,6 @@ public sealed partial class GameScene : Scene
                 }
                 else e.Transform.Rotation = newQuat;
             }
-            PushInspectorUndoIfDeactivated(e);
             ImGui.EndDisabled();
 
             var scale = lmForRot is not null ? scaleForRot : e.Transform.Scale;
@@ -212,15 +198,11 @@ public sealed partial class GameScene : Scene
             float uniform = (scale.X + scale.Y + scale.Z) / 3f;
             ImGui.SetNextItemWidth(-1f);
             bool uniformChanged = ImGui.DragFloat("Uniform Scale##t", ref uniform, 0.01f, 0.001f, 1000f);
-            if (ImGui.IsItemActivated()) _inspectorDragBefore = new TransformSnapshot(e.Transform);
             if (uniformChanged) { scale = new Vector3(uniform, uniform, uniform); ApplyScale(scale); }
-            PushInspectorUndoIfDeactivated(e);
 
             ImGui.SetNextItemWidth(-1f);
             bool scaleChanged = ImGui.DragFloat3("Scale##t", ref scale, 0.01f, 0.001f, 1000f);
-            if (ImGui.IsItemActivated()) _inspectorDragBefore = new TransformSnapshot(e.Transform);
             if (scaleChanged) ApplyScale(scale);
-            PushInspectorUndoIfDeactivated(e);
 
             var wp = e.Transform.World.Translation;
             ImGui.TextDisabled($"World  {wp.X:F2}  {wp.Y:F2}  {wp.Z:F2}");
@@ -281,11 +263,11 @@ public sealed partial class GameScene : Scene
                 if (ImGui.Combo("Fog Color##wlfog", ref fogIdx, CrashEngine.Importer.MeshDecoder.FogColorNames, CrashEngine.Importer.MeshDecoder.FogColorNames.Length))
                     lighting.FogColorIndex = fogIdx;
                 if (ImGui.IsItemHovered())
-                    MaybeTooltip("Real distance-fog colour this level blends distant geometry toward\n" +
-                                      "(exponential curve, capped at 40% blend). Not a bug/LOD issue - a\n" +
-                                      "genuine PS2-era technique to soften the far draw distance. Limited\n" +
-                                      "to these 6 real values (that's all the format supports), unlike the\n" +
-                                      "free colour pickers above. Save Chunk to persist.");
+                    MaybeTooltip("The game's own fog pass: every pixel farther than ~25 units from the\n" + // Amedo 2026-09-26
+                                      "camera (sky included) is blended 29.7% toward this colour, taken\n" +
+                                      "from the game's per-index fog palettes. 'None' turns the fog off.\n" +
+                                      "Only these 7 values exist in the game. Updates live; Save Chunk\n" +
+                                      "to persist.");
 
                 var ambient = lighting.AmbientColor;
                 if (ImGui.ColorEdit3("Ambient##wl", ref ambient)) lighting.AmbientColor = ambient;
@@ -411,7 +393,7 @@ public sealed partial class GameScene : Scene
                     if (mat.Albedo is not null)
                     {
                         var tex = mat.Albedo;
-                        ImGui.TextDisabled($"Texture: {tex.Width}x{tex.Height}");
+                        ImGui.TextDisabled($"Texture: {tex.Width}x{tex.Height}{tex.HdLabel}"); // Amedo 2026-10-02
                         float avail  = ImGui.GetContentRegionAvail().X;
                         float aspect = tex.Height > 0 ? (float)tex.Width / tex.Height : 1f;
                         float th     = MathF.Min(avail / aspect, 160f);
@@ -564,7 +546,7 @@ public sealed partial class GameScene : Scene
                 if (mat.Albedo is not null)
                 {
                     var tex = mat.Albedo;
-                    ImGui.TextDisabled($"Texture: {tex.Width}×{tex.Height}");
+                    ImGui.TextDisabled($"Texture: {tex.Width}×{tex.Height}{tex.HdLabel}"); // Amedo 2026-10-02
                     float avail  = ImGui.GetContentRegionAvail().X;
                     float aspect = tex.Height > 0 ? (float)tex.Width / tex.Height : 1f;
                     float th     = MathF.Min(avail / aspect, 160f);
@@ -811,11 +793,15 @@ public sealed partial class GameScene : Scene
                     ImGui.TextDisabled("(preview-only — the load wall isn't collidable, so\n" +
                                         "walking here won't actually transition, per this data)");
 
-                bool isRendered = linkedScenery.Source.IsRendered;
-                if (ImGui.Checkbox("Rendered (visible preview before crossing)##linkRendered", ref isRendered))
+                int renderMode = (linkedScenery.Source.IsRendered ? 1 : 0) | (linkedScenery.Source.UnkNum << 1); // Amedo 2026-10-06
+                int renderPick = renderMode == 0 ? 0 : renderMode == 1 ? 1 : 2;
+                string[] renderNames = { "Never", "Always", "When its load wall is on screen" };
+                ImGui.SetNextItemWidth(-1f);
+                if (ImGui.Combo("##linkRenderMode", ref renderPick, renderNames, renderNames.Length) && renderPick != (renderMode == 0 ? 0 : renderMode == 1 ? 1 : 2))
                 {
-                    linkedScenery.Source.IsRendered = isRendered;
-                    if (isRendered)
+                    linkedScenery.Source.IsRendered = renderPick == 1;
+                    linkedScenery.Source.UnkNum = (byte)(renderPick == 2 ? 1 : 0);
+                    if (renderPick == 1)
                     {
                         if (e.Children.Count == 0)
                             RetargetLinkedScenery(e, linkedScenery.Source.Path);
@@ -826,9 +812,12 @@ public sealed partial class GameScene : Scene
                             e.RemoveChild(child);
                     }
                 }
-                if (!isRendered)
-                    ImGui.TextDisabled("(not rendered — real game skips the preview for this link;\n" +
-                                        "toggle on to load+edit it here anyway)");
+                ImGui.TextDisabled(renderPick switch
+                {
+                    0 => "(in game: never drawn — loaded only for its logic, if at all)",
+                    1 => "(in game: always drawn while its scenery is loaded)",
+                    _ => "(in game: drawn only while its load wall is inside the camera view;\n no preview here)",
+                });
 
                 ImGui.TextDisabled("Redirect to a different level's chunk:");
                 if (GetGameProject() is { IsNewGame: true })
@@ -1084,22 +1073,22 @@ public sealed partial class GameScene : Scene
                     ImGui.SetNextItemWidth(-1f);
                     var v1 = new Vector3(camData.UnkVector1.X, camData.UnkVector1.Y, camData.UnkVector1.Z);
                     if (ImGui.DragFloat3("Offset 1 (XYZ)##camData", ref v1, 0.05f))
-                    { camData.UnkVector1.X = v1.X; camData.UnkVector1.Y = v1.Y; camData.UnkVector1.Z = v1.Z; }
+                    { var u1 = camData.UnkVector1; u1.X = v1.X; u1.Y = v1.Y; u1.Z = v1.Z; camData.UnkVector1 = u1; } // Amedo
                     if (bit28)
                     {
                         ImGui.SetNextItemWidth(-1f);
                         float w1 = camData.UnkVector1.W;
-                        if (ImGui.DragFloat("Offset 1 W##camData", ref w1, 0.05f)) camData.UnkVector1.W = w1;
+                        if (ImGui.DragFloat("Offset 1 W##camData", ref w1, 0.05f)) { var u1 = camData.UnkVector1; u1.W = w1; camData.UnkVector1 = u1; } // Amedo
                     }
                     ImGui.SetNextItemWidth(-1f);
                     var v2 = new Vector3(camData.UnkVector2.X, camData.UnkVector2.Y, camData.UnkVector2.Z);
                     if (ImGui.DragFloat3("Offset 2 (XYZ)##camData", ref v2, 0.05f))
-                    { camData.UnkVector2.X = v2.X; camData.UnkVector2.Y = v2.Y; camData.UnkVector2.Z = v2.Z; }
+                    { var u2 = camData.UnkVector2; u2.X = v2.X; u2.Y = v2.Y; u2.Z = v2.Z; camData.UnkVector2 = u2; } // Amedo
                     if (bit28)
                     {
                         ImGui.SetNextItemWidth(-1f);
                         float w2 = camData.UnkVector2.W;
-                        if (ImGui.DragFloat("Offset 2 W##camData", ref w2, 0.05f)) camData.UnkVector2.W = w2;
+                        if (ImGui.DragFloat("Offset 2 W##camData", ref w2, 0.05f)) { var u2 = camData.UnkVector2; u2.W = w2; camData.UnkVector2 = u2; } // Amedo
                     }
                     ImGui.Unindent();
                 }
@@ -1204,7 +1193,7 @@ public sealed partial class GameScene : Scene
                 ImGui.TextDisabled("XYZ: see Transform above.");
                 ImGui.SetNextItemWidth(-1f);
                 float w = posMarker.Source.Position.W;
-                if (ImGui.DragFloat("W (unknown)##posData", ref w, 0.05f)) posMarker.Source.Position.W = w;
+                if (ImGui.DragFloat("W (unknown)##posData", ref w, 0.05f)) { var pp = posMarker.Source.Position; pp.W = w; posMarker.Source.Position = pp; } // Amedo
             }
         }
 
@@ -1217,7 +1206,7 @@ public sealed partial class GameScene : Scene
                 ImGui.TextDisabled("XYZ: see Transform above.");
                 ImGui.SetNextItemWidth(-1f);
                 float w = aiPosMarker.Source.Position.W;
-                if (ImGui.DragFloat("W (unknown)##aiPosData", ref w, 0.05f)) aiPosMarker.Source.Position.W = w;
+                if (ImGui.DragFloat("W (unknown)##aiPosData", ref w, 0.05f)) { var ap = aiPosMarker.Source.Position; ap.W = w; aiPosMarker.Source.Position = ap; } // Amedo
                 ImGui.SetNextItemWidth(-1f);
                 int unkShort = aiPosMarker.Source.UnkShort;
                 if (ImGui.DragInt("Unk Short##aiPosData", ref unkShort, 1f, 0, ushort.MaxValue))
@@ -1312,6 +1301,7 @@ public sealed partial class GameScene : Scene
                         int msg = trigMarker.Source.TriggerMessages[i];
                         if (ImGui.DragInt($"Message {i}##trigMsg{i}", ref msg, 1f, 0, ushort.MaxValue))
                             trigMarker.Source.TriggerMessages[i] = (ushort)Math.Clamp(msg, 0, ushort.MaxValue);
+                        DrawTriggerMessageTargets(trigMarker.Source, trigMarker.Source.TriggerMessages[i]); // Amedo 2026-09-25
                     }
                     ImGui.TreePop();
                 }
@@ -1337,6 +1327,7 @@ public sealed partial class GameScene : Scene
             {
                 ImGui.TextDisabled($"Object ID:    0x{inst.ObjectId:X4}");
                 ImGui.TextDisabled($"State Flags:  0x{inst.Source.StateFlags:X8}");
+                DrawUniqueObject(e, inst); // Amedo
 
                 if (ImGui.CollapsingHeader("Instance Flags (this placement only)##instflags"))
                 {
@@ -1356,12 +1347,32 @@ public sealed partial class GameScene : Scene
 
                 if (inst.Source.Positions.Count > 0 || inst.Source.Paths.Count > 0)
                 {
-                    if (ImGui.CollapsingHeader("Referenced Positions/Paths##instrefs", ImGuiTreeNodeFlags.DefaultOpen))
+                    if (ImGui.CollapsingHeader("Referenced Instances/Positions/Paths##instrefs", ImGuiTreeNodeFlags.DefaultOpen))
                     {
                         var chunkRootForRefs = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
                         Entity? FindPositionEntity(ushort pid) => chunkRootForRefs is null ? null :
                             AllEntities(chunkRootForRefs).FirstOrDefault(x =>
                                 x.Get<CrashEngine.Importer.PositionMarker>()?.Source.GetID() == pid);
+                        Entity? FindInstanceEntity(ushort iid) => chunkRootForRefs is null ? null :   // Amedo 2026-09-23
+                            AllEntities(chunkRootForRefs).FirstOrDefault(x =>
+                                x.Get<InstanceData>()?.Source.GetID() == iid);
+
+                        // Amedo 2026-09-23
+                        if (inst.Source.Instances.Count > 0)
+                        {
+                            ImGui.TextDisabled($"Instances ({inst.Source.Instances.Count}) — IDs this instance messages:");
+                            for (int i = 0; i < inst.Source.Instances.Count; i++)
+                            {
+                                ushort iid = inst.Source.Instances[i];
+                                var itarget = FindInstanceEntity(iid);
+                                ImGui.TextUnformatted($"  [{i}] Instance_{iid:X4}" + (itarget is null ? "  (not found in this chunk)" : $"  ({itarget.Name})"));
+                                if (itarget is not null)
+                                {
+                                    ImGui.SameLine();
+                                    if (ImGui.SmallButton($"Select##instref_{i}")) SelectClicked(itarget, false);
+                                }
+                            }
+                        }
 
                         if (inst.Source.Positions.Count > 0)
                         {
@@ -1416,6 +1427,20 @@ public sealed partial class GameScene : Scene
                             int pval1 = unchecked((int)inst.Source.ParamList1[p]);
                             if (ImGui.InputInt($"[{p}]##paramlist1_{p}", ref pval1, 0, 0, ImGuiInputTextFlags.CharsHexadecimal))
                                 inst.Source.ParamList1[p] = unchecked((uint)pval1);
+                        }
+                    }
+                }
+
+                // Amedo 2026-09-23
+                if (inst.Source.ParamList3.Count > 0)
+                {
+                    if (ImGui.CollapsingHeader("IVars (raw)##paramlist3ivars"))
+                    {
+                        for (int p = 0; p < inst.Source.ParamList3.Count; p++)
+                        {
+                            int pval3 = unchecked((int)inst.Source.ParamList3[p]);
+                            if (ImGui.InputInt($"[{p}]##ivars_{p}", ref pval3))
+                                inst.Source.ParamList3[p] = unchecked((uint)pval3);
                         }
                     }
                 }
@@ -1539,25 +1564,32 @@ public sealed partial class GameScene : Scene
                         }
                     }
 
-                    if (thisObj is not null && thisObj.RefBehaviours.Contains((ushort)TntCountdownBehaviourId) &&
-                        scriptChunkSrc is not null)
+                    // Amedo
+                    if (thisObj is not null && ChunkSourceFor(e) is { } tntChunkSrc && ObjectRunsBehaviour(tntChunkSrc, thisObj, TntCountdownBehaviourId))
                     {
-                        var globalBehSecForTnt = scriptChunkSrc.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
                         if (ImGui.CollapsingHeader("TNT Countdown##tntcountdown", ImGuiTreeNodeFlags.DefaultOpen))
                         {
-                            DrawTntCountdownSpeed(scriptChunkSrc, globalBehSecForTnt);
+                            DrawTntCountdownSpeed(e, tntChunkSrc, thisObj);
                         }
                     }
 
-                    if (thisObj is not null && thisObj.RefBehaviours.Contains((ushort)NitroCrateBehaviourId) &&
-                        scriptChunkSrc is not null)
+                    // Amedo
+                    var objChunkSrc = ChunkSourceFor(e);
+                    if (thisObj is not null && objChunkSrc is not null && ObjectRunsBehaviour(objChunkSrc, thisObj, NitroCrateBehaviourId))
                     {
-                        var globalBehSecForNitro = scriptChunkSrc.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
-                        if (ImGui.CollapsingHeader("Nitro Blast Radius##nitroblastradius", ImGuiTreeNodeFlags.DefaultOpen))
+                        if (ImGui.CollapsingHeader("Nitro Hop Noise Radius##nitroblastradius"))
                         {
-                            DrawNitroBlastRadius(scriptChunkSrc, globalBehSecForNitro);
+                            DrawNitroNoiseRadius(e, objChunkSrc, thisObj);
+                        }
+                    }
+
+                    // Amedo
+                    if (thisObj is not null && objChunkSrc is not null &&
+                        (ObjectRunsBehaviour(objChunkSrc, thisObj, NitroCrateBehaviourId) || ObjectRunsBehaviour(objChunkSrc, thisObj, TntCountdownBehaviourId)))
+                    {
+                        if (ImGui.CollapsingHeader("Crate Explosion Radius##crateexplode", ImGuiTreeNodeFlags.DefaultOpen))
+                        {
+                            DrawCrateExplosionRadius(e, objChunkSrc, thisObj);
                         }
                     }
 
@@ -1749,7 +1781,15 @@ public sealed partial class GameScene : Scene
                         }
                     }
 
+                    DrawTextSection(e, inst, localObjForInsp ?? globalObjForInsp, behSecForInsp, globalBehSecForInsp); // Amedo 2026-10-01
+
                     var behSecForList = editingGlobal ? globalBehSecForInsp : behSecForInsp;
+                    if (thisObj is not null && thisObj.TriggerBehaviours.Count > 0)
+                    {
+                        if (ImGui.CollapsingHeader($"Messages -> Behaviours ({thisObj.TriggerBehaviours.Count})##objmsgbeh")) // Amedo 2026-09-25
+                            DrawMessageBehaviours(thisObj);
+                    }
+
                     if (thisObj is not null && behSecForList is not null && thisObj.RefBehaviours.Count > 0)
                     {
                         if (ImGui.CollapsingHeader($"Behaviours ({thisObj.RefBehaviours.Count})##objbeh"))
@@ -1867,7 +1907,7 @@ public sealed partial class GameScene : Scene
                         float aspect = firstTex.Height > 0 ? (float)firstTex.Width / firstTex.Height : 1f;
                         float th     = MathF.Min(avail / aspect, 128f);
                         float tw     = th * aspect;
-                        ImGui.TextDisabled($"Texture: {firstTex.Width}x{firstTex.Height}");
+                        ImGui.TextDisabled($"Texture: {firstTex.Width}x{firstTex.Height}{firstTex.HdLabel}"); // Amedo 2026-10-02
                         ImGui.Image((nint)firstTex.GlId, new Vector2(tw, th), new Vector2(0f, 1f), new Vector2(1f, 0f));
                     }
                     else
@@ -2040,9 +2080,36 @@ public sealed partial class GameScene : Scene
             }
         }
 
+        if (e.Get<CrashEngine.Runtime.AgentLab.AgentLabAgent>() is { } agent) // Amedo 2026-09-26
+        {
+            ImGui.Separator();
+            ImGui.TextColored(new Vector4(0.4f, 1f, 0.6f, 1f), "AgentLab (running)");
+            ImGui.TextDisabled($"Behaviour / state: {agent.StateLabel}");
+            ImGui.TextDisabled($"Message: {(agent.Message == CrashEngine.Runtime.AgentLab.AgentLabAgent.NoMessage ? "-" : $"{agent.Message} @ {agent.MessageTime:0.00}s")}"); // Amedo 2026-09-28
+        }
+
+        var dynAnim = e.Get<CrashEngine.Importer.DynamicSceneryAnimator>(); // Amedo 2026-09-26
+        if (dynAnim is not null && dynAnim.FrameCount > 1)
+        {
+            ImGui.Separator();
+            if (ImGui.CollapsingHeader("Dynamic Scenery Animation##dynanim", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.Button(dynAnim.Playing ? "Pause##dynanim" : "Play##dynanim")) dynAnim.Playing = !dynAnim.Playing;
+                ImGui.SameLine();
+                ImGui.TextDisabled($"{dynAnim.FrameCount} frames @ {CrashEngine.Importer.DynamicSceneryAnimator.Fps:0} fps, loop");
+                float df = dynAnim.Frame;
+                ImGui.SetNextItemWidth(-1f);
+                if (ImGui.SliderFloat("##dynanimtimeline", ref df, 0f, dynAnim.FrameCount, "Frame %.2f"))
+                {
+                    dynAnim.Frame   = df;
+                    dynAnim.Playing = false;
+                }
+            }
+        }
+
         bool hasSpecific = mr is not null || rmr is not null || dcr is not null || rp is not null
                         || cam is not null || se is not null || inst is not null || anim is not null
-                        || linkedScenery is not null || loadWall is not null;
+                        || linkedScenery is not null || loadWall is not null || dynAnim is not null; // Amedo 2026-09-26
         if (!hasSpecific && e.Components.Count > 0)
         {
             ImGui.Separator();
@@ -2064,17 +2131,9 @@ public sealed partial class GameScene : Scene
             string bLabel = bItem is PS2BehaviourGraph bg && !string.IsNullOrEmpty(bg.Name)
                 ? bg.Name : (bItem is TwinBehaviourStarter ? "(starter, no name)" : "(missing)");
             string bType = bItem is TwinBehaviourStarter ? "Starter" : bItem is PS2BehaviourGraph ? "Graph" : "?";
-            bool clicked = ImGui.Selectable($"0x{bid:X4}  [{bType,-7}]  {bLabel}");
+            bool clicked = ImGui.Selectable($"0x{bid:X4}  [{bType,-7}]  {bLabel}", _inspectedBehaviourId == bid); // Amedo 2026-09-25
             if (clicked && bItem is PS2BehaviourGraph clickedGraph)
-            {
-                _inspectedBehaviourId = bid;
-                _inspectedBehaviourGraph = clickedGraph;
-                _inspectedBehaviourManual = false;
-                _inspectedBehaviourText = GraphToEditableText(clickedGraph);
-                _inspectedBehaviourOriginalText =
-                    GetPristineBehaviourGraphText(editingGlobal, bid) ?? _inspectedBehaviourText;
-                _inspectedBehaviourApplyMsg = "";
-            }
+                OpenBehaviourInTab(bid, clickedGraph, editingGlobal, manual: false); // Amedo 2026-09-25
         }
         ImGui.EndChild();
 
@@ -2088,18 +2147,12 @@ public sealed partial class GameScene : Scene
                     System.Globalization.CultureInfo.InvariantCulture, out uint manualId) &&
                 behSecForList.GetItem<PS2BehaviourGraph>(manualId) is { } manualGraph)
             {
-                _inspectedBehaviourId = manualId;
-                _inspectedBehaviourGraph = manualGraph;
-                _inspectedBehaviourManual = true;
-                _inspectedBehaviourText = GraphToEditableText(manualGraph);
-                _inspectedBehaviourOriginalText =
-                    GetPristineBehaviourGraphText(editingGlobal, manualId) ?? _inspectedBehaviourText;
-                _inspectedBehaviourApplyMsg = "";
+                OpenBehaviourInTab(manualId, manualGraph, editingGlobal, manual: true); // Amedo 2026-09-25
             }
             else
             {
-                _inspectedBehaviourApplyMsg = $"0x{_openBehIdText}: not found in this " +
-                    $"{(editingGlobal ? "GLOBAL" : "LOCAL")} Behaviours section (or not a Graph).";
+                _browser.Log($"Open by ID: 0x{_openBehIdText} not found in this " +
+                    $"{(editingGlobal ? "GLOBAL" : "LOCAL")} Behaviours section (or not a Graph).");
             }
         }
         if (ImGui.IsItemHovered())
@@ -2108,56 +2161,11 @@ public sealed partial class GameScene : Scene
                          "terminal state can hand off to a totally different graph by id\n" +
                          "(e.g. \"State_3(2635)\") that's never in RefBehaviours at all.");
 
-        if (_inspectedBehaviourId is uint ibid &&
-            (obj.RefBehaviours.Any(x => x == ibid) || _inspectedBehaviourManual) &&
-            _inspectedBehaviourGraph is not null)
+        if (_inspectedBehaviourId is uint ibid && _inspectedBehaviourGraph is not null) // Amedo 2026-09-25
         {
-            ImGui.TextDisabled($"0x{ibid:X4} — editable (uses WriteText/ReadText, the same " +
-                                "round-trippable format the game's own tools save/load, NOT " +
-                                "the pretty-print .lab decompile — command arguments are the " +
-                                "raw hex values you're changing):");
-            ImGui.InputTextMultiline("##objBehTextEdit", ref _inspectedBehaviourText, 65536,
-                new Vector2(-1f, 220f));
-            if (ImGui.Button("Apply Changes (live, in-memory)##applybeh"))
-            {
-                try
-                {
-                    using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_inspectedBehaviourText));
-                    using var sr = new StreamReader(ms);
-                    _inspectedBehaviourGraph.ReadText(sr);
-                    _scriptTextCache.Remove(ibid);
-                    if (editingGlobal && scriptChunkSrc is not null)
-                        scriptChunkSrc.GlobalRm2Dirty = true;
-                    _inspectedBehaviourApplyMsg = "Applied — in-memory only" +
-                        (editingGlobal ? " (GLOBAL script — affects every instance of this " +
-                                         "object type, every level)" : "") +
-                        ". Build ISO to test live right now (no Save Chunk needed for " +
-                        "that) — Save Chunk only when you're sure you want to keep it.";
-                }
-                catch (Exception ex)
-                {
-                    _inspectedBehaviourApplyMsg = $"Parse failed, NOT applied: {ex.Message}";
-                }
-            }
+            ImGui.TextDisabled($"0x{ibid:X4} is open in the Behaviour tab.");
             ImGui.SameLine();
-            if (ImGui.Button("Revert to Original##revertbeh"))
-            {
-                try
-                {
-                    using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_inspectedBehaviourOriginalText));
-                    using var sr = new StreamReader(ms);
-                    _inspectedBehaviourGraph.ReadText(sr);
-                    _inspectedBehaviourText = _inspectedBehaviourOriginalText;
-                    _scriptTextCache.Remove(ibid);
-                    _inspectedBehaviourApplyMsg = "Reverted to the true original (disc) script, in-memory. Save Chunk to persist.";
-                }
-                catch (Exception ex)
-                {
-                    _inspectedBehaviourApplyMsg = $"Revert failed: {ex.Message}";
-                }
-            }
-            if (!string.IsNullOrEmpty(_inspectedBehaviourApplyMsg))
-                ImGui.TextDisabled(_inspectedBehaviourApplyMsg);
+            if (ImGui.SmallButton("Show##showbehtab")) _focusBehaviourTab = true;
         }
     }
 
@@ -2599,18 +2607,21 @@ public sealed partial class GameScene : Scene
             int dw, dh;
             if (texObj.TextureFormat == Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMT8)
             {
+                double aspect = Math.Log2((double)img.Width / img.Height); // Amedo 2026-10-02
                 var best = PS2AnyTexture.RegisteredPsmt8Sizes
-                    .OrderBy(s => Math.Abs(s.Width - img.Width) + Math.Abs(s.Height - img.Height))
+                    .OrderBy(s => Math.Abs(Math.Log2((double)s.Width / s.Height) - aspect))
+                    .ThenBy(s => Math.Abs(s.Width - img.Width) + Math.Abs(s.Height - img.Height))
                     .First();
                 (dw, dh) = best;
             }
             else
             {
-                dw = NearestPowerOfTwo(img.Width);
-                dh = NearestPowerOfTwo(img.Height);
+                dw = Math.Min(NearestPowerOfTwo(img.Width), Ps2MaxSide); // Amedo 2026-10-02
+                dh = Math.Min(NearestPowerOfTwo(img.Height), Ps2MaxSide);
             }
             var rgba = (dw == img.Width && dh == img.Height)
                 ? img.Data
+                : dw <= img.Width && dh <= img.Height ? ResizeBox(img.Data, img.Width, img.Height, dw, dh) // Amedo 2026-10-02
                 : ResizeNearest(img.Data, img.Width, img.Height, dw, dh);
 
             var colors = new List<TwinColor>(dw * dh);
@@ -2621,11 +2632,12 @@ public sealed partial class GameScene : Scene
 
             if (fromGlobal) chunkSource.GlobalRm2Dirty = true;
 
-            mat.Albedo.UpdateData(rgba, (uint)dw, (uint)dh);
+            bool pc = img.Width > dw || img.Height > dh; // Amedo 2026-10-02
+            string? key = pc ? ChunkImporter.SaveHd(texObj, img.Data, img.Width, img.Height) : null;
+            if (key is not null) mat.Albedo.UpdateHighRes(img.Data, (uint)img.Width, (uint)img.Height, (uint)dw, (uint)dh);
+            else mat.Albedo.UpdateData(rgba, (uint)dw, (uint)dh);
 
-            _browser.Log($"Imported texture → Texture {id:X8} ({img.Width}x{img.Height} → {dw}x{dh}), format {texObj.TextureFormat}" +
-                         (dw != img.Width || dh != img.Height ? "  [resized to nearest power-of-two]" : "") +
-                         "  [kept at the SOURCE image's own resolution, not clamped to the original texture's size — larger than the original slot, real VRAM-overflow risk at big resolutions]" +
+            _browser.Log($"Imported texture → Texture {id:X8} ({img.Width}x{img.Height}): PS2 {dw}x{dh}, PC {(key is not null ? $"{img.Width}x{img.Height}" : $"{dw}x{dh}")}, format {texObj.TextureFormat}" + // Amedo 2026-10-02
                          (fromGlobal ? "  [shared/global object — will also write Startup\\Default.rm2 on Save Chunk]" : ""));
         }
         catch (Exception ex) { _browser.Log($"Import Texture failed: {ex.Message}"); }
@@ -2665,6 +2677,7 @@ public sealed partial class GameScene : Scene
             {
                 var pl = MakeEditorPointLight(scenery, new TwinVec4(0f, 0f, 0f, 1f));
                 scenery.PointLights.Add(pl);
+                EnableAddedSceneryLights(scenery); // Amedo 2026-09-26
                 var m = AddOneLightMarker(pl, false, $"PointLight_{scenery.PointLights.Count - 1}");
                 if (m is not null) SelectClicked(m, false);
             }
@@ -2701,6 +2714,7 @@ public sealed partial class GameScene : Scene
             {
                 var nl = MakeEditorNegativeLight(scenery, new TwinVec4(0f, 0f, 0f, 1f));
                 scenery.NegativeLights.Add(nl);
+                EnableAddedSceneryLights(scenery); // Amedo 2026-09-26
                 var m = AddOneLightMarker(nl, true, $"NegLight_{scenery.NegativeLights.Count - 1}");
                 if (m is not null) SelectClicked(m, false);
             }
@@ -2709,7 +2723,7 @@ public sealed partial class GameScene : Scene
             ImGui.TreePop();
         }
 
-        ImGui.TextDisabled("Point/Negative lights affect the real game only (the editor preview\nshows ambient+directional). Save Chunk to persist.");
+        ImGui.TextDisabled("Point/Negative lights update live on lit objects (Game Lighting);\nscenery stays unlit, like the game. Save Chunk to persist.");
     }
 
     // Amedo 2026-09-19
@@ -2920,6 +2934,32 @@ public sealed partial class GameScene : Scene
         int lower = 1 << (int)Math.Floor(Math.Log2(v));
         int upper = lower << 1;
         return (v - lower) < (upper - v) ? lower : upper;
+    }
+
+    private const int Ps2MaxSide = 256; // Amedo 2026-10-02
+
+    // Amedo 2026-10-02
+    private static byte[] ResizeBox(byte[] src, int sw, int sh, int dw, int dh)
+    {
+        var dst = new byte[dw * dh * 4];
+        for (int y = 0; y < dh; y++)
+        {
+            int y0 = y * sh / dh, y1 = Math.Max(y0 + 1, (y + 1) * sh / dh);
+            for (int x = 0; x < dw; x++)
+            {
+                int x0 = x * sw / dw, x1 = Math.Max(x0 + 1, (x + 1) * sw / dw);
+                int r = 0, g = 0, b = 0, a = 0, n = (x1 - x0) * (y1 - y0);
+                for (int yy = y0; yy < y1; yy++)
+                    for (int xx = x0; xx < x1; xx++)
+                    {
+                        int si = (yy * sw + xx) * 4;
+                        r += src[si]; g += src[si + 1]; b += src[si + 2]; a += src[si + 3];
+                    }
+                int di = (y * dw + x) * 4;
+                dst[di] = (byte)(r / n); dst[di + 1] = (byte)(g / n); dst[di + 2] = (byte)(b / n); dst[di + 3] = (byte)(a / n);
+            }
+        }
+        return dst;
     }
 
     private static byte[] ResizeNearest(byte[] src, int sw, int sh, int dw, int dh)

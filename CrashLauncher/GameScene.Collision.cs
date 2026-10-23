@@ -845,6 +845,7 @@ public sealed partial class GameScene : Scene
                     if (idx < 0 || idx >= coll.Vectors.Count) continue;
                     var v = coll.Vectors[idx];
                     v.X = corners[i].X; v.Y = corners[i].Y; v.Z = corners[i].Z;
+                    coll.Vectors[idx] = v; // Amedo
                 }
                 foreach (var triIdx in marker.OwnedTriIndices)
                     if (triIdx >= 0 && triIdx < coll.Triangles.Count)
@@ -958,6 +959,7 @@ public sealed partial class GameScene : Scene
                     if (idx < 0 || idx >= coll.Vectors.Count) continue;
                     var v = coll.Vectors[idx];
                     v.X = corners[i].X; v.Y = corners[i].Y; v.Z = corners[i].Z;
+                    coll.Vectors[idx] = v; // Amedo
                 }
                 foreach (var triIdx in marker.OwnedTriIndices)
                     if (triIdx >= 0 && triIdx < coll.Triangles.Count)
@@ -1028,6 +1030,7 @@ public sealed partial class GameScene : Scene
                     if (idx < 0 || idx >= coll.Vectors.Count) continue;
                     var v = coll.Vectors[idx];
                     v.X = corners[i].X; v.Y = corners[i].Y; v.Z = corners[i].Z;
+                    coll.Vectors[idx] = v; // Amedo
                 }
                 foreach (var triIdx in marker.OwnedTriIndices)
                     if (triIdx >= 0 && triIdx < coll.Triangles.Count)
@@ -1112,6 +1115,7 @@ public sealed partial class GameScene : Scene
                     if (idx < 0 || idx >= coll.Vectors.Count) continue;
                     var v = coll.Vectors[idx];
                     v.X = raw[i].X; v.Y = raw[i].Y; v.Z = raw[i].Z;
+                    coll.Vectors[idx] = v; // Amedo
                 }
                 foreach (var triIdx in marker.OwnedTriIndices)
                     if (triIdx >= 0 && triIdx < coll.Triangles.Count)
@@ -1157,7 +1161,7 @@ public sealed partial class GameScene : Scene
         if (delta.LengthSquared() < 1e-8f) return;
 
         float rdx = -delta.X, rdy = delta.Y, rdz = delta.Z;
-        foreach (var v in coll.Vectors)
+        foreach (ref var v in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(coll.Vectors)) // Amedo
         {
             v.X += rdx; v.Y += rdy; v.Z += rdz;
         }

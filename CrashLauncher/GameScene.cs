@@ -106,6 +106,8 @@ public sealed partial class GameScene : Scene
 
 		public bool OwnsMesh { get; set; }
 
+		public override bool IsOverlay => Mat.AlwaysOnTop || Mat.IgnoreDepthTest; // Amedo 2026-10-02
+
 
 		public override void OnUpdate()
 		{
@@ -137,118 +139,6 @@ public sealed partial class GameScene : Scene
 		{
 			Mat.Albedo?.Dispose();
 			if (OwnsMesh) Mesh?.Dispose();
-		}
-	}
-
-	private sealed class ParticleBillboardRenderer : Component
-	{
-		public GpuMesh? Mesh { get; set; }
-
-		public Material Mat { get; } = new Material
-		{
-			Unlit = true,
-			Culling = Material.CullMode.Both,
-			AlphaBlend = true,
-			Blend = Material.BlendMode.Additive,
-			DepthWrite = false,
-			FogEnabled = false,
-			BillboardRender = true
-		};
-
-
-		public System.Numerics.Vector4 Color
-		{
-			get
-			{
-				return Mat.BaseColor;
-			}
-			set
-			{
-				Mat.BaseColor = value;
-			}
-		}
-
-		public override bool IsTranslucent => true;
-
-		public override void OnRender(GL gl)
-		{
-			if (Mesh != null)
-			{
-				RenderPipeline instance = RenderPipeline.Instance;
-				if (instance != null)
-				{
-					TwinShaderProgram shader = instance.Shader;
-					shader.Set("StartModel", base.Entity.Transform.World);
-					Mat.Apply(gl, shader);
-					Mesh.Draw(gl);
-					Mat.Restore(gl, shader);
-				}
-			}
-		}
-	}
-
-	private sealed class ParticleEmitterPreview : Component
-	{
-		public readonly List<TwinParticleSystem> Members = new List<TwinParticleSystem>();
-
-		public readonly List<ParticleBillboardRenderer> Particles = new List<ParticleBillboardRenderer>();
-
-		public override void OnUpdate()
-		{
-			if (Particles.Count == 0 || Members.Count == 0)
-			{
-				return;
-			}
-			int num = Math.Max(1, Particles.Count / Members.Count);
-			int num2 = 0;
-			for (int i = 0; i < Members.Count; i++)
-			{
-				if (num2 >= Particles.Count)
-				{
-					break;
-				}
-				TwinParticleSystem twinParticleSystem = Members[i];
-				List<(float, System.Numerics.Vector4)> colorGradient = MeshDecoder.GetColorGradient(twinParticleSystem);
-				List<(float, float)> sizeGradient = MeshDecoder.GetSizeGradient(twinParticleSystem);
-				Twinsanity.TwinsanityInterchange.Common.Vector3 unkVec = twinParticleSystem.UnkVec2;
-				float num3 = MathF.Sqrt(unkVec.X * unkVec.X + unkVec.Y * unkVec.Y + unkVec.Z * unkVec.Z);
-				float num4 = (unkVec.X + unkVec.Y + unkVec.Z) / 3f;
-				float num5 = MathF.Max(MathF.Abs(unkVec.X - num4), MathF.Max(MathF.Abs(unkVec.Y - num4), MathF.Abs(unkVec.Z - num4)));
-				bool flag = num3 < 0.05f || num5 < MathF.Abs(num4) * 0.35f;
-				Twinsanity.TwinsanityInterchange.Common.Vector3 unkVec2 = twinParticleSystem.UnkVec1;
-				float num6 = MathF.Max(0.15f, MathF.Sqrt(unkVec2.X * unkVec2.X + unkVec2.Y * unkVec2.Y + unkVec2.Z * unkVec2.Z));
-				System.Numerics.Vector3 vector = new System.Numerics.Vector3(unkVec.X, unkVec.Y, unkVec.Z);
-				float num7 = vector.Length();
-				vector = ((num7 > 0.0001f) ? (vector / num7) : System.Numerics.Vector3.UnitY);
-				System.Numerics.Vector3 vector2 = ((System.Numerics.Vector3.Cross(vector, System.Numerics.Vector3.UnitX).LengthSquared() > 0.0001f) ? System.Numerics.Vector3.Normalize(System.Numerics.Vector3.Cross(vector, System.Numerics.Vector3.UnitX)) : System.Numerics.Vector3.UnitZ);
-				int num8 = 0;
-				while (num8 < num && num2 < Particles.Count)
-				{
-					ParticleBillboardRenderer particleBillboardRenderer = Particles[num2];
-					float num9 = (EngineTime.Total / 1.6f + ((float)num8 * 0.618034f + (float)(i & 0xFF) / 255f)) % 1f;
-					float num10 = (float)(num8 + i * 97) * 12.9898f % 1f;
-					System.Numerics.Vector3 position;
-					if (flag)
-					{
-						float x = ((float)num8 * 137.50777f + (float)i * 53f) * ((float)Math.PI / 180f);
-						float x2 = ((float)num8 * 71.337f + (float)i * 31f) * ((float)Math.PI / 180f);
-						System.Numerics.Vector3 vector3 = new System.Numerics.Vector3(MathF.Cos(x) * MathF.Cos(x2), MathF.Sin(x2), MathF.Sin(x) * MathF.Cos(x2));
-						position = vector3 * (num9 * num6 * 2.2f + num10 * num6 * 0.4f);
-					}
-					else
-					{
-						position = vector * (num9 * num6 * 2.2f) + vector2 * ((num10 - 0.5f) * num6 * 0.9f);
-					}
-					particleBillboardRenderer.Entity.Transform.Position = position;
-					System.Numerics.Vector4 vector4 = MeshDecoder.SampleColorGradient(colorGradient, num9);
-					float w = MathF.Sin(num9 * (float)Math.PI);
-					float num11 = MeshDecoder.SampleSizeGradient(sizeGradient, num9);
-					particleBillboardRenderer.Color = new System.Numerics.Vector4(vector4.X, vector4.Y, vector4.Z, w);
-					particleBillboardRenderer.Entity.Transform.Scale = new System.Numerics.Vector3(MathF.Max(0.1f, 1.1f * num11));
-					num8++;
-					num2++;
-				}
-			}
 		}
 	}
 
@@ -322,6 +212,12 @@ public sealed partial class GameScene : Scene
 				instance.DirectionalLights = Directional.Select(((System.Numerics.Vector3 Color, System.Numerics.Vector3 Direction) l) => (l.Color * Intensity, Direction: l.Direction)).ToList();
 				int idx = Math.Clamp(FogColorIndex, 0, CrashEngine.Importer.MeshDecoder.FogColors.Length - 1);
 				instance.FogColor = CrashEngine.Importer.MeshDecoder.FogColors[idx];
+				instance.FogIndex = idx; // Amedo 2026-09-26
+			}
+			if (base.Entity.Parent?.Get<CrashEngine.Importer.GameLightingEnvironment>() is { } env) // Amedo 2026-09-26
+			{
+				env.AmbientOverride = AmbientColor * Intensity;
+				env.DirectionalOverride = Directional.Select(l => (l.Color * Intensity, new System.Numerics.Vector3(-l.Direction.X, l.Direction.Y, l.Direction.Z))).ToList();
 			}
 		}
 	}
@@ -337,9 +233,11 @@ public sealed partial class GameScene : Scene
 
 		public Quaternion GizmoRot { get; set; } = Quaternion.Identity;
 
+		public Matrix4x4? GizmoBasis { get; set; } // Amedo 2026-10-04
 
 		public bool Visible { get; set; } = false;
 
+		public override bool IsOverlay => true; // Amedo 2026-10-02
 
 		public override void OnRender(GL gl)
 		{
@@ -349,7 +247,7 @@ public sealed partial class GameScene : Scene
 				if (instance != null)
 				{
 					TwinShaderProgram shader = instance.Shader;
-					Matrix4x4 m = Matrix4x4.CreateScale(GizmoScale) * Matrix4x4.CreateFromQuaternion(GizmoRot) * Matrix4x4.CreateTranslation(GizmoPos);
+					Matrix4x4 m = Matrix4x4.CreateScale(GizmoScale) * (GizmoBasis ?? Matrix4x4.CreateFromQuaternion(GizmoRot)) * Matrix4x4.CreateTranslation(GizmoPos); // Amedo 2026-10-04
 					shader.Set("StartModel", m);
 					shader.Set("twin_material.use_texture", 0f);
 					shader.Set("twin_material.double_color", 1f);
@@ -364,10 +262,10 @@ public sealed partial class GameScene : Scene
 					shader.Set("twin_material.two_sided_lighting", 1);
 					shader.Set("twin_material.perform_fog", 0f);
 					shader.Set("twin_material.select_pulse", 1f);
-					gl.Disable(EnableCap.CullFace);
-					gl.DepthFunc(DepthFunction.Always);
+					CrashEngine.Renderer.GlState.Culling(gl, false); // Amedo 2026-10-01
+					CrashEngine.Renderer.GlState.DepthFunc(gl, DepthFunction.Always);
 					Mesh.Draw(gl);
-					gl.DepthFunc(DepthFunction.Lequal);
+					CrashEngine.Renderer.GlState.DepthFunc(gl, DepthFunction.Lequal);
 				}
 			}
 		}
@@ -408,6 +306,7 @@ public sealed partial class GameScene : Scene
     private GpuMesh? _cubeMesh;
     private GpuMesh? _cubeWireMesh;
     private Texture2D? _cameraIconTexture;
+    private static readonly System.Numerics.Vector2 CameraIconMin = new(-14f, -17f), CameraIconMax = new(14f, 11f); // Amedo 2026-10-04
 
     // Amedo 2026-09-21
     private Texture2D? _rotateIconTexture;
@@ -434,7 +333,6 @@ public sealed partial class GameScene : Scene
     private Entity? _selected;
     private readonly HashSet<Entity> _selectedSet = new HashSet<Entity>();
     private CrashEngine.Renderer.PositionChainRenderer? _positionChainRenderer;
-    private CrashEngine.Renderer.BlobShadowRenderer? _blobShadowRenderer;
     private bool _revealSelectionInTree;
     private readonly HashSet<Entity> _treeRevealAncestors = new HashSet<Entity>();
 
@@ -460,7 +358,6 @@ public sealed partial class GameScene : Scene
     private GpuMesh? _dupGizmoMesh;
     private GizmoRenderer? _dupGizmoRenderer;
     private readonly Dictionary<Entity, TransformSnapshot> _gizmoDragBefore = new Dictionary<Entity, TransformSnapshot>();
-    private TransformSnapshot _inspectorDragBefore;
     private readonly EditorUndoStack _undoStack = new EditorUndoStack();
     // Amedo 2026-09-20
     private readonly List<Entity> _selSnapshot = new List<Entity>();
@@ -703,24 +600,6 @@ public sealed partial class GameScene : Scene
 	}
 
 
-	private void PushInspectorUndoIfDeactivated(Entity e)
-	{
-		if (ImGui.IsItemDeactivatedAfterEdit())
-		{
-			TransformSnapshot after = new TransformSnapshot(e.Transform);
-			if (!after.Equals(in _inspectorDragBefore))
-			{
-				_undoStack.Push(new TransformEditAction
-				{
-					Entity = e,
-					Before = _inspectorDragBefore,
-					After = after
-				});
-			}
-		}
-	}
-
-
 	public GameScene(string extractedRoot, string rm2, string sm2, string scriptOut, LevelBrowserScene browser, string? autoAddCrashFrom = null)
 	{
 		_extractedRoot = extractedRoot;
@@ -749,6 +628,7 @@ public sealed partial class GameScene : Scene
 			_dupGizmoMesh = BuildDuplicateGizmoMesh(gL);
 			Entity entity = new Entity("RenderPipeline");
 			RenderPipeline renderPipeline = entity.Add(new RenderPipeline());
+			entity.Add(new GameShadowPass()); // Amedo 2026-09-26
 			AddRoot(entity);
 			Entity entity2 = new Entity("Camera");
 			_camera = entity2.Add(new CameraComponent());
@@ -792,6 +672,8 @@ public sealed partial class GameScene : Scene
 
 	private void LoadLevelEntities(GL gl, RenderPipeline pipeline, bool useShadowDir)
 	{
+		StopSimulation(); // Amedo 2026-09-26
+		GameShadowDefs.CratesReceiveShadows = GetGameProject()?.CratesReceiveShadows ?? false; // Amedo
 		try
 		{
 			string text = (useShadowDir ? _extractedRoot : ResolvePristinePackageSource());
@@ -820,8 +702,12 @@ public sealed partial class GameScene : Scene
 			_pristineRm2ForRecovery = null;
 			_pristineRm2RecoveryFailed = false;
 			ScriptDumper.ChunkScripts scripts;
+			ChunkImporter.HdTextureDir = Path.Combine(ModeDir("HD"), "Textures"); // Amedo 2026-10-02
+			CrashEngine.Renderer.SmoothNormalCache.Directory = Path.Combine(ModeDir("Cache"), "SmoothNormals"); // Amedo
+			DropPlayHost();
 			Entity entity = ChunkImporter.LoadChunk(gl, packageReader, _rm2, _sm2, out scripts);
 			StripDanglingLinksForNewGamePreview(entity); // Amedo 2026-09-22
+			MakeEditorContentReceiveShadows(entity); // Amedo
 			System.Numerics.Vector3? lastFogColor = MeshDecoder.LastFogColor;
 			if (lastFogColor.HasValue)
 			{
@@ -851,6 +737,11 @@ public sealed partial class GameScene : Scene
 			IL_0273:
 			if (useShadowDir) RestoreWorldLightingMeta(worldLightingSettings); // Amedo 2026-09-21
 			entity.AddChild(entity2);
+			entity.Add(new CrashEngine.Importer.GameLightingEnvironment // Amedo 2026-09-26
+			{
+				Scenery = entity.Get<ChunkSource>()?.Sm2?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery>((uint)TwinConstants.SCENERY_SECENERY_ITEM),
+			});
+			entity.Add(new CrashEngine.Importer.GameShadowCasters()); // Amedo 2026-09-26
 			foreach (var item2 in worldLightingSettings.Directional)
 			{
 				System.Numerics.Vector3 item = item2.Color;
@@ -917,6 +808,7 @@ public sealed partial class GameScene : Scene
 
 			_statusLine = $"Loaded: {_rm2}  |  {_enemyCount} enemies  |  {_scriptCount} scripts";
 			_browser.Log(_statusLine);
+			PrepareForPlay(); // Amedo 2026-10-02
 		}
 		catch (Exception ex2)
 		{
@@ -936,9 +828,12 @@ public sealed partial class GameScene : Scene
 		_selectedSet.Clear();
 		_selected = null;
 		_triggersRoot = (_camerasRoot = (_positionsRoot = (_aiPosRoot = null)));
+		_objectCollisionRoot = null; // Amedo 2026-10-03
+		_gameCameraOverlay = null; // Amedo 2026-10-06
 		_collisionTileMap = null;
 		_collisionTileBaselinePos.Clear();
 		_undoStack.Clear();
+		_animUndo.Clear(); // Amedo 2026-10-04
 		GL gL = Engine.Instance.GL;
 		RenderPipeline renderPipeline = FindFirst<RenderPipeline>();
 		if (renderPipeline == null)
@@ -954,13 +849,14 @@ public sealed partial class GameScene : Scene
 	protected override void OnUpdate()
 	{
 		RecordSelectionChangeIfAny(); // Amedo 2026-09-20
+		UpdateSimulation(); // Amedo 2026-09-26
 
 		if (_pendingOpenLevelPath is not null)
 		{
 			var openPath = _pendingOpenLevelPath;
 			_pendingOpenLevelPath = null;
-			_browser.OpenLevel(openPath);
-			return;
+			LeaveScene(() => _browser.OpenLevel(openPath)); // Amedo 2026-09-28
+			if (!Simulating) return;
 		}
 		if (_autoAddCrashFrom is not null &&
 		    base.Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2 is not null)
@@ -971,7 +867,7 @@ public sealed partial class GameScene : Scene
 		}
 		CrashEngine.Importer.MeshRenderer.DrawCallsThisFrame = 0;
 		UpdatePositionChainVisual();
-		UpdateBlobShadowVisual();
+		SyncLightMarkerPositionsLive(); // Amedo 2026-09-26
 		if (_pendingDel.Count > 0)
 		{
 			PS2AnyCollisionData pS2AnyCollisionData = base.Roots.FirstOrDefault((Entity r) => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2?.GetItem<PS2AnyCollisionData>(9u);
@@ -1041,7 +937,13 @@ public sealed partial class GameScene : Scene
 			SpawnCollisionPlane(new System.Numerics.Vector3(0f, 0f, 0f));
 		}
 		UpdateSelectionPulse();
-		if (Input.KeyDown(Key.Escape))
+		HandlePlayViewKeys(); // Amedo 2026-09-28
+		if (_workspace == Workspace.Animation) // Amedo 2026-10-04
+		{
+			UpdateAnimationWorkspace();
+			return;
+		}
+		if (!TextTyping && Input.KeyDown(Key.Escape)) // Amedo 2026-10-01
 		{
 			if (_choosingDuplicateDirection)
 			{
@@ -1055,10 +957,10 @@ public sealed partial class GameScene : Scene
 			}
 			else
 			{
-				Engine.Instance.ActiveScene = _browser;
+				LeaveScene(); // Amedo 2026-09-28
 			}
 		}
-		if (_glueMode)
+		if (_glueMode && !TextTyping) // Amedo 2026-10-01
 		{
 			if (Input.KeyDown(Key.X))
 			{
@@ -1084,13 +986,13 @@ public sealed partial class GameScene : Scene
 		bool flag3 = flag2 && !_mouseWasDown;
 		bool flag4 = !flag2 && _mouseWasDown;
 		_mouseWasDown = flag2;
-		int width = Engine.Instance.Width;
-		int height = Engine.Instance.Height;
+		int width = ViewW; // Amedo
+		int height = ViewH;
 		System.Numerics.Vector2 mousePosition = Input.MousePosition;
-		bool flag5 = !flag && !ImGui.GetIO().WantCaptureMouse;
+		bool flag5 = !flag && !ImGui.GetIO().WantCaptureMouse && !PlayFullView && MouseInView(mousePosition); // Amedo
 		if (_gizmoRenderer != null)
 		{
-			_gizmoRenderer.Visible = _selected != null && !flag && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move;
+			_gizmoRenderer.Visible = _selected != null && !flag && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move && !PlayFullView; // Amedo 2026-09-28
 			if (_selected != null)
 			{
 				_gizmoRenderer.GizmoPos = GizmoPivot();
@@ -1114,7 +1016,7 @@ public sealed partial class GameScene : Scene
 			for (int i = 0; i < worldLightingSettings.ArrowRenderers.Count && i < worldLightingSettings.Directional.Count; i++)
 			{
 				GizmoRenderer gizmoRenderer = worldLightingSettings.ArrowRenderers[i];
-				gizmoRenderer.Visible = !flag;
+				gizmoRenderer.Visible = !flag && !PlayFullView; // Amedo 2026-09-28
 				gizmoRenderer.GizmoPos = translation;
 				gizmoRenderer.GizmoScale = gizmoScale;
 				gizmoRenderer.GizmoRot = RotationBetween(System.Numerics.Vector3.UnitX, worldLightingSettings.Directional[i].Direction);
@@ -1229,7 +1131,7 @@ public sealed partial class GameScene : Scene
 			_gizmoDragging = false;
 			_gizmoAxis = -1;
 		}
-		if (Input.KeyHeld(Key.ControlLeft) || Input.KeyHeld(Key.ControlRight))
+		if (!TextTyping && (Input.KeyHeld(Key.ControlLeft) || Input.KeyHeld(Key.ControlRight))) // Amedo 2026-10-01
 		{
 			if (Input.KeyDown(Key.Z) && (Input.KeyHeld(Key.ShiftLeft) || Input.KeyHeld(Key.ShiftRight)))
 			{
@@ -1237,6 +1139,7 @@ public sealed partial class GameScene : Scene
 			}
 			else if (Input.KeyDown(Key.Z))
 			{
+				CommitInspectorEdit(force: true); // Amedo
 				SelectAffected(_undoStack.Undo());
 			}
 			else if (Input.KeyDown(Key.Y))
@@ -1252,7 +1155,7 @@ public sealed partial class GameScene : Scene
 				DuplicateSelected(_lastDuplicateDirection);
 			}
 		}
-		if (Input.KeyDown(Key.Delete))
+		if (!TextTyping && Input.KeyDown(Key.Delete)) // Amedo 2026-10-01
 		{
 			DeleteSelected();
 		}
@@ -1384,35 +1287,6 @@ public sealed partial class GameScene : Scene
 		}
 	}
 
-	private void UpdateBlobShadowVisual()
-	{
-		if (_blobShadowRenderer is null)
-		{
-			var host = new Entity("__BlobShadowViz");
-			_blobShadowRenderer = host.Add(new CrashEngine.Renderer.BlobShadowRenderer());
-			LoadAndAddRoot(host);
-		}
-
-		_blobShadowRenderer.Visible = false;
-
-		var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-		if (chunkRoot is null) return;
-
-		var crashEnt = AllEntities(chunkRoot).FirstOrDefault(e => e.Get<InstanceData>()?.ObjectId == 0x0000);
-		if (crashEnt is null) return;
-
-		var collRoot = AllEntities(chunkRoot).FirstOrDefault(e => e.Has<CrashEngine.Importer.CollisionMesh>());
-		var collMr = collRoot?.Children.FirstOrDefault()?.Get<CrashEngine.Importer.MeshRenderer>();
-		if (collMr is null) return;
-
-		var origin = crashEnt.Transform.World.Translation + Vector3.UnitY * 0.5f;
-		if (!RaycastMeshRenderer(collMr, origin, -Vector3.UnitY, out float dist) || dist > 20f) return;
-
-		_blobShadowRenderer.Visible = true;
-		_blobShadowRenderer.GroundPoint = origin - Vector3.UnitY * dist;
-		_blobShadowRenderer.GroundNormal = Vector3.UnitY;
-	}
-
 	private bool WorldToScreen(System.Numerics.Vector3 world, int sw, int sh, out System.Numerics.Vector2 screen)
 	{
 		screen = System.Numerics.Vector2.Zero;
@@ -1431,7 +1305,7 @@ public sealed partial class GameScene : Scene
 		{
 			return false;
 		}
-		screen = new System.Numerics.Vector2((num + 1f) * 0.5f * (float)sw, (1f - num2) * 0.5f * (float)sh);
+		screen = ViewOrigin + new System.Numerics.Vector2((num + 1f) * 0.5f * (float)sw, (1f - num2) * 0.5f * (float)sh); // Amedo
 		return true;
 	}
 
@@ -1441,8 +1315,10 @@ public sealed partial class GameScene : Scene
 		foreach (var child in camerasRoot.Children)
 		{
 			if (!WorldToScreen(child.Transform.World.Translation, sw, sh, out var screen)) continue;
-			if (mouse.X >= screen.X - 11f && mouse.X <= screen.X + 11f &&
-			    mouse.Y >= screen.Y - 12.5f && mouse.Y <= screen.Y + 7.5f)
+			var hitMin = _cameraIconTexture is not null ? CameraIconMin : new System.Numerics.Vector2(-11f, -12.5f); // Amedo 2026-10-04
+			var hitMax = _cameraIconTexture is not null ? CameraIconMax : new System.Numerics.Vector2(11f, 7.5f); // Amedo 2026-10-04
+			if (mouse.X >= screen.X + hitMin.X && mouse.X <= screen.X + hitMax.X &&
+			    mouse.Y >= screen.Y + hitMin.Y && mouse.Y <= screen.Y + hitMax.Y)
 				return child;
 		}
 		return null;
@@ -1463,42 +1339,6 @@ public sealed partial class GameScene : Scene
 				yield return sub;
 	}
 
-
-	private static string? ResolveCrashPlayerExePath()
-	{
-		var net9Dir = new DirectoryInfo(AppContext.BaseDirectory);
-		var configDir = net9Dir.Parent;
-		var launcherProjDir = configDir?.Parent?.Parent;
-		var repoRoot = launcherProjDir?.Parent;
-		var documentsRoot = repoRoot?.Parent;
-		if (documentsRoot is null || configDir is null) return null;
-		var candidate = Path.Combine(documentsRoot.FullName, "CrashPlayer", "bin", configDir.Name, net9Dir.Name, "CrashPlayer.exe");
-		return File.Exists(candidate) ? candidate : null;
-	}
-
-	private void LaunchPlayer()
-	{
-		if (_playerProcess is { HasExited: false }) { _browser.Log("Launch Player: already running."); return; }
-
-		var exePath = ResolveCrashPlayerExePath();
-		if (exePath is null) { _browser.Log("Launch Player: CrashPlayer.exe not found -- build the CrashPlayer project first."); return; }
-
-		var psi = new System.Diagnostics.ProcessStartInfo
-		{
-			FileName = exePath,
-			ArgumentList = { _extractedRoot, _rm2, _sm2 },
-			UseShellExecute = false,
-		};
-		try
-		{
-			_playerProcess = System.Diagnostics.Process.Start(psi);
-			_browser.Log($"Launch Player: started CrashPlayer.exe (pid {_playerProcess?.Id}) -- '{_rm2}' from '{_extractedRoot}'.");
-		}
-		catch (Exception ex)
-		{
-			_browser.Log("Launch Player: failed to start -- " + ex.Message);
-		}
-	}
 
 	private void StopPlayer()
 	{
@@ -1580,7 +1420,7 @@ public sealed partial class GameScene : Scene
 	{
 		PS2AnyInstance? slot = null;
 		for (int i = 0; i < section.GetItemsAmount(); i++)
-			if (section.GetItem(i) is PS2AnyInstance cand && cand.StateFlags == 0) { slot = cand; break; }
+			if (section.GetItem(i) is PS2AnyInstance cand && CrashEngine.Importer.ChunkImporter.IsNeutered(cand)) { slot = cand; break; } // Amedo
 
 		PS2AnyInstance target;
 		bool reused = slot is not null;
@@ -1622,20 +1462,15 @@ public sealed partial class GameScene : Scene
 
 
 	private bool _defaultLayoutApplied;
-	private const string DefaultDockLayout =
+	private const string DefaultDockLayout = // Amedo
 @"[Window][##dockhost]
 Pos=0,32
 Size=1920,977
 Collapsed=0
 
-[Window][##topbar]
-Pos=0,0
-Size=1920,32
-Collapsed=0
-
-[Window][Scene##panel]
+[Window][Hierarchy##panel]
 Pos=0,32
-Size=325,977
+Size=325,728
 Collapsed=0
 DockId=0x00000003,0
 
@@ -1645,90 +1480,57 @@ Size=415,977
 Collapsed=0
 DockId=0x00000006,0
 
-[Window][Assets]
-Pos=327,762
-Size=1176,247
+[Window][Project##panel]
+Pos=0,762
+Size=1503,247
 Collapsed=0
 DockId=0x00000001,0
 
-[Window][Output]
-Pos=327,762
-Size=1176,247
+[Window][Console##panel]
+Pos=0,762
+Size=1503,247
 Collapsed=0
 DockId=0x00000001,1
 
+[Window][Behaviour##panel]
+Pos=0,762
+Size=1503,247
+Collapsed=0
+DockId=0x00000001,2
+
 [Docking][Data]
 DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
-  DockNode      ID=0x00000005 Parent=0x50DE06D3 SizeRef=1503,977 Split=X
-    DockNode    ID=0x00000003 Parent=0x00000005 SizeRef=325,977 Selected=0x32F5ED47
-    DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=1593,977 Split=Y
-      DockNode  ID=0x00000002 Parent=0x00000004 SizeRef=1920,728 CentralNode=1
-      DockNode  ID=0x00000001 Parent=0x00000004 SizeRef=1920,247 Selected=0x26CE0345
-  DockNode      ID=0x00000006 Parent=0x50DE06D3 SizeRef=415,977 Selected=0x58565765
+  DockNode      ID=0x00000005 Parent=0x50DE06D3 SizeRef=1503,977 Split=Y
+    DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=1503,728 Split=X
+      DockNode  ID=0x00000003 Parent=0x00000004 SizeRef=325,728
+      DockNode  ID=0x00000002 Parent=0x00000004 SizeRef=1176,728 CentralNode=1
+    DockNode    ID=0x00000001 Parent=0x00000005 SizeRef=1503,247
+  DockNode      ID=0x00000006 Parent=0x50DE06D3 SizeRef=415,977
 ";
 
 	public override void OnImGuiRender()
 	{
-		if (!_defaultLayoutApplied) { ImGui.LoadIniSettingsFromMemory(DefaultDockLayout); _defaultLayoutApplied = true; }
+		ApplyPendingWorkspaceLayout(); // Amedo 2026-10-04
 		DrawSaveConfirmPopup();
 		DrawResetAllConfirmPopup();
+		DrawLeavePlayConfirmPopup(); // Amedo 2026-09-28
 		DrawBuildProgress();
+		if (PlayFullView) { Engine.Instance.SceneViewport = null; DrawPlayOverlay(); return; } // Amedo 2026-09-28
 		int width = Engine.Instance.Width;
 		int height = Engine.Instance.Height;
 		float y = (float)height - 32f - 180f - 2f;
-		ImGui.SetNextWindowPos(new System.Numerics.Vector2(0f, 0f));
-		ImGui.SetNextWindowSize(new System.Numerics.Vector2(width, 32f));
-		ImGui.Begin("##topbar", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoBringToFrontOnFocus);
+		ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new System.Numerics.Vector2(ImGui.GetStyle().FramePadding.X, MathF.Max(0f, (32f - ImGui.GetFontSize()) * 0.5f))); // Amedo
+		bool topBar = ImGui.BeginMainMenuBar();
+		ImGui.PopStyleVar();
+		if (topBar)
+		{
+		DrawMainMenus(); // Amedo
+		DrawWorkspaceTabs(); // Amedo 2026-10-04
 		float value = ((EngineTime.Delta > 0f) ? (1f / EngineTime.Delta) : 0f);
 		int drawCallsThisFrame = CrashEngine.Importer.MeshRenderer.DrawCallsThisFrame;
-		ImGui.Text($"  {_rm2}  |  {_enemyCount} enemies  |  {_scriptCount} scripts" +
-		           (_musicLabel is not null ? $"  |  Music: {_musicLabel}" : ""));
-		ImGui.SameLine();
-		if (ImGui.SmallButton("UI##uibrowserbtn"))
-		{
-			_showUiBrowser = !_showUiBrowser;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Browse the game's own loading screens, icons, decals, and fonts —\nreal assets decoded straight from disc, same as the game shows them.");
-		}
-		ImGui.SameLine();
-		if (ImGui.SmallButton("Game Settings##gamesettingsbtn"))
-		{
-			_showGameSettings = !_showGameSettings;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Gameplay-rule toggles — real script edits to shared behaviour\ngraphs (Startup\\Default.rm2), not per-object Inspector tweaks.");
-		}
-		ImGui.SameLine();
-		if (ImGui.SmallButton("Default.rm2 Data##globaldatabtn"))
-		{
-			_showGlobalData = !_showGlobalData;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Browse Startup\\Default.rm2's own shared objects/behaviours/sounds\ndirectly by list — this data has no Layout/scenery of its own, so\nthere's nothing to click on in the 3D view the way a per-level\nobject works.");
-		}
-		ImGui.SameLine();
-		if (ImGui.SmallButton("About##aboutbtn"))
-		{
-			_showAbout = !_showAbout;
-		}
-		ImGui.SameLine();
-		if (ImGui.SmallButton("Shortcuts##shortcutsbtn")) // Amedo 2026-09-22
-		{
-			_showShortcuts = !_showShortcuts;
-		}
-		ImGui.SameLine();
-		if (ImGui.SmallButton("Reset Layout##resetlayoutbtn"))
-		{
-			ImGui.LoadIniSettingsFromMemory(DefaultDockLayout); // Amedo 2026-09-19
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Restore the default panel layout — Scene/Hierarchy left,\nInspector right, Assets+Output docked at the bottom.");
-		}
+		Engine.Instance.SetTitleDetail($"{_rm2}  |  {_enemyCount} enemies  |  {_scriptCount} scripts" +
+		                               (_musicLabel is not null ? $"  |  Music: {_musicLabel}" : "")); // Amedo
+		if (_workspace == Workspace.Scene) DrawSimulationButtons(); // Amedo 2026-10-04
 		if (_glueMode)
 		{
 			ImGui.SameLine();
@@ -1750,10 +1552,12 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.85f, 0.2f, 1f), "  |  GLUE MODE (axis: " + text2 + ") — click target, X/Y/Z=lock axis, Esc=cancel");
 		}
 		ImGui.SameLine((float)width - 430f);
-		ImGui.BeginDisabled(!_undoStack.CanUndo);
+		bool animUndo = _workspace == Workspace.Animation; // Amedo 2026-10-04
+		ImGui.BeginDisabled(animUndo ? !_animUndo.CanUndo : !_undoStack.CanUndo); // Amedo 2026-10-04
 		if (ImGui.SmallButton("Undo"))
 		{
-			SelectAffected(_undoStack.Undo());
+			if (animUndo) AnimUndo(); // Amedo 2026-10-04
+			else SelectAffected(_undoStack.Undo());
 		}
 		ImGui.EndDisabled();
 		if (ImGui.IsItemHovered())
@@ -1761,15 +1565,16 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			MaybeTooltip("Ctrl+Z");
 		}
 		ImGui.SameLine();
-		ImGui.BeginDisabled(!_undoStack.CanRedo);
+		ImGui.BeginDisabled(animUndo ? !_animUndo.CanRedo : !_undoStack.CanRedo); // Amedo 2026-10-04
 		if (ImGui.SmallButton("Redo"))
 		{
-			SelectAffected(_undoStack.Redo());
+			if (animUndo) AnimRedo(); // Amedo 2026-10-04
+			else SelectAffected(_undoStack.Redo());
 		}
 		ImGui.EndDisabled();
 		if (ImGui.IsItemHovered())
 		{
-			MaybeTooltip("Ctrl+Y");
+			MaybeTooltip("Ctrl+Y / Ctrl+Shift+Z"); // Amedo 2026-10-04
 		}
 		ImGui.SameLine((float)width - 320f);
 		string camSpeedText = (_camera != null) ? $"Cam speed: {_camera.Speed:F1}  |  " : "";
@@ -1781,7 +1586,8 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		{
 			ImGui.TextDisabled($"{camSpeedText}draws: {drawCallsThisFrame}  FPS {value:F0}  ESC=back");
 		}
-		ImGui.End();
+		ImGui.EndMainMenuBar(); // Amedo
+		}
 		_fileBrowser.Draw();
 		DrawUiBrowser();
 		DrawGameSettings();
@@ -1811,416 +1617,16 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		ImGui.PopStyleVar(3);
 		uint iD = ImGui.GetID("MainDockSpace");
 		ImGui.DockSpace(iD, System.Numerics.Vector2.Zero, ImGuiDockNodeFlags.PassthruCentralNode);
+		UpdateSceneViewport(iD); // Amedo
 		ImGui.End();
+		if (_workspace == Workspace.Scene) // Amedo 2026-10-04
+		{
 		ImGui.SetNextWindowPos(new System.Numerics.Vector2(0f, 32f), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new System.Numerics.Vector2(280f, y), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSizeConstraints(new System.Numerics.Vector2(180f, 120f), new System.Numerics.Vector2(float.MaxValue, float.MaxValue));
-		ImGui.Begin("Scene##panel", ImGuiWindowFlags.NoCollapse);
-		// Amedo 2026-09-21
-		{
-			float gizmoHalf = (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) * 0.5f;
-			bool gizmoIsMove = _gizmoMode == GizmoMode.Move;
-			System.Numerics.Vector4 gizmoActiveCol = ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive];
-			float gizmoIconSz = ImGui.GetFontSize();
-			if (gizmoIsMove) ImGui.PushStyleColor(ImGuiCol.Button, gizmoActiveCol);
-			bool moveClicked;
-			if (_moveIconTexture != null)
-			{
-				moveClicked = ImGui.ImageButton("##movegizmo", (nint)_moveIconTexture.GlId,
-					new System.Numerics.Vector2(gizmoIconSz, gizmoIconSz),
-					new System.Numerics.Vector2(0f, 0f), new System.Numerics.Vector2(1f, 1f),
-					new System.Numerics.Vector4(0f, 0f, 0f, 0f), new System.Numerics.Vector4(1f, 1f, 1f, 1f));
-			}
-			else
-			{
-				moveClicked = ImGui.Button("Position", new System.Numerics.Vector2(gizmoHalf, 0f));
-			}
-			if (gizmoIsMove) ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered())
-			{
-				ImGui.SetTooltip("Position");
-			}
-			if (moveClicked)
-			{
-				_gizmoMode = GizmoMode.Move;
-			}
-			ImGui.SameLine();
-			if (!gizmoIsMove) ImGui.PushStyleColor(ImGuiCol.Button, gizmoActiveCol);
-			float rotIconSz = ImGui.GetFontSize();
-			bool rotClicked;
-			if (_rotateIconTexture != null)
-			{
-				rotClicked = ImGui.ImageButton("##rotgizmo", (nint)_rotateIconTexture.GlId,
-					new System.Numerics.Vector2(rotIconSz, rotIconSz),
-					new System.Numerics.Vector2(0f, 0f), new System.Numerics.Vector2(1f, 1f),
-					new System.Numerics.Vector4(0f, 0f, 0f, 0f), new System.Numerics.Vector4(1f, 1f, 1f, 1f));
-			}
-			else
-			{
-				rotClicked = ImGui.Button("Rotation", new System.Numerics.Vector2(gizmoHalf, 0f));
-			}
-			if (!gizmoIsMove) ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered())
-			{
-				ImGui.SetTooltip("Rotation");
-			}
-			if (rotClicked)
-			{
-				_gizmoMode = GizmoMode.Rotate;
-			}
-		}
-		ImGui.Separator();
-		if (ImGui.Button("Deselect", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			SelectClicked(null, additive: false);
-		}
-
-		if (ImGui.Button("Show Scripts (names)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_showScriptsBrowser = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Lists every item in this chunk's CODE_BEHAVIOURS_SECTION. PS2BehaviourGraph\nitems (odd id) store a REAL name string in the file itself — shown here\ninstead of just the hex id. TwinBehaviourStarter items (even id) have no\nName field in the format at all, shown as \"(starter, no name)\".");
-		}
-		ImGui.BeginDisabled(_selectedSet.Count == 0);
-		if (ImGui.Button("Delete Selected", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			DeleteSelected();
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Del key also works. Only real PS2 objects/scenery tiles are\nremoved from the archive — cubes just disappear from the editor.");
-		}
-		ImGui.EndDisabled();
-
-		ImGui.Spacing();
-		ImGui.TextColored(new System.Numerics.Vector4(1f, 0.82f, 0.15f, 1f), "CrashEngine");
-		ImGui.Separator();
-
-		if (ImGui.CollapsingHeader("File"))
-		{
-			ImGui.Indent();
-			ImGui.BeginDisabled(_building);
-			if (ImGui.Button("Save Chunk (.rm2/.sm2)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				SaveChunk();
-			}
-			if (ImGui.Button("Reload Level (keep saved edits)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ReloadLevel(fromDiscOnly: false);
-			}
-			if (ImGui.Button("Reload Level from Disc (discard saved edits)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ReloadLevel(fromDiscOnly: true);
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Re-extracts just THIS level fresh from the real disc archive —\nignores SavedChunks entirely. Use this to recover from a broken\nsaved edit (e.g. a bad texture import) without redoing the whole\nCreate Project extraction. Any unsaved live edits on this level\nare lost too.");
-			}
-			ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0.6f, 0.15f, 0.15f, 1f));
-			if (ImGui.Button("Reset ALL Levels From Disc (delete all saved edits)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_openResetAllConfirmPopup = true;
-			}
-			ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("PROJECT-WIDE, not just this level: permanently deletes the entire\nSavedChunks folder (every level's saved edits) so everything reads\nfresh from the real disc archive again. No backup, no Undo — asks\nfor confirmation first.");
-			}
-			EnsureIsoOutputPathLoaded(); // Amedo 2026-09-20
-			ImGui.TextDisabled("ISO output (blank = default path):");
-			ImGui.SetNextItemWidth(-32f);
-			if (ImGui.InputText("##isoOutPath", ref _isoOutputPath, 512u))
-				SaveIsoOutputPath();
-			ImGui.SameLine();
-			if (ImGui.Button("...##isoOutBrowse", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ShowSaveFileDialog("Choose ISO output file (overwritten every build)", "PS2 ISO\0*.iso\0All Files\0*.*\0\0", "game_test.iso", text3 =>
-				{
-					if (text3 != null)
-					{
-						_isoOutputPath = text3;
-						SaveIsoOutputPath();
-					}
-				});
-			}
-			if (ImGui.Button("Build ISO (PS2)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				BuildIso();
-			}
-			ImGui.EndDisabled();
-			if (ImGui.Button("Export Collision to OBJ...", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ExportCollisionToObj();
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Writes this level's ENTIRE current collision (Coll.Triangles/\nColl.Vectors) to a plain .obj file — edit it in Blender (move/\nsculpt/delete verts, add new geometry, anything), then use\n\"Import Collision from OBJ...\" to bring it back. Vertex ORDER is\npreserved exactly (needed so an edited-in-place OBJ round-trips\ncorrectly) — don't reorder/reindex vertices in Blender (a plain\nedit that doesn't add/remove verts is always safe).");
-			}
-			if (ImGui.Button("Import Collision from OBJ...", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ImportCollisionFromObj();
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Replaces this level's ENTIRE collision (Coll.Triangles/Coll.Vectors,\nColl.Groups rebuilt as one big group) from a .obj file — use\nthe SAME file \"Export Collision to OBJ...\" wrote (edited in\nBlender) so vertex count/order still lines up with anything else\nthat might reference it. Triggers are left untouched. Save Chunk +\nBuild ISO to test.");
-			}
-			if (ImGui.Button("Import Object (OBJ + textures)...", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				bool flipX = _flipModelX;
-				ShowOpenFileDialog("Import Object (real, as PS2 Object)", ModelImporter.FileFilter, modelPath =>
-				{
-					if (modelPath != null) BakeExternalModel(modelPath, flipX);
-				});
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Imports a mesh file (.obj + its .mtl + textures, or .glb/.fbx/etc.) as\na REAL PS2 RigidModel/OGI/Object, placed as a normal Instance at\nthe camera — same real pipeline \"+ Add Model (real, as Object)\"\nabove uses. Unlike the Inspector's own \"Export Object\" round-trip\npreview, this DOES survive Save Chunk + Build ISO.");
-			}
-			ImGui.Unindent();
-		}
-
-		if (ImGui.CollapsingHeader("Add"))
-		{
-		if (ImGui.Button("+ Cube", new System.Numerics.Vector2(134f, 0f)))
-		{
-			_pendingSpawn = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("A real, unit-sized (1x1x1) box baked as a genuine PS2 RigidModel/\nOGI/Object and placed as a normal Instance at the camera's current\nposition — same real pipeline \"+ Add Model\" uses, procedural geometry\ninstead of an imported file. Starts with a real, opaque solid-gray\ntexture+material, so Import Texture (Inspector) can replace it with\nanything afterward, exactly like any other real object (max 512x512).\nSave Chunk to keep it, then Build ISO + test.");
-		}
-		if (ImGui.Button("+ Add Crash (full, with scripts)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_showCrashPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Crash is defined LOCALLY per-level (not shared like Wumpa/Nitro) —\nthis does a real full transplant (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references) from a\nlevel that already has a real, working Crash. First attempt at a\nfull script transplant this session — not guaranteed to work\nperfectly the first try, see the Add Crash log message.");
-		}
-		if (ImGui.Button("+ Add Object (full, from another level)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_objectTransplantLevelFilter = "";
-			_showObjectTransplantLevelPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Same full transplant as Add Crash (object + OGIs + animations +\nbehaviours/scripts + sounds + everything it references), but for ANY\nobject in ANY level — pick the source level, then pick the object by\nname. Copies the source's own Instance config (StateFlags/ParamLists)\ntoo, same as Add Crash — needed for it to behave correctly, not just\nrender. Save Chunk to keep it, then Build ISO + test.");
-		}
-		if (ImGui.Button("+ Add Trigger (from another level)", new System.Numerics.Vector2(-1f, 0f)))
-		{
-			_triggerTransplantLevelFilter = "";
-			_showTriggerTransplantLevelPicker = true;
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Same source-level browse as Add Object, but for a Trigger volume —\npick the source level, then pick the trigger by id/messages. Copies\nits volume shape + TriggerMessages. If you added an object with\n\"Add Object\" FIRST (same session, not saved/reloaded since), the new\ntrigger's own Instances list is automatically pointed at THAT\nobject's new instance id, so touching it fires the same messages the\nobject's script listens for — do Add Object, then Add Trigger, in\nthat order. Otherwise the source trigger's own (likely wrong once\ncopied) Instances list is kept as-is and logged as a warning. Save\nChunk to keep it, then Build ISO + test.");
-		}
-		if (_importError != null)
-		{
-			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.4f, 0.4f, 1f), _importError);
-		}
-		float flipW = ImGui.CalcTextSize("Flip X (fix mirror)").X + ImGui.GetFrameHeight()
-		              + ImGui.GetStyle().ItemInnerSpacing.X + ImGui.GetStyle().ItemSpacing.X;
-		if (ImGui.Button("+ Add Model (real, as Object)", new System.Numerics.Vector2(-flipW, 0f)))
-		{
-			_importError = null;
-			bool flipX = _flipModelX;
-			ShowOpenFileDialog("Import 3D Model (real)", ModelImporter.FileFilter, modelPath =>
-			{
-				if (modelPath != null) BakeExternalModel(modelPath, flipX);
-			});
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Bakes the mesh into a real PS2 RigidModel/OGI/Object and places it\nas a normal Instance — same pipeline Add Object (full) already uses\nlive in PCSX2. One real PS2 texture per submesh (diffuse only).\nSave Chunk to keep it, then Build ISO + test.");
-		}
-		ImGui.SameLine();
-		ImGui.Checkbox("Flip X (fix mirror)##flipModelX", ref _flipModelX);
-
-		if (ImGui.Button("+ Add Scenery (real)", new System.Numerics.Vector2(-flipW, 0f)))
-		{
-			_importError = null;
-			bool flipX = _flipModelX;
-			ShowOpenFileDialog("Import 3D Model as Scenery (real)", ModelImporter.FileFilter, modelPath =>
-			{
-				if (modelPath != null) BakeExternalModelAsScenery(modelPath, flipX);
-			});
-		}
-		if (ImGui.IsItemHovered())
-		{
-			MaybeTooltip("Bakes the mesh into real, independent PS2 SCENERY (a new scenery leaf\nreferencing a freshly-baked SM2 mesh) placed at the world origin (0,0,0)\n-- behaves like any scenery tile you add: move it, Ctrl+D, Delete. Unlike\n\"+ Add Model\", no Object/Instance is created. Save Chunk to keep it,\nthen Build ISO + test.");
-		}
-		ImGui.SameLine();
-		ImGui.Checkbox("Flip X (fix mirror)##flipSceneryX", ref _flipModelX);
-
-		if (ImGui.Button("+ AI Position", new System.Numerics.Vector2(134f, 0f)))
-			AddAiPositionAt(System.Numerics.Vector3.Zero);
-		if (ImGui.IsItemHovered())
-			MaybeTooltip("Drops a new AI position (red nav point) at the world origin (0,0,0),\nlike everything else you add. Enemies roam among nearby AI positions.\nCtrl+D copies it next to itself, drag to move, Delete removes. Connect\nthem with \"+ AI Path\". Save Chunk to keep.");
-		ImGui.SameLine();
-		if (ImGui.Button("+ AI Path (link all selected)", new System.Numerics.Vector2(-1f, 0f)))
-			AddAiPathBetweenSelected();
-		if (ImGui.IsItemHovered())
-			MaybeTooltip("Select ALL the AI positions you want linked (Ctrl+click), then this\nconnects them in one click: 2 -> a single edge, 3+ -> a closed loop\n(nearest-neighbour order, follows the terrain). Enemies route between\nconnected nodes; without paths they only wander to the nearest. Save Chunk.");
-		}
-		if (ImGui.CollapsingHeader("Collision"))
-		{
-			ImGui.Indent();
-			if (ImGui.Button("+ Collision Box", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_pendingSpawnCollisionBox = true;
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Drops a visible, resizable box (drag it, resize via the Transform\npanel's Scale) that ALSO emits real PS2 collision geometry matching\nits current position/scale — for sanity-testing that collision\nround-trips through Save Chunk + Build ISO + an emulator at all,\nindependent of any mesh decoding. Synced into the real collision\ndata on every Save Chunk (not immediately) — move/resize it as much\nas you want first. Any existing cube can also opt in/out via its own\n\"Emit Collision\" checkbox in the Inspector.");
-			}
-			if (ImGui.Button("+ Cylinder Collision", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_pendingSpawnCollisionCylinder = true;
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Flat-capped cylinder (an N-sided prism, not a rounded/spherical-cap\ncapsule) — Radius/Height/Segments editable in the Inspector.\nSegments locks once synced (changes the actual vertex/triangle\ncount); Radius/Height stay editable anytime. Same sync-on-Save-Chunk\nbehaviour as + Collision Box.");
-			}
-			if (ImGui.Button("+ Plane Collision", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_pendingSpawnCollisionPlane = true;
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("A single flat quad (Width x Length, editable in the Inspector) —\nfor patching a ramp/wall/ceiling piece without a full box. Single-\nsided: rotate the entity (same gizmo as anything else) to orient it,\nplaced flat by default matches real ground's own solid-side\nconvention. Same sync-on-Save-Chunk behaviour as + Collision Box.");
-			}
-			if (ImGui.Checkbox("Show Collision", ref _showCollision))
-			{
-				SetCollisionVisible(_showCollision);
-			}
-			RenderPipeline instance = RenderPipeline.Instance;
-			if (instance != null)
-			{
-				bool wire = instance.Wireframe;
-					if (ImGui.Checkbox("Show Mesh (Wireframe)", ref wire))
-					{
-						instance.Wireframe = wire;
-					}
-					if (ImGui.IsItemHovered())
-					{
-						MaybeTooltip("Draws the whole world as edge-only wireframe so you can read the\nactual triangle topology of every model/scenery mesh. The sky stays\nsolid and the UI is unaffected. Purely a viewport view mode — never\nsaved, never changes any data.");
-					}
-					bool v = instance.LitEnabled;
-				if (ImGui.Checkbox("Lit Shading (experimental)", ref v))
-				{
-					instance.LitEnabled = v;
-				}
-				if (ImGui.IsItemHovered())
-				{
-					MaybeTooltip("Global on/off for the real per-level world lighting term (see the\n\"World Lighting\" Hierarchy entry). Off by default because the\nreal game's own scenery appears fully unlit/baked-colour, matching\nTT Lab's own reference shader - this is a one-click experiment/\ncomparison switch, and doubles as an instant revert if enabling it\never looks wrong.");
-				}
-			}
-			if (ImGui.Button("Clear Collision Data (experimental)", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				ClearCollisionData();
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Empties this level's ground/world collision triangles — for\ntesting whether the real game (built ISO, in an emulator) falls\nthrough the world without them. Save Chunk + Build ISO to test.");
-			}
-			ImGui.Unindent();
-		}
-
-		if (ImGui.CollapsingHeader("UI"))
-		{
-			ImGui.Indent();
-			if (ImGui.Checkbox("Show Triggers", ref _showTriggers) && _triggersRoot != null)
-			{
-				_triggersRoot.Active = _showTriggers;
-			}
-			ImGui.SameLine();
-			if (ImGui.Checkbox("Show Cameras", ref _showCameras) && _camerasRoot != null)
-			{
-				_camerasRoot.Active = _showCameras;
-			}
-			if (ImGui.Checkbox("Show Positions", ref _showPositions) && _positionsRoot != null)
-			{
-				_positionsRoot.Active = _showPositions;
-			}
-			ImGui.SameLine();
-			if (ImGui.Checkbox("Show AI Positions", ref _showAiPositions) && _aiPosRoot != null)
-			{
-				_aiPosRoot.Active = _showAiPositions;
-			}
-			if (ImGui.Checkbox("Show Load Scenes", ref _showLoadScenes) && _loadScenesRoot != null)
-			{
-				_loadScenesRoot.Active = _showLoadScenes;
-			}
-			ImGui.SameLine();
-			if (ImGui.Checkbox("Show Particle Emitters", ref _showParticleEmitters) && _particleEmittersRoot != null)
-			{
-				_particleEmittersRoot.Active = _showParticleEmitters;
-			}
-			if (ImGui.Checkbox("Show Lights", ref _showLights) && _lightsRoot != null) // Amedo 2026-09-19
-			{
-				_lightsRoot.Active = _showLights;
-			}
-			bool playerRunning = _playerProcess is { HasExited: false };
-			ImGui.BeginDisabled(playerRunning);
-			if (ImGui.Button("Launch Player")) LaunchPlayer();
-			ImGui.EndDisabled();
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Starts the real, standalone CrashPlayer.exe (see project_crashengine_agentlabvm\nmemory) for this level as a separate process -- reflects your saved edits\n(SavedChunks), same as reloading normally would. The editor itself runs no\nAgentLab/physics code at all anymore.");
-			}
-			ImGui.SameLine();
-			ImGui.BeginDisabled(!playerRunning);
-			if (ImGui.Button("Stop Player")) StopPlayer();
-			ImGui.EndDisabled();
-			if (ImGui.Button("Delete Linked Scenery (test)"))
-			{
-				DeleteLinkedScenery();
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Clears this chunk's whole LinksList (adjacent-level links, e.g. what\n\"Show Load Scenes\" visualizes) in-memory only — for isolating whether\nsomething related to a linked neighbouring chunk is active in the\nbackground during a live-memory investigation. Reload Level from Disc\nto undo (not on the undo stack). Save Chunk to persist if you actually\nmean to remove them.");
-			}
-			ImGui.SameLine();
-			if (ImGui.Button("Delete Skydome (test)"))
-			{
-				DeleteSkydome();
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Clears this chunk's skydome (the rotating/animated background sky\npass, drawn every frame) in-memory only — another candidate source\nof constant background activity to rule out during a live-memory\ninvestigation. Reload Level from Disc to undo (not on the undo\nstack). Save Chunk to persist if you actually mean to remove it.");
-			}
-			if (ImGui.Button("Copy All Ground Colors From Level...", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_groundColorPickerFilter = "";
-				_showGroundColorPicker = true;
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Whole-level, no-selection version of Copy Vertex Colors From Level —\npicks a level and copies vertex colors for EVERY scenery mesh in this\nchunk that shares the exact same underlying mesh id with that level\n(same asset reused across dimension variants, e.g. beach vs AltEarth).\nCoverage isn't total — tiles with no matching id are left untouched.");
-			}
-			ImGui.Unindent();
-		}
-
-		if (ImGui.CollapsingHeader("Game Settings"))
-		{
-			ImGui.Indent();
-			if (ImGui.Button("Open Game Settings...", new System.Numerics.Vector2(-1f, 0f)))
-			{
-				_showGameSettings = !_showGameSettings;
-			}
-			if (ImGui.IsItemHovered())
-			{
-				MaybeTooltip("Gameplay-rule toggles — real script edits to shared behaviour\ngraphs (Startup\\Default.rm2), not per-object Inspector tweaks.\nSame window as the top bar's \"Game Settings\" button.");
-			}
-			ImGui.Unindent();
-		}
-		ImGui.Spacing();
-		ImGui.Separator();
-		ImGui.SetNextItemWidth(-1f);
-		ImGui.InputText("##filter", ref _sceneFilter, 128u);
+		ImGui.Begin("Hierarchy##panel", ImGuiWindowFlags.NoCollapse); // Amedo
+		if (_importError != null) ImGui.TextColored(new System.Numerics.Vector4(1f, 0.4f, 0.4f, 1f), _importError); // Amedo
+		DrawHierarchyHeader(); // Amedo
 		ImGui.Separator();
 		ImGui.BeginChild("##tree", new System.Numerics.Vector2(-1f, -1f), ImGuiChildFlags.None);
 		if (!string.IsNullOrWhiteSpace(_sceneFilter))
@@ -2269,11 +1675,15 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		}
 		ImGui.EndChild();
 		ImGui.End();
+		}
 		ImGui.SetNextWindowPos(new System.Numerics.Vector2((float)width - 280f, 32f), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new System.Numerics.Vector2(280f, y), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSizeConstraints(new System.Numerics.Vector2(180f, 120f), new System.Numerics.Vector2(float.MaxValue, float.MaxValue));
 		ImGui.Begin("Inspector##panel", ImGuiWindowFlags.NoCollapse);
-		if (_selected != null)
+		if (_workspace == Workspace.Scene) InspectorUndoFrame(_selected); // Amedo
+		_inspectorRect = (ImGui.GetWindowPos(), ImGui.GetWindowSize()); // Amedo 2026-10-04
+		if (_workspace == Workspace.Animation) DrawAnimationInspector(); // Amedo 2026-10-04
+		else if (_selected != null)
 		{
 			ImGui.PushID(_selected.GetHashCode());
 			DrawInspector(_selected);
@@ -2288,7 +1698,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		// Amedo 2026-09-21
 		bool blockingUi = ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup);
 
-		if (!blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move)
+		if (_workspace == Workspace.Scene && !blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Move)
 		{
 			System.Numerics.Vector3 vector = GizmoPivot();
 			float num = 2.25f * GizmoScale();
@@ -2301,11 +1711,11 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			uint[] array2 = new uint[3] { 4282401023u, 4282449728u, 4294918208u };
 			uint[] array3 = new uint[3] { 1614823679u, 1614872384u, 1627340864u };
 			ImDrawListPtr foregroundDrawList = ImGui.GetForegroundDrawList();
-			if (WorldToScreen(vector, width, height, out var screen))
+			if (WorldToScreen(vector, ViewW, ViewH, out var screen))
 			{
 				for (int i = 0; i < 3; i++)
 				{
-					if (WorldToScreen(array[i], width, height, out var screen2))
+					if (WorldToScreen(array[i], ViewW, ViewH, out var screen2))
 					{
 						foregroundDrawList.AddLine(screen, screen2, array3[i], 1.5f);
 						float num2 = ((_gizmoHover == i || (_gizmoDragging && _gizmoAxis == i)) ? 11f : 7f);
@@ -2315,7 +1725,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (!blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Rotate)
+		if (_workspace == Workspace.Scene && !blockingUi && _selected != null && _camera != null && !_choosingDuplicateDirection && _gizmoMode == GizmoMode.Rotate)
 		{
 			System.Numerics.Vector3 vector2 = GizmoPivot();
 			float num3 = 2.25f * GizmoScale();
@@ -2336,7 +1746,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				{
 					System.Numerics.Vector3 vector4 = array6[k % array6.Length];
 					bool flag4 = j == 3 || System.Numerics.Vector3.Dot(vector4 - vector2, position - vector2) > 0f;
-					if (!WorldToScreen(vector4, width, height, out var screen3))
+					if (!WorldToScreen(vector4, ViewW, ViewH, out var screen3))
 					{
 						vector3 = null;
 						continue;
@@ -2360,15 +1770,15 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (!blockingUi && _choosingDuplicateDirection && _camera != null)
+		if (_workspace == Workspace.Scene && !blockingUi && _choosingDuplicateDirection && _camera != null)
 		{
 			float num5 = 2.25f * GizmoScale();
 			ImDrawListPtr foregroundDrawList3 = ImGui.GetForegroundDrawList();
-			if (WorldToScreen(_dupGizmoPivot, width, height, out var screen4))
+			if (WorldToScreen(_dupGizmoPivot, ViewW, ViewH, out var screen4))
 			{
 				for (int l = 0; l < SixDirs.Length; l++)
 				{
-					if (WorldToScreen(_dupGizmoPivot + SixDirs[l] * num5, width, height, out var screen5))
+					if (WorldToScreen(_dupGizmoPivot + SixDirs[l] * num5, ViewW, ViewH, out var screen5))
 					{
 						foregroundDrawList3.AddLine(screen4, screen5, 1627366694u, 1.5f);
 						float num6 = ((_dupGizmoHover == l) ? 11f : 7f);
@@ -2384,7 +1794,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 			foreach (CubeEntry cube in _cubes)
 			{
 				System.Numerics.Vector3 world = cube.Ent.Transform.World.Translation + new System.Numerics.Vector3(0f, 2.3f, 0f);
-				if (WorldToScreen(world, width, height, out var screen6))
+				if (WorldToScreen(world, ViewW, ViewH, out var screen6))
 				{
 					uint col2 = (_selectedSet.Contains(cube.Ent) ? 4286644223u : 4289374890u);
 					float x = ImGui.CalcTextSize(cube.Label).X;
@@ -2392,7 +1802,8 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
-		if (!blockingUi && _camera != null)
+		if (_workspace == Workspace.Scene) UpdateAiPathLines(); // Amedo
+		if (_workspace == Workspace.Scene && !blockingUi && _camera != null)
 		{
 			Entity camerasRoot = _camerasRoot;
 			if (camerasRoot != null && camerasRoot.Active)
@@ -2400,7 +1811,11 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				ImDrawListPtr foregroundDrawList4 = ImGui.GetForegroundDrawList();
 				foreach (Entity child in _camerasRoot.Children)
 				{
-					if (WorldToScreen(child.Transform.World.Translation, width, height, out var screen7))
+					if (WorldToScreen(child.Transform.World.Translation, ViewW, ViewH, out var screen7) && _cameraIconTexture is { } camIcon) // Amedo 2026-10-04
+					{
+						foregroundDrawList4.AddImage((nint)camIcon.GlId, screen7 + CameraIconMin, screen7 + CameraIconMax); // Amedo 2026-10-04
+					}
+					else if (WorldToScreen(child.Transform.World.Translation, ViewW, ViewH, out screen7)) // Amedo 2026-10-04
 					{
 						System.Numerics.Vector2 p_min = screen7 - new System.Numerics.Vector2(11f, 7.5f);
 						System.Numerics.Vector2 p_max = screen7 + new System.Numerics.Vector2(11f, 7.5f);
@@ -2419,10 +1834,12 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 				}
 			}
 		}
+		if (_workspace == Workspace.Scene) // Amedo 2026-10-04
+		{
 		ImGui.SetNextWindowPos(new System.Numerics.Vector2(0f, (float)height - 180f), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new System.Numerics.Vector2(width, 180f), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSizeConstraints(new System.Numerics.Vector2(200f, 60f), new System.Numerics.Vector2(float.MaxValue, float.MaxValue));
-		ImGui.Begin("Output", ImGuiWindowFlags.NoCollapse);
+		ImGui.Begin("Console##panel", ImGuiWindowFlags.NoCollapse); // Amedo
 		foreach (string item2 in _browser.GetLog())
 		{
 			ImGui.TextUnformatted(item2);
@@ -2434,5 +1851,10 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=X
 		ImGui.End();
 
 		DrawAssetsPanel();
+		DrawBehaviourTab(); // Amedo 2026-09-25
+		}
+		else DrawAnimationWorkspace();
+		DrawViewGizmo(); // Amedo 2026-10-04
+		DrawGizmoModeButtons(); // Amedo
 	}
 }

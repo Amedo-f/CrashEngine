@@ -48,76 +48,116 @@ public sealed partial class GameScene : Scene
 {
     private string _fxFilter = "";
     private string? _fxSelected;
-    private List<(string Name, string Level, int TexturePage)>? _fxGlobalCatalog;
+    private List<(string Name, string Level, int TexturePage, Vector4 Swatch)>? _fxGlobalCatalog; // Amedo 2026-09-26
     private bool _fxGlobalLoading;
     private int _fxGlobalLoadProgress;
     private int _fxGlobalLoadTotal;
     private string? _fxSelectedLevel;
     private readonly Dictionary<(string Level, string Name), Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem?> _fxResolvedCache = new();
     private MeshDecoder.ParticleTexturePage[]? _fxTexturePages;
+    private DecalAssets? _fxDecals; // Amedo 2026-09-30
     private bool _fxTexturePagesLoading;
 
     private List<(string Name, string Level, int Count)>? _emitterGlobalCatalog;
     private bool _emitterGlobalLoading;
     private string _emitterFilter = "";
 
-    private static GpuMesh BuildParticleQuadMesh(GL gl, Vector2 uv0, Vector2 uv1)
-    {
-        var white = new Vector4(1f, 1f, 1f, 1f);
-        GpuMesh.Vertex V(float x, float y, float u, float v) => new()
-        {
-            Position = new Vector3(x, y, 0f), Normal = Vector3.UnitZ, UV = new Vector2(u, v), Color = white
-        };
-        var v0 = V(-0.5f, -0.5f, uv0.X, uv1.Y);
-        var v1 = V( 0.5f, -0.5f, uv1.X, uv1.Y);
-        var v2 = V( 0.5f,  0.5f, uv1.X, uv0.Y);
-        var v3 = V(-0.5f,  0.5f, uv0.X, uv0.Y);
-        return new GpuMesh(gl, new[] { v0, v1, v2, v0, v2, v3 }, PrimitiveType.Triangles);
-    }
+    // Amedo 2026-09-26
+    private PreviewFbo? _fxPrevFbo;
+    private ParticleWorld? _fxPrevWorld;
+    private string? _fxPrevKey;
+    private bool _fxPrevBurst;
+    private bool _fxPrevFramed;
+    private float _fxPrevYaw = 35f, _fxPrevPitch = 15f, _fxPrevZoom = 1f;
+    private Vector3 _fxPrevCenter;
+    private float _fxPrevRadius = 1f;
+    private float _fxPrevRestartIn = -1f;
+    private static readonly Matrix4x4 FxPreviewToEditor = Matrix4x4.CreateScale(-1f, 1f, 1f);
 
-    private void BuildParticleEmitterPreview(Entity markerEnt, string name, PS2AnyTwinsanityRM2 rm2)
+    // Amedo 2026-09-26
+    private static void AddParticleEffect(ParticleEffectsRenderer? effects, Entity markerEnt, TwinParticleEmitter em, ChunkSource? src)
     {
-        var sys = MeshDecoder.FindParticleSystem(rm2, name);
+        if (effects is null || src?.Rm2 is null) return;
+        var name = ParticleNames.Clean(em.Name);
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var sys = MeshDecoder.FindParticleSystem(src.Rm2, name)
+                  ?? (src.GlobalRm2 is { } def ? MeshDecoder.FindParticleSystem(def, name) : null);
         if (sys is null) return;
+        effects.AddEmitter(markerEnt, em, sys);
+    }
 
-        EnsureFxTexturePagesLoaded();
-        MeshDecoder.ParticleTexturePage? page = _fxTexturePages is not null && sys.UnkInt is >= 0 and < 3
-            ? _fxTexturePages[sys.UnkInt] : null;
-        (int X, int Y, int W, int H, float FillRatio)? icon = page is { Icons.Count: > 0 } pg
-            ? pg.Icons.OrderByDescending(i => i.FillRatio).First() : null;
-
-        var uv0 = Vector2.Zero;
-        var uv1 = Vector2.One;
-        Texture2D? pageTex = null;
-        if (page is { } pgv && icon is { } ic)
+    // Amedo 2026-09-26
+    private void UpdateFxPreview(List<TwinParticleSystem> systems, string key)
+    {
+        if (_fxPrevWorld is null || _fxPrevKey != key)
         {
-            uv0 = new Vector2(ic.X / (float)pgv.Width, ic.Y / (float)pgv.Height);
-            uv1 = new Vector2((ic.X + ic.W) / (float)pgv.Width, (ic.Y + ic.H) / (float)pgv.Height);
-            pageTex = pgv.Tex;
+            _fxPrevWorld = new ParticleWorld();
+            _fxPrevWorld.Rng = _fxPrevWorld.Decals.Rng = new CrashEngine.Core.GameRandom(); // Amedo
+            foreach (var sys in systems)
+            {
+                var def = ParticleFx.DefFor(sys);
+                _fxPrevWorld.Emitters.Add(new ParticleEmitterSim(def, _fxPrevWorld, def.Phase, _fxPrevBurst ? 1 : 0));
+            }
+            _fxPrevKey = key;
+            _fxPrevFramed = false;
+            _fxPrevRestartIn = -1f;
         }
 
-        var gl = Engine.Instance.GL;
-        var quadMesh = BuildParticleQuadMesh(gl, uv0, uv1);
-        int particleCount = Math.Clamp((int)sys.UnkUShort2, 10, 200);
-
-        var preview = markerEnt.Add(new ParticleEmitterPreview());
-        preview.Members.Add(sys);
-        for (int i = 0; i < particleCount; i++)
+        _fxPrevWorld.Advance(EngineTime.Delta, null, distanceGating: false);
+        if (_fxPrevBurst)
         {
-            var pEnt = new Entity($"particle_{i}");
-            var billboard = pEnt.Add(new ParticleBillboardRenderer { Mesh = quadMesh });
-            if (pageTex is not null) billboard.Mat.Albedo = pageTex;
-            preview.Particles.Add(billboard);
-            markerEnt.AddChild(pEnt);
+            float now = _fxPrevWorld.RenderTime;
+            if (_fxPrevWorld.Emitters.All(e => e.Finished && !e.AnyAlive(now)))
+            {
+                if (_fxPrevRestartIn < 0f) _fxPrevRestartIn = 0.6f;
+                _fxPrevRestartIn -= EngineTime.Delta;
+                if (_fxPrevRestartIn <= 0f) { _fxPrevWorld.Reset(); _fxPrevRestartIn = -1f; }
+            }
+        }
+
+        if (ParticleFx.LiveBounds(_fxPrevWorld, FxPreviewToEditor, out var mn, out var mx))
+        {
+            var c = (mn + mx) * 0.5f;
+            float r = MathF.Max((mx - mn).Length() * 0.5f, 0.25f);
+            if (!_fxPrevFramed) { _fxPrevCenter = c; _fxPrevRadius = r; _fxPrevFramed = true; }
+            else
+            {
+                float k = 1f - MathF.Exp(-EngineTime.Delta * 2f);
+                _fxPrevCenter = Vector3.Lerp(_fxPrevCenter, c, k);
+                _fxPrevRadius += (r - _fxPrevRadius) * (r > _fxPrevRadius ? k : k * 0.15f);
+            }
         }
     }
+
+    // Amedo 2026-09-26
+    private void RenderFxPreview(int w, int h)
+    {
+        var gl = Engine.Instance.GL;
+        _fxPrevFbo ??= new PreviewFbo(gl, w, h);
+        _fxPrevFbo.Resize(w, h);
+        _fxPrevFbo.Begin(new Vector3(0.08f, 0.08f, 0.1f));
+        if (_fxPrevWorld is not null && _fxTexturePages is not null)
+        {
+            float fov = 50f * MathF.PI / 180f;
+            float dist = _fxPrevRadius / MathF.Sin(fov * 0.5f) * _fxPrevZoom;
+            float yr = _fxPrevYaw * MathF.PI / 180f, pr = _fxPrevPitch * MathF.PI / 180f;
+            var eye = _fxPrevCenter + new Vector3(MathF.Cos(pr) * MathF.Sin(yr), MathF.Sin(pr), MathF.Cos(pr) * MathF.Cos(yr)) * dist;
+            var view = CameraComponent.CreateLookAtRH(eye, _fxPrevCenter, Vector3.UnitY);
+            var proj = CameraComponent.CreatePerspectiveRH(fov, (float)w / h, 0.02f, 5000f);
+            ParticleFx.Draw(gl, _fxPrevWorld, view, proj, FxPreviewToEditor, _fxTexturePages, drawDistanceCull: false);
+        }
+        _fxPrevFbo.End(Engine.Instance.Width, Engine.Instance.Height);
+        RenderPipeline.Instance?.Shader.Use();
+    }
+
+    private static readonly string[] FxBlendNames = { "Add", "Subtract", "Mix", "Opaque" }; // Amedo 2026-09-26
 
     private void LoadGlobalFxCatalog()
     {
         _fxGlobalLoading = true;
         Task.Run(() =>
         {
-            var result = new List<(string, string, int)>();
+            var result = new List<(string, string, int, Vector4)>(); // Amedo 2026-09-26
             try
             {
                 using var pkg = PackageReader.Open(_extractedRoot);
@@ -131,8 +171,8 @@ public sealed partial class GameScene : Scene
                             var def = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
                             using var reader = new BinaryReader(defStream);
                             def.Read(reader, (int)defStream.Length);
-                            foreach (var (name, texPage) in MeshDecoder.GetParticleSystemCatalog(def))
-                                result.Add((name, @"Startup\Default", texPage));
+                            foreach (var (name, texPage, swatch) in MeshDecoder.GetParticleSystemCatalog(def)) // Amedo 2026-09-26
+                                result.Add((name, @"Startup\Default", texPage, swatch));
                         }
                         catch (Exception ex) { _browser.Log($"Effects: Startup\\Default.rm2 particle scan failed: {ex.Message}"); }
                     }
@@ -168,8 +208,8 @@ public sealed partial class GameScene : Scene
                         var rm2 = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2();
                         using var reader = new BinaryReader(stream);
                         rm2.Read(reader, (int)stream.Length);
-                        foreach (var (name, texPage) in MeshDecoder.GetParticleSystemCatalog(rm2))
-                            result.Add((name, levelPath, texPage));
+                        foreach (var (name, texPage, swatch) in MeshDecoder.GetParticleSystemCatalog(rm2)) // Amedo 2026-09-26
+                            result.Add((name, levelPath, texPage, swatch));
                     }
                     catch {  }
                 }
@@ -223,7 +263,7 @@ public sealed partial class GameScene : Scene
                         var data = rm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
                         if (data is null) continue;
                         foreach (var grp in data.ParticleEmitters
-                                     .Select(em => new string(em.Name).TrimEnd('\0', ' '))
+                                     .Select(em => ParticleNames.Clean(em.Name)) // Amedo 2026-09-26
                                      .Where(n => !string.IsNullOrWhiteSpace(n))
                                      .GroupBy(n => n, StringComparer.OrdinalIgnoreCase))
                             result.Add((grp.Key, levelPath, grp.Count()));
@@ -267,7 +307,10 @@ public sealed partial class GameScene : Scene
                 }
             }
             if (def is not null)
+            {
                 _fxTexturePages = MeshDecoder.GetParticleTexturePages(Engine.Instance.GL, def);
+                _fxDecals = MeshDecoder.GetDecalAssets(Engine.Instance.GL, def); // Amedo 2026-09-30
+            }
         }
         catch (Exception ex) { _browser.Log($"Effects: failed to load particle texture pages: {ex.Message}"); }
         finally { _fxTexturePagesLoading = false; }
@@ -293,19 +336,18 @@ public sealed partial class GameScene : Scene
 
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##fxFilter", "Search effects (e.g. NITRO, EXP, MIST)...", ref _fxFilter, 128);
-        ImGui.TextDisabled($"{_fxGlobalCatalog.Count} particle system(s) across every level — real color/count/size, approximate motion (see tooltip).");
+        ImGui.TextDisabled($"{_fxGlobalCatalog.Count} particle system(s) across every level — preview = the game's own particle math."); // Amedo 2026-09-26
         if (ImGui.IsItemHovered())
-            MaybeTooltip("Color-over-lifetime, particle count, and the grow/hold/shrink size\n" +
-                         "curve are decoded from real data. Spawn shape/velocity/texture aren't\n" +
-                         "confirmed yet — the preview's MOTION (drift direction) is still a\n" +
-                         "generic approximation, not the real effect's actual spawn shape.");
+            MaybeTooltip("The preview runs the same simulation as the viewport: the game's emission cycle,\n" +
+                         "spawn shapes, gravity, the 64-sample shape/colour table, the real texture\n" +
+                         "rectangle and the real blend mode (see CrashEngine-Lab docs/re/particles-system.md).\n" +
+                         "Swatch = the effect's average colour weighted by its alpha curve.");
 
         ImGui.BeginChild("##fxList", new Vector2(-1f, 160f), ImGuiChildFlags.Border);
-        foreach (var (name, level, texPage) in _fxGlobalCatalog)
+        foreach (var (name, level, texPage, swatchColor) in _fxGlobalCatalog) // Amedo 2026-09-26
         {
             if (!string.IsNullOrWhiteSpace(_fxFilter) && !name.Contains(_fxFilter, StringComparison.OrdinalIgnoreCase))
                 continue;
-            var swatchColor = MeshDecoder.GuessParticleTint(name);
             var cursor = ImGui.GetCursorScreenPos();
             var dl = ImGui.GetWindowDrawList();
             dl.AddRectFilled(cursor, cursor + new Vector2(14f, 14f),
@@ -318,6 +360,8 @@ public sealed partial class GameScene : Scene
             {
                 _fxSelected = name;
                 _fxSelectedLevel = level;
+                _fxPrevBurst = _emitterGlobalCatalog is not null && !_emitterGlobalCatalog.Any(e => // Amedo 2026-09-26
+                    string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
             }
         }
         ImGui.EndChild();
@@ -338,106 +382,47 @@ public sealed partial class GameScene : Scene
                 .Where(m => m.Sys is not null)
                 .ToList();
 
-            ImGui.TextDisabled(resolvedMembers.Count > 0
-                ? $"Preview: {familyKey}*  ({resolvedMembers.Count} system(s) in this family, real color+count+size+direction+texture page)"
+            ImGui.TextDisabled(resolvedMembers.Count > 0 // Amedo 2026-09-26
+                ? $"Preview: {familyKey}*  ({resolvedMembers.Count} system(s) in this family, drag = rotate, wheel = zoom)"
                 : $"Preview: {_fxSelected}  (system not found)");
-            if (ImGui.IsItemHovered()) MaybeTooltip(
-                "Sprite shapes are the REAL per-system texture page (0/1/2, from sys.UnkInt) — 3 " +
-                "real sprite atlases decoded from Startup\\Default.rm2. Which exact icon on that " +
-                "page a system uses could not be identified despite a thorough data + Ghidra " +
-                "investigation (see project_crashengine_particles memory) — shown icon defaults " +
-                "to the page's largest shape, a fallback, not decoded data.");
 
-            var avail = ImGui.GetContentRegionAvail().X;
-            var boxSize = new Vector2(MathF.Min(avail, 220f), 110f);
-            var p0 = ImGui.GetCursorScreenPos();
-            var dl2 = ImGui.GetWindowDrawList();
-            dl2.AddRectFilled(p0, p0 + boxSize, ImGui.ColorConvertFloat4ToU32(new Vector4(0.08f, 0.08f, 0.08f, 1f)), 4f);
-
-            var center = p0 + boxSize * 0.5f;
-            const float baseRadius = 5f;
-            float cycle = 1.6f;
-
-            Vector4 peakColor = default;
-            float peakBrightness = -1f;
-            foreach (var (_, s) in resolvedMembers)
+            // Amedo 2026-09-26
+            if (resolvedMembers.Count > 0)
             {
-                if (s is null) continue;
-                foreach (var (_, c) in MeshDecoder.GetColorGradient(s))
+                var systems = resolvedMembers.Select(m => m.Sys!).ToList();
+                UpdateFxPreview(systems, $"{_fxSelectedLevel}|{familyKey}|{_fxPrevBurst}");
+
+                int pw = (int)MathF.Max(64f, ImGui.GetContentRegionAvail().X), ph = 200;
+                RenderFxPreview(pw, ph);
+                ImGui.Image((nint)_fxPrevFbo!.ColorTexture, new Vector2(pw, ph), new Vector2(0, 1), new Vector2(1, 0));
+                if (ImGui.IsItemHovered())
                 {
-                    float b = c.X + c.Y + c.Z;
-                    if (b > peakBrightness) { peakBrightness = b; peakColor = c; }
+                    var io = ImGui.GetIO();
+                    if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
+                    {
+                        _fxPrevYaw -= io.MouseDelta.X * 0.4f;
+                        _fxPrevPitch = Math.Clamp(_fxPrevPitch + io.MouseDelta.Y * 0.4f, -89f, 89f);
+                    }
+                    if (io.MouseWheel != 0) _fxPrevZoom = Math.Clamp(_fxPrevZoom * (1f - io.MouseWheel * 0.12f), 0.1f, 20f);
+                }
+
+                if (ImGui.Checkbox("Burst##fxburst", ref _fxPrevBurst)) _fxPrevKey = null;
+                if (ImGui.IsItemHovered()) MaybeTooltip(
+                    "Off = runs forever, like a placed emitter in a level.\n" +
+                    "On = one emission cycle, like a script firing it (DoParticle), replayed\n" +
+                    "once every particle has died. Defaults to On for effects no level places.");
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Restart##fxrestart")) _fxPrevWorld?.Reset();
+
+                foreach (var (memberName, sys) in resolvedMembers)
+                {
+                    var def = ParticleFx.DefFor(sys!);
+                    string blend = def.Blend is >= 0 and < 4 ? FxBlendNames[def.Blend] : $"blend {def.Blend}";
+                    string rate = def.Rate >= 0 ? $"{def.Rate}/frame" : $"1 every {-def.Rate} frames";
+                    ImGui.TextDisabled($"{memberName}: shape {def.SpawnClass}, {blend}, life {def.Life:0.##}s, {rate}, " +
+                                       $"on {def.OnFrames}/off {def.OffFrames}, max {def.MaxAlive}, page {def.Page}");
                 }
             }
-            if (peakBrightness > 0f)
-            {
-                float flashPhase = (EngineTime.Total / cycle) % 1f;
-                float flashAlpha = MathF.Max(0f, 1f - flashPhase * 3.5f);
-                float flashRadius = boxSize.Y * (0.12f + flashPhase * 0.35f);
-                dl2.AddCircleFilled(center, flashRadius,
-                    ImGui.ColorConvertFloat4ToU32(new Vector4(peakColor.X, peakColor.Y, peakColor.Z, flashAlpha * 0.55f)), 24);
-            }
-
-            foreach (var (memberName, sys) in resolvedMembers)
-            {
-                if (sys is null) continue;
-                var gradient = MeshDecoder.GetColorGradient(sys);
-                var sizeCurve = MeshDecoder.GetSizeGradient(sys);
-                int previewCount = Math.Clamp((int)sys.UnkUShort2, 8, 32);
-                int nameHash = memberName.GetHashCode();
-
-                float yawCenter = sys.UnkVec2.Z;
-                float yawSpread = MathF.Abs(sys.UnkVec1.Z);
-                float pitchSpread = MathF.Abs(sys.UnkVec1.Y);
-                float posMag = MathF.Max(0.15f, MathF.Abs(sys.UnkVec2.X));
-                float travelUnit = MathF.Min(posMag * 18f, MathF.Min(boxSize.X, boxSize.Y) * 0.48f);
-                float spreadPx = MathF.Min(posMag * 6f, boxSize.X * 0.15f);
-
-                MeshDecoder.ParticleTexturePage? page = _fxTexturePages is not null && sys.UnkInt is >= 0 and < 3
-                    ? _fxTexturePages[sys.UnkInt] : null;
-                (int X, int Y, int W, int H, float FillRatio)? memberIcon = page is { Icons.Count: > 0 } pgForIcon
-                    ? pgForIcon.Icons.OrderByDescending(i => i.FillRatio).First()
-                    : null;
-
-                for (int i = 0; i < previewCount; i++)
-                {
-                    float phase = (EngineTime.Total / cycle + (i * 0.6180339887f + (nameHash & 0xFF) / 255f)) % 1f;
-                    float jitterYaw = ((i + nameHash) * 12.9898f) % 1f;
-                    float jitterPitch = ((i + nameHash) * 78.233f) % 1f;
-
-                    float yaw = yawCenter + (jitterYaw * 2f - 1f) * yawSpread;
-                    float pitch = (jitterPitch * 2f - 1f) * pitchSpread;
-                    float cosPitch = MathF.Cos(pitch);
-                    var coneDir = new Vector2(MathF.Cos(yaw) * cosPitch, -MathF.Sin(yaw));
-                    if (coneDir.LengthSquared() < 1e-6f) coneDir = new Vector2(1f, 0f);
-                    else coneDir = Vector2.Normalize(coneDir);
-                    var perp = new Vector2(-coneDir.Y, coneDir.X);
-                    float lateral = (jitterPitch - 0.5f) * spreadPx;
-                    var pos = center + coneDir * (phase * travelUnit) + perp * lateral;
-
-                    var col = MeshDecoder.SampleColorGradient(gradient, phase);
-                    float alpha = MathF.Sin(phase * MathF.PI);
-                    float sizeMul = MeshDecoder.SampleSizeGradient(sizeCurve, phase);
-                    float radius = MathF.Max(0.5f, baseRadius * sizeMul);
-                    uint tintU32 = ImGui.ColorConvertFloat4ToU32(new Vector4(col.X, col.Y, col.Z, alpha));
-
-                    if (page is { } pg && pg.Tex is not null && memberIcon is { } icon)
-                    {
-                        var uv0 = new Vector2(icon.X / (float)pg.Width, icon.Y / (float)pg.Height);
-                        var uv1 = new Vector2((icon.X + icon.W) / (float)pg.Width, (icon.Y + icon.H) / (float)pg.Height);
-                        float iconAspect = icon.H > 0 ? icon.W / (float)icon.H : 1f;
-                        float drawH = radius * 2.4f;
-                        float drawW = drawH * iconAspect;
-                        var half = new Vector2(drawW, drawH) * 0.5f;
-                        dl2.AddImage((nint)pg.Tex.GlId, pos - half, pos + half, uv0, uv1, tintU32);
-                    }
-                    else
-                    {
-                        dl2.AddCircleFilled(pos, radius, tintU32, 10);
-                    }
-                }
-            }
-            ImGui.Dummy(boxSize);
 
             var currentChunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
             bool isSameLevel = currentChunkRoot is not null &&
@@ -551,7 +536,7 @@ public sealed partial class GameScene : Scene
                 if (srcSys is null) { missing++; continue; }
 
                 bool exists = destData.ParticleSystems.Any(s =>
-                    string.Equals(new string(s.Name).TrimEnd('\0', ' '), memberName, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(ParticleNames.Clean(s.Name), memberName, StringComparison.OrdinalIgnoreCase)); // Amedo 2026-09-26
                 if (exists) { alreadyPresent++; continue; }
 
                 destData.ParticleSystems.Add(CloneParticleSystem(srcSys));
@@ -584,7 +569,7 @@ public sealed partial class GameScene : Scene
 
             var srcData = sourceRm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
             var srcEmitter = srcData?.ParticleEmitters.FirstOrDefault(em =>
-                string.Equals(new string(em.Name).TrimEnd('\0', ' '), name, StringComparison.OrdinalIgnoreCase));
+                string.Equals(ParticleNames.Clean(em.Name), name, StringComparison.OrdinalIgnoreCase)); // Amedo 2026-09-26
             if (srcEmitter is null) { _browser.Log($"Add Ambient Effect: '{name}' not found in '{sourceLevel}'."); return; }
 
             var destData = chunkSource.Rm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
@@ -619,7 +604,7 @@ public sealed partial class GameScene : Scene
             }
 
             bool templateExists = destData.ParticleSystems.Any(s =>
-                string.Equals(new string(s.Name).TrimEnd('\0', ' '), name, StringComparison.OrdinalIgnoreCase));
+                string.Equals(ParticleNames.Clean(s.Name), name, StringComparison.OrdinalIgnoreCase)); // Amedo 2026-09-26
             bool templateAdded = false;
             if (!templateExists)
             {
@@ -633,6 +618,7 @@ public sealed partial class GameScene : Scene
 
             var newEmitter = CloneEmitter(srcEmitter);
             var spawnPos = _camera?.Transform.Position ?? Vector3.Zero;
+            if (Matrix4x4.Invert(chunkRoot!.Transform.World, out var toGame)) spawnPos = Vector3.Transform(spawnPos, toGame); // Amedo 2026-09-26
             newEmitter.Position.X = spawnPos.X;
             newEmitter.Position.Y = spawnPos.Y;
             newEmitter.Position.Z = spawnPos.Z;
@@ -647,7 +633,7 @@ public sealed partial class GameScene : Scene
                 rdr.Mat.AlphaBlend = true;
                 e.Add(new CrashEngine.Importer.ParticleEmitterMarker { Source = newEmitter });
                 _particleEmittersRoot.AddChild(e);
-                BuildParticleEmitterPreview(e, name, chunkSource.Rm2);
+                AddParticleEffect(_particleEffects, e, newEmitter, chunkSource); // Amedo 2026-09-26
                 _particleEmittersRoot.Active = true;
                 _showParticleEmitters = true;
             }

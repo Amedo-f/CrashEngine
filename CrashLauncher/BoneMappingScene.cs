@@ -157,9 +157,9 @@ public sealed class BoneMappingScene : Scene
             sh.Set("StartModel", Matrix4x4.Identity);
             sh.Set("Diffuse", Vector4.One);
             sh.Set("Opacity", 1f);
-            gl.Disable(EnableCap.Blend);
-            gl.Disable(EnableCap.CullFace);
-            gl.DepthMask(true);
+            CrashEngine.Renderer.GlBlend.Force(gl, false); // Amedo 2026-09-30
+            CrashEngine.Renderer.GlState.Culling(gl, false); // Amedo 2026-10-01
+            CrashEngine.Renderer.GlState.DepthMask(gl, true);
             gl.LineWidth(2f);
 
             using var lines = BuildSkeletonLines(gl);

@@ -49,10 +49,11 @@ namespace CrashLauncher;
 public sealed partial class GameScene : Scene
 {
 
-    private void SaveChunk()
+    private bool SaveChunk(bool confirm = true) // Amedo 2026-10-04
     {
+        StopSimulation(); // Amedo 2026-09-26
         var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-        if (chunkRoot is null) { _browser.Log("Save: no loaded chunk has a ChunkSource (unexpected)."); return; }
+        if (chunkRoot is null) { _browser.Log("Save: no loaded chunk has a ChunkSource (unexpected)."); return false; }
 
         try
         {
@@ -78,9 +79,10 @@ public sealed partial class GameScene : Scene
                       (result.GlobalRm2Path is not null ? $" + Startup\\Default.rm2 (shared objects, texture edit)" : "");
             _browser.Log(msg);
             _saveConfirmMessage = msg;
-            _openSaveConfirmPopup = true;
+            _openSaveConfirmPopup = confirm; // Amedo 2026-10-04
+            return true;
         }
-        catch (Exception ex) { _browser.Log($"Save failed: {ex.Message}"); }
+        catch (Exception ex) { _browser.Log($"Save failed: {ex.Message}"); return false; }
     }
 
     private void ApplyChunkTransform()
@@ -120,6 +122,7 @@ public sealed partial class GameScene : Scene
                 var v = coll.Vectors[i];
                 var p = BakePoint(new Vector3(v.X, v.Y, v.Z));
                 v.X = p.X; v.Y = p.Y; v.Z = p.Z;
+                coll.Vectors[i] = v; // Amedo
             }
             vecCount = coll.Vectors.Count;
             foreach (var t in coll.Triggers)
@@ -144,7 +147,9 @@ public sealed partial class GameScene : Scene
                     if (trigSec.GetItem(i) is PS2AnyTrigger t)
                     {
                         var p = BakePoint(new Vector3(t.Trigger.Position.X, t.Trigger.Position.Y, t.Trigger.Position.Z));
-                        t.Trigger.Position.X = p.X; t.Trigger.Position.Y = p.Y; t.Trigger.Position.Z = p.Z;
+                        var tp = t.Trigger.Position; // Amedo
+                        tp.X = p.X; tp.Y = p.Y; tp.Z = p.Z;
+                        t.Trigger.Position = tp; // Amedo
                         layoutTrigCount++;
                     }
 
@@ -154,7 +159,9 @@ public sealed partial class GameScene : Scene
                     if (camSec.GetItem(i) is PS2AnyCamera c)
                     {
                         var p = BakePoint(new Vector3(c.CamTrigger.Position.X, c.CamTrigger.Position.Y, c.CamTrigger.Position.Z));
-                        c.CamTrigger.Position.X = p.X; c.CamTrigger.Position.Y = p.Y; c.CamTrigger.Position.Z = p.Z;
+                        var cp = c.CamTrigger.Position; // Amedo
+                        cp.X = p.X; cp.Y = p.Y; cp.Z = p.Z;
+                        c.CamTrigger.Position = cp; // Amedo
                         camCount++;
                     }
 
@@ -164,7 +171,9 @@ public sealed partial class GameScene : Scene
                     if (posSec.GetItem(i) is PS2AnyPosition p0)
                     {
                         var p = BakePoint(new Vector3(p0.Position.X, p0.Position.Y, p0.Position.Z));
-                        p0.Position.X = p.X; p0.Position.Y = p.Y; p0.Position.Z = p.Z;
+                        var pp = p0.Position; // Amedo
+                        pp.X = p.X; pp.Y = p.Y; pp.Z = p.Z;
+                        p0.Position = pp; // Amedo
                         posCount++;
                     }
 
@@ -174,7 +183,9 @@ public sealed partial class GameScene : Scene
                     if (aiSec.GetItem(i) is PS2AnyAIPosition ap)
                     {
                         var p = BakePoint(new Vector3(ap.Position.X, ap.Position.Y, ap.Position.Z));
-                        ap.Position.X = p.X; ap.Position.Y = p.Y; ap.Position.Z = p.Z;
+                        var aq = ap.Position; // Amedo
+                        aq.X = p.X; aq.Y = p.Y; aq.Z = p.Z;
+                        ap.Position = aq; // Amedo
                         aiCount++;
                     }
         }
@@ -326,6 +337,7 @@ public sealed partial class GameScene : Scene
 
     private void BuildIso()
     {
+        StopSimulation(); // Amedo 2026-09-26
         var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
         if (chunkRoot is null) { _browser.Log("Build ISO: no loaded chunk has a ChunkSource (unexpected)."); return; }
         if (_building) return;
@@ -365,6 +377,12 @@ public sealed partial class GameScene : Scene
         Func<string, bool>? excludePath = null;
         List<string>? keepLevelPaths = null;
         List<string>? excludedCutscenes = null;
+        uint? doubleJumpMask = null; // Amedo 2026-09-25
+        int? akuAkuSeconds = null; // Amedo 2026-09-25
+        bool akuAkuTouchBreak = false; // Amedo 2026-09-25
+        uint? akuAkuMusicId = null; // Amedo 2026-09-25
+        int? akuAkuMusicVolume = null; // Amedo 2026-09-25
+        bool akuAkuGlowFix = false; // Amedo 2026-09-25
         const string startingLevel = @"Levels\Earth\Hub\beach";
         var projectRoot = Path.GetDirectoryName(_scriptOut) ?? _extractedRoot;
         // Amedo 2026-09-20
@@ -372,6 +390,12 @@ public sealed partial class GameScene : Scene
         {
             if (proj.ExcludedCutscenes.Count > 0)
                 excludedCutscenes = proj.ExcludedCutscenes;
+            doubleJumpMask = proj.DoubleJumpMask; // Amedo 2026-09-25
+            akuAkuSeconds = proj.AkuAkuInvincibilitySeconds; // Amedo 2026-09-25
+            akuAkuTouchBreak = proj.AkuAkuTouchBreak; // Amedo 2026-09-25
+            akuAkuMusicId = proj.AkuAkuGoldenMusicId; // Amedo 2026-09-25
+            akuAkuMusicVolume = proj.AkuAkuGoldenMusicVolume; // Amedo 2026-09-25
+            akuAkuGlowFix = ReadClassicAkuAku() ?? proj.ClassicAkuAku; // Amedo 2026-09-25
 
             if (proj.IsNewGame)
             {
@@ -397,7 +421,7 @@ public sealed partial class GameScene : Scene
             {
                 var isoPath = CrashLauncher.BuildIsoToPS2.Build(
                     chunkRoot, workDir, _extractedRoot, savedChunksDir,
-                    BLog, p => _buildProgress = p, outPathOverride, excludePath, keepLevelPaths, excludedCutscenes);
+                    BLog, p => _buildProgress = p, outPathOverride, excludePath, keepLevelPaths, excludedCutscenes, doubleJumpMask, akuAkuSeconds, akuAkuTouchBreak, akuAkuMusicId, akuAkuMusicVolume, akuAkuGlowFix); // Amedo 2026-09-25
                 BLog($"Build ISO: done. Open in PCSX2: {isoPath}");
                 _browser.Log($"Build ISO: done. Open in PCSX2: {isoPath}");
             }
@@ -600,20 +624,7 @@ public sealed partial class GameScene : Scene
                      $"fog = {CrashEngine.Importer.MeshDecoder.FogColorNames[fogIdxToSave]}, HasLighting={sceneryItem.HasLighting}.");
 
         // Amedo 2026-09-19
-        int gAmb = sceneryItem.AmbientLights.Count, gDir = sceneryItem.DirectionalLights.Count, gPt = sceneryItem.PointLights.Count;
-        int totalNodes = sceneryItem.Sceneries.Count;
-        int rescoped = 0;
-        void EnableEditorLight(int gi)
-        {
-            if (gi < 0 || gi >= 128 || totalNodes == 0) return;
-            int cnt = sceneryItem.Sceneries.Count(nd => nd.LightsEnabler[gi]);
-            if (cnt != 0 && cnt != totalNodes) return;
-            if (cnt == totalNodes) return;
-            foreach (var nd in sceneryItem.Sceneries) nd.LightsEnabler[gi] = true;
-            rescoped++;
-        }
-        for (int p = 0; p < gPt; p++) EnableEditorLight(gAmb + gDir + p);
-        for (int q = 0; q < sceneryItem.NegativeLights.Count; q++) EnableEditorLight(gAmb + gDir + gPt + q);
+        int rescoped = EnableAddedSceneryLights(sceneryItem); // Amedo 2026-09-26
         if (rescoped > 0) _browser.Log($"Enabled {rescoped} added light(s) on all scenery nodes; locality comes from each light's Position+Radius+UnkShort falloff (RE-verified).");
     }
 

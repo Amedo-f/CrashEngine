@@ -157,13 +157,17 @@ public sealed class TriggerVolumeNeuterAction : IEditAction
     public void Redo()
     {
         if (!_saved) { _savedX = Trigger.Scale.X; _savedY = Trigger.Scale.Y; _savedZ = Trigger.Scale.Z; _saved = true; }
-        Trigger.Scale.X = 0f; Trigger.Scale.Y = 0f; Trigger.Scale.Z = 0f;
+        var scale = Trigger.Scale; // Amedo
+        scale.X = 0f; scale.Y = 0f; scale.Z = 0f;
+        Trigger.Scale = scale; // Amedo
         Parent.RemoveChild(Entity);
     }
 
     public void Undo()
     {
-        Trigger.Scale.X = _savedX; Trigger.Scale.Y = _savedY; Trigger.Scale.Z = _savedZ;
+        var scale = Trigger.Scale; // Amedo
+        scale.X = _savedX; scale.Y = _savedY; scale.Z = _savedZ;
+        Trigger.Scale = scale; // Amedo
         Parent.AddChild(Entity);
     }
 

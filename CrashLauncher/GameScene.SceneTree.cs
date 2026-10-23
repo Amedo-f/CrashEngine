@@ -48,7 +48,7 @@ public sealed partial class GameScene : Scene
 {
     private void DrawEntityNode(Entity e)
     {
-        if (e.Name is "__Gizmo" or "Meter" or "Player") return;
+        if (e.Name is "__Gizmo" or "Meter" or "Player" or "__AiPathLines") return; // Amedo
 
         bool isSel    = _selectedSet.Contains(e);
         bool isSystem = e.Name is "RenderPipeline" or "Camera" or "Grid";
@@ -57,7 +57,8 @@ public sealed partial class GameScene : Scene
         {
             _ when e.Has<StealthEnemy>()                              => " [npc]",
             _ when e.Has<DirectCubeRenderer>()                        => " [cube]",
-            _ when e.Has<CrashEngine.Importer.AnimatedObject>()      => " [anim]",
+            _ when e.Get<CrashEngine.Importer.AnimatedObject>() is { Groups.Count: > 0 } => " [anim]", // Amedo 2026-09-28
+            _ when e.Has<CrashEngine.Importer.DynamicSceneryAnimator>() => " [anim]", // Amedo 2026-09-26
             _ when e.Has<CrashEngine.Importer.MeshRenderer>()        => " [mesh]",
             _ when e.Has<CrashEngine.Renderer.MeshRenderer>()        => " [mesh]",
             _ when e.Has<InstanceData>()                              => " [inst]",

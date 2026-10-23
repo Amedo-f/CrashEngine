@@ -460,7 +460,7 @@ public sealed class AssetBrowserScene : Scene
             sh.Set("DiffuseOnly", 0f);
             sh.SetMatrixArray("BoneMatrices", _boneMatrices);
 
-            gl.Disable(Silk.NET.OpenGL.EnableCap.Blend);
+            CrashEngine.Renderer.GlBlend.Force(gl, false); // Amedo 2026-09-30
             foreach (var (mesh, mat) in _previewMeshes)
             {
                 mat.FogEnabled = false;
@@ -496,7 +496,7 @@ public sealed class AssetBrowserScene : Scene
                 }
             }
             if (_previewOgi is not null)
-                _boneMatrices = MeshDecoder.SampleAnimationPose(_previewOgi, _animData, _animFrame);
+                _boneMatrices = MeshDecoder.SampleAnimationPose(_previewOgi, _animData, _animFrame, _animLoop); // Amedo 2026-09-26
         }
 
         int sw = Engine.Instance.Width, sh = Engine.Instance.Height;
