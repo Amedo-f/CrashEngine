@@ -24,8 +24,11 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.Base
             this.data = data;
         }
 
+        public static bool ComputeHashes { get; set; } // Amedo 2026-10-02
+
         public virtual void ComputeHash(Stream stream)
         {
+            if (!ComputeHashes) return; // Amedo 2026-10-02
             hash = Hasher.ComputeHash(stream);
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);
@@ -37,6 +40,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.Base
 
         public virtual void ComputeHash(Stream stream, UInt32 length)
         {
+            if (!ComputeHashes) return; // Amedo 2026-10-02
             hash = Hasher.ComputeHash(stream, length);
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);

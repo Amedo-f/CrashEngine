@@ -21,6 +21,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
         public List<Vector4> Colors { get; set; }
         public List<VertexJointInfo> SkinJoints { get; set; }
         public List<Int32> GroupSizes { get; set; }
+        public UInt32 PositionScale { get; set; } // Amedo 2026-10-05
 
         public int GetLength()
         {
@@ -163,7 +164,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                 Colors,
                 SkinJoints.Select(j => j.GetVector4()).ToList()
             };
-            var compiler = new TwinVIFCompiler(ModelFormat.Skin, data, null, 0);
+            var compiler = new TwinVIFCompiler(ModelFormat.Skin, data, null, PositionScale); // Amedo 2026-10-05
             vifCode = compiler.Compile();
         }
 

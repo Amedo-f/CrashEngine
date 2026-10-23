@@ -32,7 +32,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.CameraSubtypes
             base.Read(reader, base.GetLength());
             UnkMatrix1.Read(reader, Constants.SIZE_MATRIX4);
             UnkMatrix2.Read(reader, Constants.SIZE_MATRIX4);
-            UnkVector.Read(reader, Constants.SIZE_VECTOR4);
+            UnkVector = Vector4.ReadFrom(reader); // Amedo
             UnkByte1 = reader.ReadByte();
             UnkFloat3 = reader.ReadSingle();
             UnkFloat4 = reader.ReadSingle();

@@ -4,7 +4,7 @@ using Twinsanity.TwinsanityInterchange.Interfaces;
 
 namespace Twinsanity.TwinsanityInterchange.Common.Animation
 {
-    public class Transformation : ITwinSerializable
+    public struct Transformation : ITwinSerializable // Amedo
     {
         Int16 transformValue;
 

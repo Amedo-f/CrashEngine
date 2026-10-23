@@ -55,7 +55,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout
             {
                 PhysicsParameters[i] = reader.ReadSingle();
             }
-            UnkVec.Read(reader, Constants.SIZE_VECTOR4);
+            UnkVec = Vector4.ReadFrom(reader); // Amedo
             for (int i = 0; i < UnkBoundingBox.Length; ++i)
             {
                 UnkBoundingBox[i] = new Vector4();

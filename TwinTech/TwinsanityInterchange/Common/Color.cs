@@ -4,7 +4,7 @@ using Twinsanity.TwinsanityInterchange.Interfaces;
 
 namespace Twinsanity.TwinsanityInterchange.Common
 {
-    public class Color : ITwinSerializable
+    public struct Color : ITwinSerializable, IEquatable<Color> // Amedo
     {
         public Color()
         {
@@ -131,25 +131,8 @@ namespace Twinsanity.TwinsanityInterchange.Common
             return $"{A} {R} {G} {B}";
         }
 
-        public override Boolean Equals(Object obj)
-        {
-            if (obj is Color color)
-            {
-                if (obj == this)
-                {
-                    return true;
-                }
-                else
-                {
-                    Color other = color;
-                    return other.ToARGB() == ToARGB();
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
+        public override Boolean Equals(Object obj) => obj is Color other && Equals(other); // Amedo
+        public Boolean Equals(Color other) => other.ToARGB() == ToARGB(); // Amedo
         public override Int32 GetHashCode()
         {
             return (Int32)ToARGB();

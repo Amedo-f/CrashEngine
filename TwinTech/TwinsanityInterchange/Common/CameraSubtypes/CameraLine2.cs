@@ -24,8 +24,8 @@ namespace Twinsanity.TwinsanityInterchange.Common.CameraSubtypes
         public override void Read(BinaryReader reader, int length)
         {
             base.Read(reader, base.GetLength());
-            LineStart.Read(reader, Constants.SIZE_VECTOR4);
-            LineEnd.Read(reader, Constants.SIZE_VECTOR4);
+            LineStart = Vector4.ReadFrom(reader); // Amedo
+            LineEnd = Vector4.ReadFrom(reader); // Amedo
             UnkFloat3 = reader.ReadSingle();
             UnkFloat4 = reader.ReadSingle();
         }

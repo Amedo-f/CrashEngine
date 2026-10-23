@@ -23,22 +23,32 @@ namespace Twinsanity.PS2Hardware
         public UInt32 VIFn_CODE;
 
         private List<List<Vector4>> VUMem = new List<List<Vector4>>();
-        private List<Vector4> PureVUMem = new List<Vector4>(new Vector4[1024]);
+        private List<Vector4> PureVUMem; // Amedo
+        private readonly List<PureWrite> PureWrites = new(); // Amedo
         private List<GIFTag> GifBuffer = new List<GIFTag>();
         private List<UInt32> tmpStack = new List<UInt32>();
         private List<List<UInt16>> AddressOuput = new List<List<UInt16>>();
+        private const int VUMemSize = 1024; // Amedo
+
+        // Amedo
+        private readonly record struct PureWrite(List<Vector4> Vectors, Boolean Fill, Byte WL, Byte CL, UInt16 Addr, UInt32 R0, UInt32 R1, UInt32 R2, UInt32 R3);
 
         // Wrapper function for generating Interpreter instances
         public static VIFInterpreter InterpretCode(BinaryReader reader)
         {
             DMATag tag = new();
             tag.Read(reader);
-            using var mem = new MemoryStream();
-            using var writer = new BinaryWriter(mem);
             // Transfer tag's extra data and its QWC data to VIF
-            writer.Write(tag.Extra);
-            writer.Write(reader.ReadBytes(tag.QWC * 0x10));
-            mem.Position = 0;
+            var code = new Byte[8 + tag.QWC * 0x10]; // Amedo
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(code, tag.Extra);
+            int length = 8;
+            while (length < code.Length)
+            {
+                int read = reader.Read(code, length, code.Length - length);
+                if (read == 0) break;
+                length += read;
+            }
+            using var mem = new MemoryStream(code, 0, length, false);
             using var vifReader = new BinaryReader(mem);
             var vifCode = new VIFInterpreter();
             vifCode.Execute(vifReader);
@@ -68,8 +78,24 @@ namespace Twinsanity.PS2Hardware
             return AddressOuput;
         }
 
+        // Amedo
         public List<Vector4> GetPureMem()
         {
+            if (PureVUMem is null)
+            {
+                PureVUMem = new List<Vector4>(new Vector4[VUMemSize]);
+                var row = new UInt32[4];
+                foreach (var w in PureWrites)
+                {
+                    row[0] = w.R0;
+                    row[1] = w.R1;
+                    row[2] = w.R2;
+                    row[3] = w.R3;
+                    UInt16 addr = w.Addr;
+                    for (int i = 0; i < w.Vectors.Count; ++i)
+                        Fill(PureVUMem, w.Vectors[i], i, w.Fill, w.WL, w.CL, ref addr, row);
+                }
+            }
             return PureVUMem;
         }
 
@@ -123,14 +149,18 @@ namespace Twinsanity.PS2Hardware
                     }
                     AddressOuput[^1].Add(addr);
                     PackFormat fmt = (PackFormat)(vl | (vn << 2));
-                    List<Vector4> vectors = new List<Vector4>(new Vector4[1024]);
                     tmpStack.Clear();
                     for (int i = 0; i < packet_length - 1; ++i)
                     {
                         tmpStack.Add(reader.ReadUInt32());
                     }
-                    Unpack(tmpStack, PureVUMem, fmt, amount, usn, fill, WL, CL, addr);
+                    List<Vector4> vectors = new List<Vector4>(UnpackCount(fmt, amount, tmpStack.Count)); // Amedo
                     Unpack(tmpStack, vectors, fmt, amount, usn, false, 1, 1, 0);
+                    UInt16 pureAddr = addr; // Amedo
+                    for (int i = 0; i < vectors.Count; ++i)
+                        Fill(null, default, i, fill, WL, CL, ref pureAddr, VIFn_R); // Amedo
+                    PureWrites.Add(new PureWrite(vectors, fill, WL, CL, addr, VIFn_R[0], VIFn_R[1], VIFn_R[2], VIFn_R[3]));
+                    PureVUMem = null;
                     VUMem.Add(vectors);
                 }
                 else
@@ -245,7 +275,7 @@ namespace Twinsanity.PS2Hardware
                         v.SetBinaryZ(src[i] + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v.SetBinaryW(src[i] + (IsInOffsetMode() ? VIFn_R[3] : 0));
 
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.S_16:
@@ -267,7 +297,7 @@ namespace Twinsanity.PS2Hardware
                         v1.SetBinaryY(w1 + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v1.SetBinaryZ(w1 + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v1.SetBinaryW(w1 + (IsInOffsetMode() ? VIFn_R[3] : 0));
-                        Fill(dst, v1, i, fill, write, cycle, ref addr);
+                        Fill(dst, v1, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.S_8:
@@ -300,7 +330,7 @@ namespace Twinsanity.PS2Hardware
                         v1.SetBinaryY(w1 + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v1.SetBinaryZ(w1 + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v1.SetBinaryW(w1 + (IsInOffsetMode() ? VIFn_R[3] : 0));
-                        Fill(dst, v1, i, fill, write, cycle, ref addr);
+                        Fill(dst, v1, i, fill, write, cycle, ref addr, VIFn_R);
                         if (i % 4 == 3)
                         {
                             srcIdx++;
@@ -313,7 +343,7 @@ namespace Twinsanity.PS2Hardware
                         Vector4 v = new Vector4();
                         v.SetBinaryX(src[i * 2 + 0] + (IsInOffsetMode() ? VIFn_R[0] : 0));
                         v.SetBinaryY(src[i * 2 + 1] + (IsInOffsetMode() ? VIFn_R[1] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V2_16:
@@ -329,24 +359,24 @@ namespace Twinsanity.PS2Hardware
                         }
                         v.SetBinaryX(w1 + (IsInOffsetMode() ? VIFn_R[0] : 0));
                         v.SetBinaryY(w2 + (IsInOffsetMode() ? VIFn_R[1] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V2_8:
                     for (int i = 0; i < amount; ++i)
                     {
                         Vector4 v1 = new Vector4();
-                        UInt32[] mask = { 0x000000FF, 0x0000FF00 };
-                        Int32[] shift = { 0, 8 };
+                        UInt32 mask0 = 0x000000FF, mask1 = 0x0000FF00; // Amedo
+                        Int32 shift0 = 0, shift1 = 8;
                         if (i % 2 != 0)
                         {
-                            mask[0] = 0x00FF0000;
-                            mask[1] = 0xFF000000;
-                            shift[0] = 16;
-                            shift[1] = 24;
+                            mask0 = 0x00FF0000;
+                            mask1 = 0xFF000000;
+                            shift0 = 16;
+                            shift1 = 24;
                         }
-                        UInt32 w1 = (Byte)((src[srcIdx] & mask[0]) >> shift[0]);
-                        UInt32 w2 = (Byte)((src[srcIdx] & mask[1]) >> shift[1]);
+                        UInt32 w1 = (Byte)((src[srcIdx] & mask0) >> shift0);
+                        UInt32 w2 = (Byte)((src[srcIdx] & mask1) >> shift1);
                         if (unsigned == 0)
                         {
                             SEXT8(ref w1);
@@ -355,7 +385,7 @@ namespace Twinsanity.PS2Hardware
 
                         v1.X = ((w1 + (IsInOffsetMode() ? VIFn_R[0] : 0)) & 0xFF);
                         v1.Y = ((w2 + (IsInOffsetMode() ? VIFn_R[1] : 0)) & 0xFF);
-                        Fill(dst, v1, i, fill, write, cycle, ref addr);
+                        Fill(dst, v1, i, fill, write, cycle, ref addr, VIFn_R);
                         if (i % 2 != 0)
                         {
                             srcIdx++;
@@ -369,33 +399,33 @@ namespace Twinsanity.PS2Hardware
                         v.SetBinaryX(src[i * 3 + 0] + (IsInOffsetMode() ? VIFn_R[0] : 0));
                         v.SetBinaryY(src[i * 3 + 1] + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v.SetBinaryZ(src[i * 3 + 2] + (IsInOffsetMode() ? VIFn_R[2] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V3_16:
                     for (int i = 0; i < amount; ++i)
                     {
-                        UInt32[] mask = { 0x0000FFFF, 0xFFFF0000 };
-                        Int32[] shift = { 0, 16 };
+                        UInt32 mask0 = 0x0000FFFF, mask1 = 0xFFFF0000; // Amedo
+                        Int32 shift0 = 0, shift1 = 16;
                         if (i % 2 != 0)
                         {
-                            mask[0] = 0xFFFF0000;
-                            mask[1] = 0x0000FFFF;
-                            shift[0] = 16;
-                            shift[1] = 0;
+                            mask0 = 0xFFFF0000;
+                            mask1 = 0x0000FFFF;
+                            shift0 = 16;
+                            shift1 = 0;
                         }
                         Vector4 v1 = new Vector4();
-                        UInt32 w1 = (src[srcIdx] & mask[0]) >> shift[0];
+                        UInt32 w1 = (src[srcIdx] & mask0) >> shift0;
                         if (i % 2 != 0)
                         {
                             srcIdx++;
                         }
-                        UInt32 w2 = (src[srcIdx] & mask[1]) >> shift[1];
+                        UInt32 w2 = (src[srcIdx] & mask1) >> shift1;
                         if (i % 2 == 0)
                         {
                             srcIdx++;
                         }
-                        UInt32 w3 = (src[srcIdx] & mask[0]) >> shift[0];
+                        UInt32 w3 = (src[srcIdx] & mask0) >> shift0;
                         if (i % 2 != 0)
                         {
                             srcIdx++;
@@ -409,7 +439,7 @@ namespace Twinsanity.PS2Hardware
                         v1.SetBinaryX(w1 + (IsInOffsetMode() ? VIFn_R[0] : 0));
                         v1.SetBinaryY(w2 + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v1.SetBinaryZ(w3 + (IsInOffsetMode() ? VIFn_R[2] : 0));
-                        Fill(dst, v1, i, fill, write, cycle, ref addr);
+                        Fill(dst, v1, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V3_8:
@@ -417,45 +447,45 @@ namespace Twinsanity.PS2Hardware
                     {
                         Vector4 v1 = new Vector4();
                         // Is this scuffed? This is 100% scuffed
-                        UInt32[] mask = { 0x000000FF, 0x0000FF00, 0x00FF0000 };
-                        Int32[] shift = { 0, 8, 16 };
-                        Boolean[] incIdx = { false, false, false };
+                        UInt32 mask0 = 0x000000FF, mask1 = 0x0000FF00, mask2 = 0x00FF0000; // Amedo
+                        Int32 shift0 = 0, shift1 = 8, shift2 = 16;
+                        Boolean inc0 = false, inc1 = false, inc2 = false;
                         switch (i % 4)
                         {
                             case 1:
-                                mask[0] = 0xFF000000;
-                                mask[1] = 0x000000FF;
-                                mask[2] = 0x0000FF00;
-                                shift[0] = 24;
-                                shift[1] = 0;
-                                shift[2] = 8;
-                                incIdx[0] = true;
+                                mask0 = 0xFF000000;
+                                mask1 = 0x000000FF;
+                                mask2 = 0x0000FF00;
+                                shift0 = 24;
+                                shift1 = 0;
+                                shift2 = 8;
+                                inc0 = true;
                                 break;
                             case 2:
-                                mask[0] = 0x00FF0000;
-                                mask[1] = 0xFF000000;
-                                mask[2] = 0x000000FF;
-                                shift[0] = 16;
-                                shift[1] = 24;
-                                shift[2] = 0;
-                                incIdx[1] = true;
+                                mask0 = 0x00FF0000;
+                                mask1 = 0xFF000000;
+                                mask2 = 0x000000FF;
+                                shift0 = 16;
+                                shift1 = 24;
+                                shift2 = 0;
+                                inc1 = true;
                                 break;
                             case 3:
-                                mask[0] = 0x0000FF00;
-                                mask[1] = 0x00FF0000;
-                                mask[2] = 0xFF000000;
-                                shift[0] = 8;
-                                shift[1] = 16;
-                                shift[2] = 24;
-                                incIdx[2] = true;
+                                mask0 = 0x0000FF00;
+                                mask1 = 0x00FF0000;
+                                mask2 = 0xFF000000;
+                                shift0 = 8;
+                                shift1 = 16;
+                                shift2 = 24;
+                                inc2 = true;
                                 break;
                         }
-                        UInt32 w1 = (Byte)((src[srcIdx] & mask[0]) >> shift[0]);
-                        if (incIdx[0]) srcIdx++;
-                        UInt32 w2 = (Byte)((src[srcIdx] & mask[1]) >> shift[1]);
-                        if (incIdx[1]) srcIdx++;
-                        UInt32 w3 = (Byte)((src[srcIdx] & mask[2]) >> shift[2]);
-                        if (incIdx[2]) srcIdx++;
+                        UInt32 w1 = (Byte)((src[srcIdx] & mask0) >> shift0);
+                        if (inc0) srcIdx++;
+                        UInt32 w2 = (Byte)((src[srcIdx] & mask1) >> shift1);
+                        if (inc1) srcIdx++;
+                        UInt32 w3 = (Byte)((src[srcIdx] & mask2) >> shift2);
+                        if (inc2) srcIdx++;
                         if (unsigned == 0)
                         {
                             SEXT8(ref w1);
@@ -465,7 +495,7 @@ namespace Twinsanity.PS2Hardware
                         v1.X = ((w1 + (IsInOffsetMode() ? VIFn_R[0] : 0)) & 0xFF);
                         v1.Y = ((w2 + (IsInOffsetMode() ? VIFn_R[1] : 0)) & 0xFF);
                         v1.Z = ((w3 + (IsInOffsetMode() ? VIFn_R[2] : 0)) & 0xFF);
-                        Fill(dst, v1, i, fill, write, cycle, ref addr);
+                        Fill(dst, v1, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V4_32:
@@ -476,7 +506,7 @@ namespace Twinsanity.PS2Hardware
                         v.SetBinaryY(src[i * 4 + 1] + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v.SetBinaryZ(src[i * 4 + 2] + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v.SetBinaryW(src[i * 4 + 3] + (IsInOffsetMode() ? VIFn_R[3] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V4_16:
@@ -498,7 +528,7 @@ namespace Twinsanity.PS2Hardware
                         v.SetBinaryY(w2 + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v.SetBinaryZ(w3 + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v.SetBinaryW(w4 + (IsInOffsetMode() ? VIFn_R[3] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V4_8:
@@ -520,7 +550,7 @@ namespace Twinsanity.PS2Hardware
                         v.SetBinaryY(w2 + (IsInOffsetMode() ? VIFn_R[1] : 0));
                         v.SetBinaryZ(w3 + (IsInOffsetMode() ? VIFn_R[2] : 0));
                         v.SetBinaryW(w4 + (IsInOffsetMode() ? VIFn_R[3] : 0));
-                        Fill(dst, v, i, fill, write, cycle, ref addr);
+                        Fill(dst, v, i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
                 case PackFormat.V4_5:
@@ -540,7 +570,7 @@ namespace Twinsanity.PS2Hardware
                             B = (Byte)((rgba1 & (0b11111 << 10)) >> 10 << 3),
                             A = (Byte)((rgba1 & (0b1 << 15)) >> 15 << 7)
                         };
-                        Fill(dst, c1.GetVector(), i, fill, write, cycle, ref addr);
+                        Fill(dst, c1.GetVector(), i, fill, write, cycle, ref addr, VIFn_R);
                     }
                     break;
             }
@@ -802,31 +832,35 @@ namespace Twinsanity.PS2Hardware
             }
         }
 
-        private void Fill(List<Vector4> dst, Vector4 vec, Int32 index, Boolean fill, Byte wl, Byte cl, ref UInt16 addr)
+        // Amedo
+        private static void Fill(List<Vector4> dst, Vector4 vec, Int32 index, Boolean fill, Byte wl, Byte cl, ref UInt16 addr, UInt32[] row)
         {
             // Fill writing
             if (fill)
             {
                 var doFill = ((index + 1) % cl == 0);
-                dst[addr++] = vec;
+                Put(dst, addr++, vec);
                 if (doFill)
                 {
-                    var fillVec = new Vector4();
-                    fillVec.SetBinaryX(VIFn_R[0]);
-                    fillVec.SetBinaryY(VIFn_R[1]);
-                    fillVec.SetBinaryZ(VIFn_R[2]);
-                    fillVec.SetBinaryW(VIFn_R[3]);
+                    Vector4 fillVec = default; // Amedo
+                    if (dst is not null)
+                    {
+                        fillVec = new Vector4();
+                        fillVec.SetBinaryX(row[0]);
+                        fillVec.SetBinaryY(row[1]);
+                        fillVec.SetBinaryZ(row[2]);
+                        fillVec.SetBinaryW(row[3]);
+                    }
                     for (int i = 0; i < wl - cl; i++)
                     {
-                        dst[addr++] = fillVec;
+                        Put(dst, addr++, fillVec);
                     }
                 }
                 return;
             }
             // Skip writing
-            var nullVec = new Vector4();
             var skipAmt = cl - wl;
-            dst[addr++] = vec;
+            Put(dst, addr++, vec);
             if (wl != 0)
             {
                 var doSkip = ((index + 1) % wl == 0);
@@ -834,6 +868,38 @@ namespace Twinsanity.PS2Hardware
                 {
                     addr += (UInt16)skipAmt;
                 }
+            }
+        }
+
+        // Amedo
+        private static void Put(List<Vector4> dst, Int32 index, Vector4 vec)
+        {
+            if (dst is null)
+            {
+                if ((UInt32)index >= VUMemSize) throw new ArgumentOutOfRangeException(nameof(index));
+                return;
+            }
+            if (index == dst.Count && index < VUMemSize) dst.Add(vec);
+            else dst[index] = vec;
+        }
+
+        // Amedo
+        private static Int32 UnpackCount(PackFormat fmt, Byte amount, Int32 words)
+        {
+            switch (fmt)
+            {
+                case PackFormat.V2_32:
+                case PackFormat.V4_16:
+                    return words / 2;
+                case PackFormat.V3_32:
+                    return words / 3;
+                case PackFormat.V4_32:
+                    return words / 4;
+                case PackFormat.V2_16:
+                case PackFormat.V4_8:
+                    return words;
+                default:
+                    return amount;
             }
         }
 

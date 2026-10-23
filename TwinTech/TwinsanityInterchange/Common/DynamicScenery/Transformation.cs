@@ -4,7 +4,7 @@ using Twinsanity.TwinsanityInterchange.Interfaces;
 
 namespace Twinsanity.TwinsanityInterchange.Common.DynamicScenery
 {
-    public class Transformation : ITwinSerializable
+    public struct Transformation : ITwinSerializable // Amedo
     {
         public Single Value { get; set; }
 

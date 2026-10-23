@@ -243,11 +243,11 @@ namespace Twinsanity.Libraries
         }
         public static List<Color> TagToColors(GIFTag tag, List<Color> colors)
         {
-            List<UInt64> data = tag.Data.Select(d => d.Output).ToList();
+            var data = tag.Data; // Amedo
             for (var i = 0; i < data.Count - 1; i += 2)
             {
-                UInt64 output1 = data[i + 1];
-                UInt64 output2 = data[i];
+                UInt64 output1 = data[i + 1].Output;
+                UInt64 output2 = data[i].Output;
                 Color c1 = new Color();
                 Color c2 = new Color();
                 Color c3 = new Color();
@@ -294,14 +294,14 @@ namespace Twinsanity.Libraries
         }
         public static byte[] TagToBytes(GIFTag tag)
         {
-            List<UInt64> data = tag.Data.Select(d => d.Output).ToList();
+            var data = tag.Data; // Amedo
             byte[] bytes = new byte[data.Count * 8];
             for (var i = 0; i < data.Count / 2; ++i)
             {
-                UInt64 output1 = data[i * 2];
-                UInt64 output2 = data[i * 2 + 1];
-                Array.Copy(BitConverter.GetBytes(output2), 0, bytes, i * 16, 8);
-                Array.Copy(BitConverter.GetBytes(output1), 0, bytes, i * 16 + 8, 8);
+                UInt64 output1 = data[i * 2].Output;
+                UInt64 output2 = data[i * 2 + 1].Output;
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(i * 16, 8), output2);
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(i * 16 + 8, 8), output1);
             }
             return bytes;
         }

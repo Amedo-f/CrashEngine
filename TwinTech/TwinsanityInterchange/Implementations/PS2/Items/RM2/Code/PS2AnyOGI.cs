@@ -13,6 +13,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code
     {
 
         Byte[] headerData;
+        public Byte HeaderReactJointAmount => headerData[(int)ITwinOGI.HeaderInfo.REACT_JOINT_AMOUNT]; // Amedo
         public List<TwinJoint> Joints { get; set; }
         public List<TwinExitPoint> ExitPoints { get; set; }
         public Vector4[] BoundingBox { get; set; }

@@ -24,7 +24,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout
 
         public override void Read(BinaryReader reader, int length)
         {
-            Position.Read(reader, Constants.SIZE_VECTOR4);
+            Position = Vector4.ReadFrom(reader); // Amedo
             UnkShort = reader.ReadUInt16();
         }
         public override void Write(BinaryWriter writer)

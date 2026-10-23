@@ -184,34 +184,17 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
             {
                 case ITwinTexture.TexturePixelFormat.PSMCT32:
                     EzSwizzle.TagToColors(data[1], Colors);
-                    foreach (var c in Colors)
+                    foreach (ref var c in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(Colors)) // Amedo
                     {
                         c.ScaleAlphaUp();
                     }
                     break;
                 case ITwinTexture.TexturePixelFormat.PSMT8:
-                    byte[] gifData = EzSwizzle.TagToBytes(data[1]);
-                    int RRW = (int)((data[0].Data[1].Output >> 0) & 0xFFFFFFFF);
-                    int RRH = (int)((data[0].Data[1].Output >> 32) & 0xFFFFFFFF);
+                    var (rawTextureData, palette) = UploadPsmt8(data); // Amedo
+                    _lastUpload = new WeakReference<Psmt8Upload>(new Psmt8Upload(rawTextureData, palette)); // Amedo
                     int Width = (int)(Math.Pow(2, ImageWidthPower));
                     int Height = (int)(Math.Pow(2, ImageHeightPower));
-                    byte[] rawTextureData = EzSwizzle.writeTexPSMCT32(0, 1, 0, 0, RRW, RRH, gifData);
                     byte[] texData = EzSwizzle.readTexPSMT8(0, TextureBufferWidth, 0, 0, Width, Height, rawTextureData, false);
-                    byte[] paletteData = EzSwizzle.readTexPSMCT32(ClutBufferBasePointer, 1, 0, 0, 16, 16, rawTextureData, false);
-                    List<Color> palette = EzSwizzle.BytesToColors(paletteData);
-                    for (int i = 0; i < 8; i++)
-                    {
-                        for (int j = 8; j < 16; j++)
-                        {
-                            Color tmp = palette[j + i * 32];
-                            palette[j + i * 32] = palette[j + i * 32 + 8];
-                            palette[j + i * 32 + 8] = tmp;
-                        }
-                    }
-                    foreach (var c in palette)
-                    {
-                        c.ScaleAlphaUp();
-                    }
                     int Pixels = Width * Height;
                     for (var i = 0; i < Pixels; ++i)
                     {
@@ -219,6 +202,53 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
                     }
                     break;
             }
+        }
+
+        private sealed record Psmt8Upload(byte[] Raw, List<Color> Palette); // Amedo
+        private WeakReference<Psmt8Upload>? _lastUpload; // Amedo
+
+        // Amedo
+        private (byte[] Raw, List<Color> Palette) UploadPsmt8(List<GIFTag> data)
+        {
+            byte[] gifData = EzSwizzle.TagToBytes(data[1]);
+            int RRW = (int)((data[0].Data[1].Output >> 0) & 0xFFFFFFFF);
+            int RRH = (int)((data[0].Data[1].Output >> 32) & 0xFFFFFFFF);
+            byte[] rawTextureData = EzSwizzle.writeTexPSMCT32(0, 1, 0, 0, RRW, RRH, gifData);
+            byte[] paletteData = EzSwizzle.readTexPSMCT32(ClutBufferBasePointer, 1, 0, 0, 16, 16, rawTextureData, false);
+            List<Color> palette = EzSwizzle.BytesToColors(paletteData);
+            for (int i = 0; i < 8; i++)
+            {
+                for (int j = 8; j < 16; j++)
+                {
+                    Color tmp = palette[j + i * 32];
+                    palette[j + i * 32] = palette[j + i * 32 + 8];
+                    palette[j + i * 32 + 8] = tmp;
+                }
+            }
+            foreach (ref var c in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(palette)) // Amedo
+            {
+                c.ScaleAlphaUp();
+            }
+            return (rawTextureData, palette);
+        }
+
+        // Amedo
+        public List<(int Width, int Height, List<Color> Colors)> CalculateMipLevels()
+        {
+            var levels = new List<(int, int, List<Color>)>();
+            if (TextureFormat != ITwinTexture.TexturePixelFormat.PSMT8 || MipLevels < 2) return levels;
+            var (raw, palette) = _lastUpload is { } weak && weak.TryGetTarget(out var upload) ? (upload.Raw, upload.Palette) : UploadPsmt8(VIFInterpreter.InterpretCode(TextureData).GetGifMem()); // Amedo
+            _lastUpload = null;
+            int width = 1 << ImageWidthPower, height = 1 << ImageHeightPower;
+            for (int level = 1; level < MipLevels && level <= MipLevelsTBP.Length; level++)
+            {
+                int w = Math.Max(1, width >> level), h = Math.Max(1, height >> level);
+                byte[] index = EzSwizzle.readTexPSMT8(MipLevelsTBP[level - 1], MipLevelsTBW[level - 1], 0, 0, w, h, raw, false);
+                var colors = new List<Color>(w * h);
+                for (int i = 0; i < w * h; i++) colors.Add(palette[index[i]]);
+                levels.Add((w, h, colors));
+            }
+            return levels;
         }
 
         // Amedo 2026-09-19
@@ -333,13 +363,14 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
             GIFTag tag;
             if (format == ITwinTexture.TexturePixelFormat.PSMCT32)
             {
-                foreach (var c in image)
+                foreach (ref var c in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(image)) // Amedo
                 {
                     c.ScaleAlphaDown();
                 }
                 tag = EzSwizzle.ColorsToTag(image);
                 // Amedo 2026-09-16
                 head2.Output = ((ulong)height << 32) | (ulong)width;
+                headerTag.Data[1] = head2; // Amedo
             }
             else
             {
@@ -386,7 +417,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
                         ++index;
                     }
                 }
-                foreach (var c in palette)
+                foreach (ref var c in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(palette)) // Amedo
                 {
                     c.ScaleAlphaDown();
                 }
@@ -412,6 +443,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
                 ulong high = (ulong)textureDescriptor.RRH;
                 ulong low = (ulong)textureDescriptor.RRW;
                 head2.Output = (high << 32) | (low);
+                headerTag.Data[1] = head2; // Amedo
                 byte[] rawTextureData = new byte[textureDescriptor.RRH * 256];
                 Array.Fill<byte>(rawTextureData, 0xFF);
 

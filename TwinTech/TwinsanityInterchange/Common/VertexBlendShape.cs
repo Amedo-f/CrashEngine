@@ -2,7 +2,7 @@
 
 namespace Twinsanity.TwinsanityInterchange.Common
 {
-    public class VertexBlendShape
+    public struct VertexBlendShape // Amedo
     {
         public Vector4 GetVector4()
         {

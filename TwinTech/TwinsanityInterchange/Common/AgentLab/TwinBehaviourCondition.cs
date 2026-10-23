@@ -97,7 +97,8 @@ namespace Twinsanity.TwinsanityInterchange.Common.AgentLab
         public void WriteText(StreamWriter writer, Int32 tabs = 0)
         {
             AgentLabDefs defs = PS2BehaviourGraph.GetAgentLabDefs();
-            StringUtils.WriteLineTabulated(writer, $"Condition {MapIndex(ConditionIndex, defs)}({Parameter}) {"{"}", tabs);
+            string condName = defs.ConditionMap.ContainsKey(ConditionIndex.ToString()) ? defs.ConditionMap[ConditionIndex.ToString()] : $"ById_{ConditionIndex}"; // Amedo 2026-09-25
+            StringUtils.WriteLineTabulated(writer, $"Condition {condName}({Parameter}) {"{"}", tabs);
             StringUtils.WriteLineTabulated(writer, $"({CheckInterval.ToString(CultureInfo.InvariantCulture)}, " +
                 $"{ReturnCheck.ToString(CultureInfo.InvariantCulture)}, " +
                 $"{ConditionPowerMultiplier.ToString(CultureInfo.InvariantCulture)}) == {(NotGate ? "false" : "true")}", tabs + 1);

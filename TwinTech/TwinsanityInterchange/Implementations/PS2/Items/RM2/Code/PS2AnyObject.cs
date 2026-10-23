@@ -134,6 +134,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code
 
         public override void ComputeHash(Stream stream, UInt32 length)
         {
+            if (!ComputeHashes) return; // Amedo 2026-10-02
             var startPos = stream.Position;
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);

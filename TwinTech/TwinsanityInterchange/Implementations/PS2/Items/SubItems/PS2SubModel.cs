@@ -92,10 +92,10 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                         break;
 
                 }
-                Vertexes.AddRange(data[i + 2].Where((v) => v != null));
+                Vertexes.AddRange(data[i + 2]); // Amedo
                 if (fieldsPresent.HasFlag(FieldsPresent.UV_Color))
                 {
-                    var uv_con = data[i + 3].Where((v) => v != null);
+                    var uv_con = data[i + 3]; // Amedo
                     foreach (var e in uv_con)
                     {
                         var conn = (e.GetBinaryW() & 0xFF00) >> 8;
@@ -119,8 +119,6 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                 {
                     foreach (var e in data[i + 4])
                     {
-                        if (e == null)
-                            break;
                         Normals.Add(new Vector4(e.X, e.Y, e.Z, 1.0f));
                     }
                 }
@@ -128,9 +126,6 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                 {
                     foreach (var e in data[i + fields + 1])
                     {
-                        if (e == null)
-                            break;
-
                         var r = Math.Min((byte)(e.GetBinaryX() & 0xFF), (byte)255);
                         var g = Math.Min((byte)(e.GetBinaryY() & 0xFF), (byte)255);
                         var b = Math.Min((byte)(e.GetBinaryZ() & 0xFF), (byte)255);
@@ -208,7 +203,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
             return minSkinCoord;
         }
 
-        private static void TrimList(List<Vector4> list, Int32 desiredLength, Vector4 defaultValue = null)
+        private static void TrimList(List<Vector4> list, Int32 desiredLength, Vector4? defaultValue = null) // Amedo
         {
             if (list != null)
             {
@@ -218,9 +213,9 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                 }
                 while (list.Count < desiredLength)
                 {
-                    if (defaultValue != null)
+                    if (defaultValue is { } d) // Amedo
                     {
-                        list.Add(new Vector4(defaultValue));
+                        list.Add(new Vector4(d));
                     }
                     else
                     {

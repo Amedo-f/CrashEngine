@@ -10,6 +10,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
     {
         UInt32 dataPacker;
         public UInt16 TotalFrames { get; set; }
+        public UInt32 PackerFlags { get; set; } = 0x480; // Amedo 2026-10-04
 
         public List<JointSettings> JointSettings { get; set; } = new();
         public List<Transformation> StaticTransformations { get; set; } = new();
@@ -28,6 +29,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
         public void Read(BinaryReader reader, Int32 length)
         {
             dataPacker = reader.ReadUInt32();
+            PackerFlags = dataPacker & 0x780; // Amedo 2026-10-04
             TotalFrames = reader.ReadUInt16();
             var jointSettings = (dataPacker & 0x7F);
             var staticTransformations = ((dataPacker >> 0xA) & 0xFFE) / 2;
@@ -69,9 +71,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
             {
                 packer |= (UInt32)(AnimatedTransformations[0].Count << 0x16);
             }
-            // These bits must always be set
-            packer |= (1 << 0x7);
-            packer |= (1 << 0xA);
+            packer |= PackerFlags & 0x780; // Amedo 2026-10-04
 
             dataPacker = packer;
             writer.Write(packer);

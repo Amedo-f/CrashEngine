@@ -22,7 +22,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.CameraSubtypes
         public override void Read(BinaryReader reader, int length)
         {
             base.Read(reader, base.GetLength());
-            Point.Read(reader, Constants.SIZE_VECTOR4);
+            Point = Vector4.ReadFrom(reader); // Amedo
             UnkFloat3 = reader.ReadSingle();
             UnkByte = reader.ReadByte();
         }

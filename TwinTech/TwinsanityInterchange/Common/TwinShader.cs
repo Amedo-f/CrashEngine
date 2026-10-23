@@ -126,9 +126,9 @@ namespace Twinsanity.TwinsanityInterchange.Common
             var hasAnimation = reader.ReadBoolean();
             LodParamK = reader.ReadUInt16();
             LodParamL = reader.ReadUInt16();
-            UnkVector1.Read(reader, Constants.SIZE_VECTOR4);
-            UnkVector2.Read(reader, Constants.SIZE_VECTOR4);
-            UvScrollSpeed.Read(reader, Constants.SIZE_VECTOR4);
+            UnkVector1 = Vector4.ReadFrom(reader); // Amedo
+            UnkVector2 = Vector4.ReadFrom(reader); // Amedo
+            UvScrollSpeed = Vector4.ReadFrom(reader); // Amedo
             TextureId = reader.ReadUInt32();
             reader.ReadUInt32(); // ShaderType
             if (hasAnimation)

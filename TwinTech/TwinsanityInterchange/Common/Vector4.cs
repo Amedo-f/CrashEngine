@@ -7,7 +7,7 @@ using Twinsanity.TwinsanityInterchange.Interfaces;
 namespace Twinsanity.TwinsanityInterchange.Common
 {
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
-    public class Vector4 : ITwinSerializable
+    public struct Vector4 : ITwinSerializable // Amedo
     {
         public float X { get; set; }
         public float Y { get; set; }
@@ -66,6 +66,13 @@ namespace Twinsanity.TwinsanityInterchange.Common
             return (Single)Math.Sqrt(X * X + Y * Y + Z * Z);
         }
 
+        public static Vector4 ReadFrom(BinaryReader reader) // Amedo
+        {
+            var v = new Vector4();
+            v.Read(reader, Constants.SIZE_VECTOR4);
+            return v;
+        }
+
         public void Read(BinaryReader reader, int length)
         {
             X = reader.ReadSingle();
@@ -113,35 +120,35 @@ namespace Twinsanity.TwinsanityInterchange.Common
         }
         public void SetBinaryX(UInt32 src)
         {
-            X = BitConverter.ToSingle(BitConverter.GetBytes(src), 0);
+            X = BitConverter.UInt32BitsToSingle(src); // Amedo
         }
         public void SetBinaryY(UInt32 src)
         {
-            Y = BitConverter.ToSingle(BitConverter.GetBytes(src), 0);
+            Y = BitConverter.UInt32BitsToSingle(src); // Amedo
         }
         public void SetBinaryZ(UInt32 src)
         {
-            Z = BitConverter.ToSingle(BitConverter.GetBytes(src), 0);
+            Z = BitConverter.UInt32BitsToSingle(src); // Amedo
         }
         public void SetBinaryW(UInt32 src)
         {
-            W = BitConverter.ToSingle(BitConverter.GetBytes(src), 0);
+            W = BitConverter.UInt32BitsToSingle(src); // Amedo
         }
         public UInt32 GetBinaryX()
         {
-            return BitConverter.ToUInt32(BitConverter.GetBytes(X), 0);
+            return BitConverter.SingleToUInt32Bits(X); // Amedo
         }
         public UInt32 GetBinaryY()
         {
-            return BitConverter.ToUInt32(BitConverter.GetBytes(Y), 0);
+            return BitConverter.SingleToUInt32Bits(Y); // Amedo
         }
         public UInt32 GetBinaryZ()
         {
-            return BitConverter.ToUInt32(BitConverter.GetBytes(Z), 0);
+            return BitConverter.SingleToUInt32Bits(Z); // Amedo
         }
         public UInt32 GetBinaryW()
         {
-            return BitConverter.ToUInt32(BitConverter.GetBytes(W), 0);
+            return BitConverter.SingleToUInt32Bits(W); // Amedo
         }
         public override String ToString()
         {

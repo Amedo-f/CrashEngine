@@ -276,7 +276,7 @@ namespace Twinsanity.PS2Hardware
         NOP = 0x0f,
         HWREG = 0xff
     }
-    public class RegOutput
+    public struct RegOutput // Amedo
     {
         private UInt64 _Output;
         public UInt64 Output
@@ -295,11 +295,11 @@ namespace Twinsanity.PS2Hardware
                         G = (Byte)BitUtils.GetBits(_Output, 8, 8);
                         B = (Byte)BitUtils.GetBits(_Output, 8, 16);
                         A = (Byte)BitUtils.GetBits(_Output, 8, 24);
-                        Q = BitConverter.ToSingle(BitConverter.GetBytes((UInt32)BitUtils.GetBits(_Output, 32, 32)), 0);
+                        Q = BitConverter.UInt32BitsToSingle((UInt32)BitUtils.GetBits(_Output, 32, 32)); // Amedo
                         break;
                     case REGSEnum.ST:
-                        S = BitConverter.ToSingle(BitConverter.GetBytes((UInt32)BitUtils.GetBits(_Output, 32, 0)), 0);
-                        T = BitConverter.ToSingle(BitConverter.GetBytes((UInt32)BitUtils.GetBits(_Output, 32, 32)), 0);
+                        S = BitConverter.UInt32BitsToSingle((UInt32)BitUtils.GetBits(_Output, 32, 0)); // Amedo
+                        T = BitConverter.UInt32BitsToSingle((UInt32)BitUtils.GetBits(_Output, 32, 32)); // Amedo
                         break;
                     case REGSEnum.UV:
                         UInt64 v = BitUtils.GetBits(_Output, 14, 0);

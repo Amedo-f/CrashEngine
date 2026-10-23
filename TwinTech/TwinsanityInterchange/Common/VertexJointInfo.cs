@@ -5,7 +5,7 @@ using Twinsanity.TwinsanityInterchange.Interfaces;
 
 namespace Twinsanity.TwinsanityInterchange.Common
 {
-    public class VertexJointInfo : ITwinSerializable
+    public struct VertexJointInfo : ITwinSerializable // Amedo
     {
         public Single Weight1;
         public Single Weight2;

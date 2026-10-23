@@ -75,8 +75,8 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout
             CameraHeader = reader.ReadUInt32();
             UnkShort = reader.ReadUInt16();
             UnkFloat1 = reader.ReadSingle();
-            UnkVector1.Read(reader, Constants.SIZE_VECTOR4);
-            UnkVector2.Read(reader, Constants.SIZE_VECTOR4);
+            UnkVector1 = Vector4.ReadFrom(reader); // Amedo
+            UnkVector2 = Vector4.ReadFrom(reader); // Amedo
             UnkFloat2 = reader.ReadSingle();
             UnkFloat3 = reader.ReadSingle();
             UnkInt1 = reader.ReadUInt32();

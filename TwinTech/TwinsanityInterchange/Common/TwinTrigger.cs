@@ -40,9 +40,9 @@ namespace Twinsanity.TwinsanityInterchange.Common
             Header = reader.ReadUInt32();
             ObjectActivatorMask = (TriggerActivatorObjects)reader.ReadUInt32();
             UnkFloat = reader.ReadSingle();
-            Rotation.Read(reader, Constants.SIZE_VECTOR4);
-            Position.Read(reader, Constants.SIZE_VECTOR4);
-            Scale.Read(reader, Constants.SIZE_VECTOR4);
+            Rotation = Vector4.ReadFrom(reader); // Amedo
+            Position = Vector4.ReadFrom(reader); // Amedo
+            Scale = Vector4.ReadFrom(reader); // Amedo
             reader.ReadUInt32(); // instances amount
             UInt32 instances_cnt = reader.ReadUInt32();
             InstanceExtensionValue = reader.ReadUInt32();
@@ -104,10 +104,12 @@ namespace Twinsanity.TwinsanityInterchange.Common
             Vector3 n = len < 1e-6f ? new Vector3(0f, 0f, 1f) : new Vector3(axis.X / len, axis.Y / len, axis.Z / len);
             float half = angleRadians * 0.5f;
             float s = MathF.Sin(half);
-            Rotation.W = MathF.Cos(half);
-            Rotation.X = n.X * s;
-            Rotation.Y = n.Y * s;
-            Rotation.Z = n.Z * s;
+            var r = Rotation; // Amedo
+            r.W = MathF.Cos(half);
+            r.X = n.X * s;
+            r.Y = n.Y * s;
+            r.Z = n.Z * s;
+            Rotation = r; // Amedo
         }
     }
 }

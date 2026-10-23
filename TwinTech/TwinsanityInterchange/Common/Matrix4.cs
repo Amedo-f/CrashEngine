@@ -64,10 +64,10 @@ namespace Twinsanity.TwinsanityInterchange.Common
         }
         public void Read(BinaryReader reader, int length)
         {
-            Column1.Read(reader, Constants.SIZE_VECTOR4);
-            Column2.Read(reader, Constants.SIZE_VECTOR4);
-            Column3.Read(reader, Constants.SIZE_VECTOR4);
-            Column4.Read(reader, Constants.SIZE_VECTOR4);
+            Column1 = Vector4.ReadFrom(reader); // Amedo
+            Column2 = Vector4.ReadFrom(reader); // Amedo
+            Column3 = Vector4.ReadFrom(reader); // Amedo
+            Column4 = Vector4.ReadFrom(reader); // Amedo
         }
 
         public void Write(BinaryWriter writer)

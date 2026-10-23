@@ -166,6 +166,10 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.Ag
             {
                 StringUtils.WriteLineTabulated(writer, $"uses_object_slot = {UsesObjectSlot}", tabs + 1);
             }
+            if (Unknown != 0) // Amedo 2026-09-25
+            {
+                StringUtils.WriteLineTabulated(writer, $"state_unknown = 0x{Unknown:X}", tabs + 1);
+            }
             if (NoneBlocking)
             {
                 StringUtils.WriteLineTabulated(writer, "none_blocking", tabs + 1);
@@ -224,6 +228,10 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.Ag
                 if (line.StartsWith("uses_object_slot"))
                 {
                     UsesObjectSlot = Boolean.Parse(StringUtils.GetStringAfter(line, "=").Trim());
+                }
+                if (line.StartsWith("state_unknown")) // Amedo 2026-09-25
+                {
+                    Unknown = (UInt16)(Convert.ToUInt16(StringUtils.GetStringAfter(line, "=").Trim()[2..], 16) & 0x3E0);
                 }
                 if (line.StartsWith("none_blocking"))
                 {

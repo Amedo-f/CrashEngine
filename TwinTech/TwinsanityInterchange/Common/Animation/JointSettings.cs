@@ -8,6 +8,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
     public class JointSettings : ITwinSerializable
     {
         UInt16 flags;
+        public Byte ChannelCounts { get; set; } // Amedo 2026-10-04
         public Byte FacialShapesAmount { get; set; }
         public Boolean UseParentJointScale { get; set; }
         public Boolean UseAdditionalRotation { get; set; }
@@ -40,6 +41,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
         public void Read(BinaryReader reader, Int32 length)
         {
             flags = reader.ReadUInt16();
+            ChannelCounts = (Byte)(flags & 0xFF); // Amedo 2026-10-04
             {
                 FacialShapesAmount = (Byte)((flags >> 0x8) & 0xF);
                 UseParentJointScale = ((flags >> 0xD) & 0x1) != 0;
@@ -64,6 +66,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.Animation
         public void Write(BinaryWriter writer)
         {
             UInt16 newFlags = (UInt16)(FacialShapesAmount << 0x8);
+            newFlags |= ChannelCounts; // Amedo 2026-10-04
             var hasUseParentJointScale = UseParentJointScale ? 1 : 0;
             newFlags |= (UInt16)(hasUseParentJointScale << 0xD);
             var hasUseAdditionalRotation = UseAdditionalRotation ? 1 : 0;

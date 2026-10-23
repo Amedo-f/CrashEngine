@@ -43,11 +43,11 @@ namespace Twinsanity.TwinsanityInterchange.Common
             ParentIndex = (Int32)(reader.ReadUInt32() & 0xFF);
             ChildrenAmt1 = (Int32)(reader.ReadUInt32() & 0xFF);
             ChildrenAmt2 = (Int32)(reader.ReadUInt32() & 0xFF);
-            LocalTranslation.Read(reader, Constants.SIZE_VECTOR4);
-            WorldTranslation.Read(reader, Constants.SIZE_VECTOR4);
-            LocalRotation.Read(reader, Constants.SIZE_VECTOR4);
-            UnusedRotation.Read(reader, Constants.SIZE_VECTOR4);
-            AdditionalAnimationRotation.Read(reader, Constants.SIZE_VECTOR4);
+            LocalTranslation = Vector4.ReadFrom(reader); // Amedo
+            WorldTranslation = Vector4.ReadFrom(reader); // Amedo
+            LocalRotation = Vector4.ReadFrom(reader); // Amedo
+            UnusedRotation = Vector4.ReadFrom(reader); // Amedo
+            AdditionalAnimationRotation = Vector4.ReadFrom(reader); // Amedo
         }
 
         public void Write(BinaryWriter writer)
