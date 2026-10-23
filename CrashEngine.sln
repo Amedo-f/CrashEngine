@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrashEngine.Importer", "Cra
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwinTech", "TwinTech\TwinTech.csproj", "{930C058D-2D57-44C1-904E-A39EAADCBD2F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrashEngine.Runtime", "CrashEngine.Runtime\CrashEngine.Runtime.csproj", "{1F2F9E23-D90B-4D15-8811-2899E8DED890}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{930C058D-2D57-44C1-904E-A39EAADCBD2F}.Release|x64.Build.0 = Release|Any CPU
 		{930C058D-2D57-44C1-904E-A39EAADCBD2F}.Release|x86.ActiveCfg = Release|Any CPU
 		{930C058D-2D57-44C1-904E-A39EAADCBD2F}.Release|x86.Build.0 = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|x64.Build.0 = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Debug|x86.Build.0 = Debug|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|x64.ActiveCfg = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|x64.Build.0 = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|x86.ActiveCfg = Release|Any CPU
+		{1F2F9E23-D90B-4D15-8811-2899E8DED890}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

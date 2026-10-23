@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Amedo 2026-09-26 -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
+  </ItemGroup>
+  <!-- Amedo 2026-10-01 -->
+  <ItemGroup>
+    <PackageReference Include="HarfBuzzSharp" Version="8.3.1.1" />
+    <PackageReference Include="StbTrueTypeSharp" Version="1.26.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Fonts\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Fonts" />
+  </ItemGroup>
+</Project>

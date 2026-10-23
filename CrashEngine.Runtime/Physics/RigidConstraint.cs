@@ -1,0 +1,168 @@
+using System.Numerics;
+using CrashEngine.Runtime.Camera;
+
+namespace CrashEngine.Runtime.Physics;
+
+// Amedo 2026-09-29
+public sealed class RigidConstraint
+{
+    public uint Flags;
+    public Vector3 AxisLocal;
+    public Vector3 AxisWorld;
+    public float Limit;
+    public Quaternion A, B;
+    public Quaternion Rest;
+    public Vector3 Point;
+    public Vector3 LineOrigin, LineDir;
+    public Vector4 Plane;
+
+    private static float InvLen_11C030(Vector3 v)
+    {
+        float l = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
+        return l <= 2.4999998e-09f ? 0f : 1f / MathF.Sqrt(l);
+    }
+
+    private static float Rsqrt_11C0B8(Quaternion q)
+    {
+        float l = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
+        return 0f < l ? 1f / MathF.Sqrt(l) : 0f;
+    }
+
+    private static Quaternion Scale(Quaternion q, float k) => new(q.X * k, q.Y * k, q.Z * k, q.W * k);
+
+    private static float Dot4(Quaternion a, Quaternion b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
+
+    public void Point_291128(Vector3 p)
+    {
+        Flags = (Flags & ~0x70u) | 0x10;
+        Point = p;
+    }
+
+    public void Line_291148(Vector3 origin, Vector3 dir)
+    {
+        Flags = (Flags & ~0x70u) | 0x20;
+        LineOrigin = origin;
+        LineDir = dir * InvLen_11C030(dir);
+    }
+
+    public void Plane_2911E0(Vector3 n, Vector3 p)
+    {
+        Flags = (Flags & ~0x70u) | 0x40;
+        Plane = new Vector4(n, -(n.X * p.X + n.Y * p.Y + n.Z * p.Z));
+    }
+
+    public void Limit_2910B8(float limit, Quaternion rest)
+    {
+        Limit = limit;
+        Flags |= 0x100;
+        Rest = rest;
+    }
+
+    public void Axis_2880F8(Vector3 l, Vector3 w)
+    {
+        Flags |= 1;
+        AxisLocal = l;
+        AxisWorld = w;
+        var cr = new Vector3(l.Y * w.Z - l.Z * w.Y, l.Z * w.X - l.X * w.Z, l.X * w.Y - l.Y * w.X);
+        float s = MathF.Sqrt(cr.X * cr.X + cr.Y * cr.Y + cr.Z * cr.Z);
+        float c = l.X * w.X + l.Y * w.Y + l.Z * w.Z;
+        if (0f <= s)
+        {
+            s = MathF.Sqrt((1f - c) * 0.5f);
+            c = MathF.Sqrt(c * 0.5f + 0.5f);
+        }
+        else
+        {
+            s = MathF.Sqrt((1f - c) * 0.5f);
+            c = -MathF.Sqrt((c + 1f) * 0.5f);
+        }
+        var axis = cr * InvLen_11C030(cr) * s;
+        var a = new Quaternion(axis, c);
+        var b = new Quaternion(
+            axis.Y * l.Z - axis.Z * l.Y + l.X * c,
+            axis.Z * l.X - axis.X * l.Z + l.Y * c,
+            axis.X * l.Y - axis.Y * l.X + l.Z * c,
+            -(l.X * axis.X + l.Y * axis.Y + l.Z * axis.Z));
+        a = Scale(a, Rsqrt_11C0B8(a));
+        b = Scale(b, Rsqrt_11C0B8(b));
+        A = new Quaternion(-a.X, -a.Y, -a.Z, a.W);
+        B = new Quaternion(-b.X, -b.Y, -b.Z, b.W);
+    }
+
+    public void Apply_288F58(RigidBody body)
+    {
+        body.Position = ProjectPoint_288430(body.Position);
+        body.Momentum = ProjectVector_2885B0(body.Momentum);
+        body.Velocity = ProjectVector_2885B0(body.Velocity);
+        body.Orientation = ProjectOrientation_2886F8(body.Orientation);
+        if ((Flags & 1) == 0) return;
+        body.AngularMomentum = AxisWorld * Vector3.Dot(body.AngularMomentum, AxisWorld);
+        body.Spin = AxisWorld * Vector3.Dot(body.Spin, AxisWorld);
+    }
+
+    private Vector3 ProjectPoint_288430(Vector3 p)
+    {
+        if ((Flags & 0x10) != 0) return Point;
+        if ((Flags & 0x20) != 0) return LineOrigin + LineDir * Vector3.Dot(LineDir, p - LineOrigin);
+        if ((Flags & 0x40) == 0) return p;
+        var n = new Vector3(Plane.X, Plane.Y, Plane.Z);
+        return p - n * (Vector3.Dot(n, p) + Plane.W);
+    }
+
+    private Vector3 ProjectVector_2885B0(Vector3 v)
+    {
+        if ((Flags & 0x10) != 0) return Vector3.Zero;
+        if ((Flags & 0x20) != 0) return LineDir * Vector3.Dot(LineDir, v);
+        if ((Flags & 0x40) == 0) return v;
+        var n = new Vector3(Plane.X, Plane.Y, Plane.Z);
+        return v - n * Vector3.Dot(n, v);
+    }
+
+    private Quaternion ProjectOrientation_2886F8(Quaternion q)
+    {
+        if ((Flags & 1) != 0)
+        {
+            float ab = Dot4(A, B);
+            float kb = Dot4(q, new Quaternion(A.X * ab - B.X, A.Y * ab - B.Y, A.Z * ab - B.Z, A.W * ab - B.W)) / (ab * ab - 1f);
+            float ka = Dot4(q, A) - kb * ab;
+            var r = new Quaternion(A.X * ka + B.X * kb, A.Y * ka + B.Y * kb, A.Z * ka + B.Z * kb, A.W * ka + B.W * kb);
+            q = 9.999999e-09f < Dot4(r, r) ? Scale(r, Rsqrt_11C0B8(r)) : A;
+        }
+        if ((Flags & 0x100) != 0) q = Limit_288938(q);
+        return q;
+    }
+
+    private Quaternion Limit_288938(Quaternion q)
+    {
+        float k = Rsqrt_11C0B8(Rest);
+        var inverse = new Quaternion(-Rest.X * k, -Rest.Y * k, -Rest.Z * k, Rest.W * k);
+        var rel = CamMath.Mul_18D558(inverse, q);
+        int angle = AxisAngle_186B50(ref rel, out var axis);
+        float a = angle * CamMath.UnitToRad;
+        if (!(a < -Limit) && !(Limit < a)) return q;
+        a = a < -Limit ? -Limit : Limit;
+        rel = CamMath.AxisAngle_18D798(axis, CamMath.Trunc(a * CamMath.RadToUnit));
+        return CamMath.Mul_18D558(Rest, rel);
+    }
+
+    private static int AxisAngle_186B50(ref Quaternion q, out Vector3 axis)
+    {
+        float l = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
+        q = Scale(q, 1.00000005e-20f < l ? 1f / MathF.Sqrt(l) : 0f);
+        float aw = MathF.Abs(q.W);
+        if (!(aw < 1f))
+        {
+            axis = Vector3.UnitZ;
+            return 0;
+        }
+        float rest = 1f - aw;
+        if (rest < 0f) rest = 0f;
+        float a = (((aw * -0.0187293f + 0.074261f) * aw - 0.2121144f) * aw + 1.5707288f) * MathF.Sqrt(rest);
+        if (q.W < 0f) a = 3.1415927f - a;
+        int half = CamMath.Trunc(a * CamMath.RadToUnit);
+        float s = 1f / MathF.Sqrt(1f - q.W * q.W);
+        axis = new Vector3(q.X * s, q.Y * s, q.Z * s);
+        axis *= InvLen_11C030(axis);
+        return half + half;
+    }
+}
