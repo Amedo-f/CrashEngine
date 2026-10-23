@@ -46,19 +46,20 @@ public sealed class TransplantRecord
     public readonly List<uint> TextureIds    = new();
 }
 
-public static class MeshDecoder
+public static partial class MeshDecoder // Amedo 2026-10-05
 {
-    public static readonly SysVec3[] FogColors =
+    public static readonly SysVec3[] FogColors = // Amedo 2026-09-26
     {
-        new(128/255f,   0/255f, 128/255f),
+        new( 52/255f,   0f,     247/255f),
         new(  0f,       0f,       0f),
-        new(173/255f, 216/255f, 230/255f),
-        new(  0f,     255/255f,   0f),
-        new(127/255f, 127/255f, 127/255f),
-        new(245/255f, 245/255f, 220/255f),
+        new(165/255f, 235/255f, 255/255f),
+        new(  0f,     255/255f,  18/255f),
+        new(  1f,       1f,       1f),
+        new(  1f,     200/255f, 120/255f),
+        new(  0f,       0f,       0f),
     };
 
-    public static readonly string[] FogColorNames = { "Purple", "Black", "Light blue", "Green", "Grey", "Beige" };
+    public static readonly string[] FogColorNames = { "Violet", "Black", "Light blue", "Green", "White", "Beige", "None" }; // Amedo 2026-09-26
 
     public static SysVec3? LastFogColor { get; private set; }
 
@@ -90,9 +91,11 @@ public static class MeshDecoder
                                            PS2AnyTwinsanityRM2 rm2,
                                            Entity instancesRoot,
                                            Dictionary<uint, Texture2D> texCache,
-                                           PS2AnyTwinsanityRM2? globalRm2 = null)
+                                           PS2AnyTwinsanityRM2? globalRm2 = null,
+                                           ICollection<uint>? globalTextureIds = null, // Amedo 2026-09-29
+                                           object? sharedTables = null)
     {
-        var tables = BuildLookupTables(gl, rm2, texCache, globalRm2);
+        var tables = BuildLookupTables(gl, rm2, texCache, globalRm2, globalTextureIds, sharedTables as RmTables);
         Console.WriteLine($"[MeshDecoder] Objects:{tables.Objects.Count}  OGIs:{tables.OGIs.Count}  RigidModels:{tables.RigidModels.Count}  ModelGpu:{tables.ModelGpu.Count}  Animations:{tables.Animations.Count}");
 
         int instWithMesh = 0, instWithAnim = 0, instWithAltStates = 0;
@@ -118,6 +121,91 @@ public static class MeshDecoder
             e.RemoveChild(child);
         e.RemoveComponent<AnimatedObject>();
         BuildOneInstanceMesh(gl, tables, e, data);
+    }
+
+    // Amedo 2026-09-28
+    public sealed class ForeignGroupBuild
+    {
+        public required Entity Owner { get; init; }
+        public required AnimatedObject.SlotGroup Group { get; init; }
+        public Entity? CreatedRoot { get; init; }
+        public Entity? DefaultWrapper { get; init; }
+        public bool CreatedAnimator { get; init; }
+
+        public void Undo()
+        {
+            if (Owner.Get<AnimatedObject>() is { } anim && ReferenceEquals(anim.CurrentGroup, Group)) anim.Stop();
+            if (CreatedRoot is not null) Owner.RemoveChild(CreatedRoot);
+            if (DefaultWrapper is not null)
+            {
+                foreach (var child in DefaultWrapper.Children.ToList())
+                {
+                    DefaultWrapper.RemoveChild(child);
+                    child.Active = DefaultWrapper.Active; // Amedo 2026-09-29
+                    Owner.AddChild(child);
+                }
+                DefaultWrapper.Active = true;
+                Owner.RemoveChild(DefaultWrapper);
+            }
+            if (CreatedAnimator) Owner.RemoveComponent<AnimatedObject>();
+        }
+    }
+
+    // Amedo 2026-09-28
+    public static ForeignGroupBuild? BuildForeignGroup(GL gl, object tablesHandle, Entity e, ushort ogiId, ushort animId,
+                                                       AnimatedObject.SlotGroup? sameModel = null)
+    {
+        if (tablesHandle is not RmTables tables || !tables.OGIs.TryGetValue(ogiId, out var ogi)) return null;
+        PS2AnyAnimation? anim = null;
+        if (animId != 0xFFFF && (!tables.Animations.TryGetValue(animId, out anim) || !anim.HasAnimationData)) return null;
+
+        var animObj = e.Get<AnimatedObject>();
+        bool createdAnimator = animObj is null;
+        Entity? wrapper = null;
+        if (animObj is null)
+        {
+            animObj = e.Add(new AnimatedObject());
+            wrapper = new Entity($"{e.Name}_default");
+            bool shown = true; // Amedo 2026-09-29
+            foreach (var child in e.Children.ToList())
+            {
+                shown &= child.Active;
+                child.Active = true;
+                e.RemoveChild(child);
+                wrapper.AddChild(child);
+            }
+            wrapper.Active = shown;
+            e.AddChild(wrapper);
+            var data = e.Get<InstanceData>();
+            PS2AnyObject? obj = null; // Amedo
+            var defaultOgi = data is not null && tables.Objects.TryGetValue(data.ObjectId, out obj) ? ResolveDefaultOgi(tables, obj, out _) : null;
+            if (obj is not null) animObj.ReactSlots = obj.ReactJointAmount; // Amedo
+            animObj.DefaultGroup = new AnimatedObject.SlotGroup { Ogi = defaultOgi!, MeshRoot = wrapper, StaticMesh = true }; // Amedo 2026-09-28
+        }
+
+        Entity? root = null;
+        var group = new AnimatedObject.SlotGroup { Ogi = ogi, SlotIndex = 0xFFFF, AnimId = animId };
+        var share = sameModel ?? (animObj.DefaultGroup is { StaticMesh: false } def && ReferenceEquals(def.Ogi, ogi) ? def : null); // Amedo 2026-09-28
+        if (share is not null)
+        {
+            group.MeshRoot = share.MeshRoot;
+            group.AttachedRigidParts.AddRange(share.AttachedRigidParts);
+            group.MorphMeshes.AddRange(share.MorphMeshes);
+        }
+        else
+        {
+            root = NewChild(e, $"{e.Name}_foreign{ogiId:X}");
+            root.Active = false;
+            var (attached, morphs) = EmitOgiMeshEntities(gl, tables, root, BuildOgiMeshes(tables, ogi), ogi, animObj);
+            group.MeshRoot = root;
+            group.AttachedRigidParts.AddRange(attached);
+            group.MorphMeshes.AddRange(morphs);
+        }
+        if (anim is not null) group.Anim = anim;
+        return new ForeignGroupBuild
+        {
+            Owner = e, Group = group, CreatedRoot = root, DefaultWrapper = wrapper, CreatedAnimator = createdAnimator,
+        };
     }
 
     public static bool PreviewOgiOnInstance(GL gl, object tablesHandle, Entity e, uint ogiId)
@@ -340,7 +428,7 @@ public static class MeshDecoder
         int rmIndex = 0;
         foreach (var (_, model, materialIds) in srcModels)
         {
-            var shaders = GetMaterialsShadersDirect(rm2, materialIds);
+            var shaders = GetMaterialsShadersDirect(rm2, materialIds, texCache); // Amedo 2026-09-26
             var subMats = new List<(Texture2D? Tex, TwinShader? Shader)>();
             foreach (var sh in shaders)
                 subMats.Add((sh is not null && texCache.TryGetValue(sh.TextureId, out var t) ? t : null, sh));
@@ -354,7 +442,8 @@ public static class MeshDecoder
         return result.Count > 0 ? result : null;
     }
 
-    public static List<TwinShader?> GetMaterialsShadersDirect(PS2AnyTwinsanityRM2 rm2, List<uint> materialIds)
+    public static List<TwinShader?> GetMaterialsShadersDirect(PS2AnyTwinsanityRM2 rm2, List<uint> materialIds,
+        Dictionary<uint, Texture2D>? texCache = null) // Amedo 2026-09-26
     {
         var gfx = rm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
         var matSec = gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
@@ -362,6 +451,7 @@ public static class MeshDecoder
         foreach (var matId in materialIds)
         {
             var mat = matSec?.GetItem<PS2AnyMaterial>(matId);
+            if (mat is not null && texCache is not null) RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
             result.Add(mat?.Shaders is { Count: > 0 } ? mat.Shaders[0] : null);
         }
         return result;
@@ -379,6 +469,10 @@ public static class MeshDecoder
         if (!tables.Objects.TryGetValue(objectId, out var obj)) return null;
         return ResolveDefaultOgi(tables, obj, out _)?.GetID();
     }
+
+    // Amedo 2026-10-03
+    public static PS2AnyObject? GetRawObject(object tablesHandle, uint objectId) =>
+        tablesHandle is RmTables tables && tables.Objects.TryGetValue(objectId, out var obj) ? obj : null;
 
     public static List<ushort>? GetObjectOgiSlots(object tablesHandle, uint objectId) =>
         tablesHandle is RmTables tables && tables.Objects.TryGetValue(objectId, out var obj)
@@ -482,7 +576,7 @@ public static class MeshDecoder
 
     public static Texture2D? DecodeUiTexture(GL gl, Twinsanity.TwinsanityInterchange.Interfaces.ITwinPTC ptc) =>
         ptc.Texture is Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture tex
-            ? ChunkImporter.DecodeTexture(gl, tex)
+            ? ChunkImporter.DecodeTexture(gl, tex, false) // Amedo
             : null;
 
     public static List<Texture2D> DecodePsm(GL gl, Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSM psm) =>
@@ -595,16 +689,17 @@ public static class MeshDecoder
     }
 
 
-    public static List<(string Name, int TexturePage)> GetParticleSystemCatalog(PS2AnyTwinsanityRM2 rm2)
+    // Amedo 2026-09-26
+    public static List<(string Name, int TexturePage, SysVec4 Swatch)> GetParticleSystemCatalog(PS2AnyTwinsanityRM2 rm2)
     {
-        var result = new List<(string, int)>();
+        var result = new List<(string, int, SysVec4)>();
         var data = rm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData>((uint)Constants.LEVEL_PARTICLES_ITEM);
         if (data is null) return result;
         foreach (var sys in data.ParticleSystems)
         {
-            var name = new string(sys.Name).TrimEnd('\0', ' ');
+            var name = ParticleNames.Clean(sys.Name);
             if (string.IsNullOrWhiteSpace(name)) name = "(unnamed)";
-            result.Add((name, sys.UnkInt));
+            result.Add((name, sys.UnkInt, ParticleFx.DefFor(sys).Swatch));
         }
         return result.OrderBy(t => t.Item1, StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -614,12 +709,12 @@ public static class MeshDecoder
         var data = rm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData>((uint)Constants.LEVEL_PARTICLES_ITEM);
         if (data is null) return null;
         foreach (var sys in data.ParticleSystems)
-            if (string.Equals(new string(sys.Name).TrimEnd('\0', ' '), name, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ParticleNames.Clean(sys.Name), name, StringComparison.OrdinalIgnoreCase)) // Amedo 2026-09-26
                 return sys;
         return null;
     }
 
-    public readonly record struct ParticleTexturePage(Texture2D? Tex, int Width, int Height, List<(int X, int Y, int W, int H, float FillRatio)> Icons);
+    public readonly record struct ParticleTexturePage(Texture2D? Tex, int Width, int Height); // Amedo 2026-09-26
 
     public static ParticleTexturePage[] GetParticleTexturePages(GL gl, PS2AnyTwinsanityRM2 defaultRm2)
     {
@@ -635,139 +730,26 @@ public static class MeshDecoder
             for (int p = 0; p < 3; p++)
             {
                 if (tex.GetID() != data.TextureIDs[p]) continue;
-                var raw = DecodeRaw(tex);
-                var gpuTex = ChunkImporter.DecodeTexture(gl, tex);
-                var icons = raw is { } r ? SegmentSpriteIcons(r.rgba, r.w, r.h) : new List<(int, int, int, int, float)>();
-                result[p] = new ParticleTexturePage(gpuTex, raw?.w ?? 0, raw?.h ?? 0, icons);
+                var gpuTex = ChunkImporter.DecodeTexture(gl, tex, false); // Amedo
+                result[p] = new ParticleTexturePage(gpuTex, (int)(gpuTex?.Width ?? 0), (int)(gpuTex?.Height ?? 0));
             }
         }
         return result;
     }
 
-    private static readonly (int dx, int dy)[] NeighborOffsets = { (1, 0), (-1, 0), (0, 1), (0, -1) };
 
-    private static List<(int X, int Y, int W, int H, float FillRatio)> SegmentSpriteIcons(byte[] rgba, int w, int h)
+    // Amedo 2026-09-30
+    public static DecalAssets? GetDecalAssets(GL gl, PS2AnyTwinsanityRM2 defaultRm2)
     {
-        var visited = new bool[w * h];
-        var result = new List<(int, int, int, int, float)>();
-        bool IsFg(int x, int y) => rgba[(y * w + x) * 4 + 3] > 64;
-        var stack = new Stack<(int x, int y)>();
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
-        {
-            int idx = y * w + x;
-            if (visited[idx] || !IsFg(x, y)) continue;
-            int minX = x, maxX = x, minY = y, maxY = y;
-            int pixelCount = 1;
-            stack.Push((x, y));
-            visited[idx] = true;
-            while (stack.Count > 0)
-            {
-                var (cx, cy) = stack.Pop();
-                if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
-                if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
-                foreach (var (dx, dy) in NeighborOffsets)
-                {
-                    int nx = cx + dx, ny = cy + dy;
-                    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-                    int nidx = ny * w + nx;
-                    if (visited[nidx] || !IsFg(nx, ny)) continue;
-                    visited[nidx] = true;
-                    pixelCount++;
-                    stack.Push((nx, ny));
-                }
-            }
-            int bw = maxX - minX + 1, bh = maxY - minY + 1;
-            if (bw >= 4 && bh >= 4)
-                result.Add((minX, minY, bw, bh, pixelCount / (float)(bw * bh)));
-        }
-        return result.OrderByDescending(r => r.Item3 * r.Item4).ToList();
+        var data = defaultRm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2DefaultParticleData>((uint)Constants.LEVEL_PARTICLES_ITEM);
+        if (data is null) return null;
+        var assets = DecalAssets.From(data);
+        var texSec = defaultRm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION)
+                               ?.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
+        if (texSec is not null && texSec.ContainsItem(data.DecalTextureID) && texSec.GetItem<PS2AnyTexture>(data.DecalTextureID) is { } tex)
+            assets.Texture = ChunkImporter.DecodeTexture(gl, tex, false); // Amedo
+        return assets;
     }
-
-    public static List<(float T, SysVec4 Color)> GetColorGradient(Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem sys)
-    {
-        var stops = new List<(float, SysVec4)>();
-        foreach (var v in sys.UnkVecs)
-        {
-            bool allZero = v.X == 0 && v.Y == 0 && v.Z == 0 && v.W == 0;
-            if (allZero && stops.Count > 0) break;
-            stops.Add((v.X, new SysVec4(v.Y / 255f, v.Z / 255f, v.W / 255f, 1f)));
-        }
-        if (stops.Count == 0) stops.Add((0f, new SysVec4(1f, 1f, 1f, 1f)));
-        return stops;
-    }
-
-    public static SysVec4 SampleColorGradient(List<(float T, SysVec4 Color)> stops, float t)
-    {
-        if (stops.Count == 1) return stops[0].Color;
-        if (t <= stops[0].T) return stops[0].Color;
-        if (t >= stops[^1].T) return stops[^1].Color;
-        for (int i = 0; i < stops.Count - 1; i++)
-        {
-            var (t0, c0) = stops[i];
-            var (t1, c1) = stops[i + 1];
-            if (t >= t0 && t <= t1)
-            {
-                float span = t1 - t0;
-                float f = span > 0.0001f ? (t - t0) / span : 0f;
-                return SysVec4.Lerp(c0, c1, f);
-            }
-        }
-        return stops[^1].Color;
-    }
-
-    public static List<(float T, float Scale)> GetSizeGradient(Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem sys)
-    {
-        var raw = new List<float>();
-        foreach (var l in sys.UnkLongs1)
-        {
-            bool isZero = l == 0;
-            if (isZero && raw.Count > 0) break;
-            int lo = (int)(l & 0xFFFFFFFFL);
-            raw.Add(BitConverter.Int32BitsToSingle(lo));
-        }
-        if (raw.Count == 0) return new List<(float, float)> { (0f, 1f) };
-        if (raw.Count == 1) return new List<(float, float)> { (0f, raw[0]) };
-
-        var stops = new List<(float, float)>();
-        for (int i = 0; i < raw.Count; i++)
-            stops.Add((i / (float)(raw.Count - 1), raw[i]));
-        return stops;
-    }
-
-    public static float SampleSizeGradient(List<(float T, float Scale)> stops, float t)
-    {
-        if (stops.Count == 1) return stops[0].Scale;
-        if (t <= stops[0].T) return stops[0].Scale;
-        if (t >= stops[^1].T) return stops[^1].Scale;
-        for (int i = 0; i < stops.Count - 1; i++)
-        {
-            var (t0, s0) = stops[i];
-            var (t1, s1) = stops[i + 1];
-            if (t >= t0 && t <= t1)
-            {
-                float span = t1 - t0;
-                float f = span > 0.0001f ? (t - t0) / span : 0f;
-                return s0 + (s1 - s0) * f;
-            }
-        }
-        return stops[^1].Scale;
-    }
-
-    public static SysVec4 GuessParticleTint(string name)
-    {
-        var n = name.ToUpperInvariant();
-        if (n.Contains("NITRO") || n.Contains("SPARK"))              return new SysVec4(1.0f, 0.95f, 0.2f, 1f);
-        if (n.Contains("FIRE") || n.Contains("EXPLO"))                return new SysVec4(1.0f, 0.5f, 0.1f, 1f);
-        if (n.Contains("WATER"))                                     return new SysVec4(0.2f, 0.5f, 1.0f, 1f);
-        if (n.Contains("SMOKE"))                                     return new SysVec4(0.6f, 0.6f, 0.6f, 1f);
-        if (n.Contains("DUST"))                                      return new SysVec4(0.85f, 0.75f, 0.55f, 1f);
-        if (n.Contains("SNOW") || n.Contains("ICE"))                  return new SysVec4(0.7f, 0.9f, 1.0f, 1f);
-        if (n.Contains("SLIDE") || n.Contains("TRAIL"))               return new SysVec4(0.3f, 0.9f, 0.9f, 1f);
-        if (n.Contains("RING") || n.Contains("WORM"))                 return new SysVec4(0.7f, 0.3f, 0.9f, 1f);
-        return new SysVec4(0.85f, 0.85f, 0.85f, 1f);
-    }
-
 
     public static List<(uint Id, string Name)> GetObjectCatalogFromRaw(PS2AnyTwinsanityRM2 rm2)
     {
@@ -1057,7 +1039,7 @@ public static class MeshDecoder
         rec.ObjectWasNew = !objectAlreadyPresent;
 
         var modelById2 = BuildModelLookup(destGfx!);
-        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache)) destTables.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
         foreach (var kv in BuildSkinLookup(destGfx!, gl, destTexCache))             destTables.SkinGpu[kv.Key]  = kv.Value;
         foreach (var kv in BuildBlendSkinLookup(destGfx!, gl, destTexCache, destTables.BlendSkinRaw))
             destTables.BlendSkinGpu[kv.Key] = kv.Value;
@@ -1216,7 +1198,7 @@ public static class MeshDecoder
         }
 
         var modelById2 = BuildModelLookup(destGfx!);
-        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache)) destTables.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
         foreach (var kv in BuildSkinLookup(destGfx!, gl, destTexCache))             destTables.SkinGpu[kv.Key]  = kv.Value;
         foreach (var kv in BuildBlendSkinLookup(destGfx!, gl, destTexCache, destTables.BlendSkinRaw))
             destTables.BlendSkinGpu[kv.Key] = kv.Value;
@@ -1722,7 +1704,7 @@ public static class MeshDecoder
         }
 
         var modelById2 = BuildModelLookup(destGfx!);
-        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache)) destTables.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in BuildMeshLookup(destGfx!, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
         foreach (var kv in BuildSkinLookup(destGfx!, gl, destTexCache))             destTables.SkinGpu[kv.Key]  = kv.Value;
         foreach (var kv in BuildBlendSkinLookup(destGfx!, gl, destTexCache, destTables.BlendSkinRaw))
             destTables.BlendSkinGpu[kv.Key] = kv.Value;
@@ -2028,6 +2010,11 @@ public static class MeshDecoder
                             }
                             if (tex is not null) break;
                         }
+                        foreach (var sh in mat.Shaders.Skip(1)) // Amedo 2026-09-26
+                            if (!texCache.ContainsKey(sh.TextureId) && texSec?.GetItem<PS2AnyTexture>(sh.TextureId) is { } upperTex
+                                && ChunkImporter.DecodeTexture(gl, upperTex) is { } upperGpu)
+                                texCache[sh.TextureId] = upperGpu;
+                        RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
                     }
                     subMats.Add((tex, shader));
                 }
@@ -2571,6 +2558,16 @@ public static class MeshDecoder
         return dst;
     }
 
+    // Amedo 2026-10-02
+    private const int MaxImportSubModelVerts = 9000;
+
+    private static Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel NewImportSubModel() => new()
+    {
+        Vertexes = new List<TwinVec4>(), UVW = new List<TwinVec4>(), Colors = new List<TwinVec4>(),
+        Normals = new List<TwinVec4>(), EmitColor = new List<TwinVec4>(),
+        Connection = new List<bool>(), GroupSizes = new List<int>(), UnusedBlob = Array.Empty<byte>(),
+    };
+
     public static ExternalModelBakeRecord? BakeExternalModelAsObject(GL gl,
         PS2AnyTwinsanityRM2 destRm2, object destTablesHandle, Dictionary<uint, Texture2D> destTexCache,
         PS2AnyTwinsanityRM2? globalRm2, List<CrashEngine.Assets.RawSubmesh> submeshes, string objectName, out string log)
@@ -2666,6 +2663,7 @@ public static class MeshDecoder
                     Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE,
                     Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32);
                 destTexSec.AddItem(tex);
+                if (tw < raw.TexWidth || th < raw.TexHeight) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo 2026-10-02
                 var t2d = ChunkImporter.DecodeTexture(gl, tex);
                 if (t2d is not null) destTexCache[newTexId] = t2d;
                 texId = newTexId;
@@ -2683,6 +2681,7 @@ public static class MeshDecoder
                 mat.Shaders[0].ShaderType = raw.CeUnlit.Value ? TwinShader.Type.StandardUnlit : TwinShader.Type.StandardLit;
             if (raw.CeAlphaBlend.HasValue)
                 mat.Shaders[0].ABlending = raw.CeAlphaBlend.Value ? TwinShader.AlphaBlending.ON : TwinShader.AlphaBlending.OFF;
+            mat.Shaders[0].AlphaCorrectionValue = true; // Amedo
             mat.Shaders[0].XScrollSettings = TwinShader.XScrollFormula.Disabled;
             mat.Shaders[0].YScrollSettings = TwinShader.YScrollFormula.Disabled;
             mat.Shaders[0].UvScrollSpeed   = new TwinVec4(0f, 0f, 0f, 0f);
@@ -2690,17 +2689,20 @@ public static class MeshDecoder
             destMatSec.AddItem(mat);
             rec.MaterialIds.Add(newMatId); // Amedo 2026-09-20
 
-            var sub = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel
-            {
-                Vertexes = new List<TwinVec4>(), UVW = new List<TwinVec4>(), Colors = new List<TwinVec4>(),
-                Normals = new List<TwinVec4>(), EmitColor = new List<TwinVec4>(),
-                Connection = new List<bool>(), GroupSizes = new List<int>(), UnusedBlob = Array.Empty<byte>(),
-            };
+            var sub = NewImportSubModel(); // Amedo 2026-10-02
+            var subs = new List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> { sub };
 
             int triCount = raw.Indices.Length / 3;
             int inGroup = 0;
             for (int t = 0; t < triCount; t++)
             {
+                if (MaxImportSubModelVerts < sub.Vertexes.Count + 3) // Amedo 2026-10-02
+                {
+                    if (inGroup > 0) sub.GroupSizes.Add(inGroup);
+                    sub.Compile();
+                    subs.Add(sub = NewImportSubModel());
+                    inGroup = 0;
+                }
                 if (inGroup + 3 > 36) { sub.GroupSizes.Add(inGroup); inGroup = 0; }
                 for (int k = 0; k < 3; k++)
                 {
@@ -2722,14 +2724,14 @@ public static class MeshDecoder
             sub.Compile();
 
             var model = new PS2AnyModel();
-            model.SubModels.Add(sub);
+            model.SubModels.AddRange(subs); // Amedo 2026-10-02
             uint newModelId = NewGraphicsId(destModelSec);
             model.SetID(newModelId);
             destModelSec.AddItem(model);
             rec.ModelIds.Add(newModelId); // Amedo 2026-09-20
 
             var rm = new PS2AnyRigidModel { Model = newModelId };
-            rm.Materials.Add(newMatId);
+            foreach (var _ in subs) rm.Materials.Add(newMatId); // Amedo 2026-10-02
             uint newRmId = NewGraphicsId(destRmSec, destMeshSec);
             rm.SetID(newRmId);
             destRmSec.AddItem(rm);
@@ -2738,7 +2740,7 @@ public static class MeshDecoder
             rec.RigidModelIds.Add(newRmId); // Amedo 2026-09-20
 
             rec.SubmeshCount++;
-            rec.VertexCount += sub.Vertexes.Count;
+            rec.VertexCount += subs.Sum(x => x.Vertexes.Count); // Amedo 2026-10-02
         }
 
         if (rigidModelIds.Count == 0) { log = "no usable triangles found in the imported file"; return null; }
@@ -2778,7 +2780,7 @@ public static class MeshDecoder
         rec.OgiIds.Add(newOgiId); // Amedo 2026-09-20
 
         var modelById2 = BuildModelLookup(destGfx);
-        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache)) destTables.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
 
         log = $"baked {rec.SubmeshCount} submesh(es), {rec.VertexCount} vert(s) as new object 0x{newObjId:X4} " +
               $"(OGI 0x{newOgiId:X4}, +{rec.TextureCount} Texture) — real PS2 RigidModel/OGI/Object, not a preview. " +
@@ -2914,6 +2916,7 @@ public static class MeshDecoder
                     Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE,
                     Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32);
                 texSec.AddItem(tex);
+                if (tw < raw.TexWidth || th < raw.TexHeight) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo 2026-10-02
                 var t2d = ChunkImporter.DecodeTexture(gl, tex);
                 if (t2d is not null) destSceneryTexCache[newTexId] = t2d;
                 texId = newTexId;
@@ -2927,6 +2930,7 @@ public static class MeshDecoder
             mat.Shaders[0].TextureId = texId;
             if (raw.DiffusePixelsRGBA is not null)
                 mat.Shaders[0].TxtMapping = TwinShader.TextureMapping.ON;
+            mat.Shaders[0].AlphaCorrectionValue = true; // Amedo
             mat.Shaders[0].XScrollSettings = TwinShader.XScrollFormula.Disabled;
             mat.Shaders[0].YScrollSettings = TwinShader.YScrollFormula.Disabled;
             mat.Shaders[0].UvScrollSpeed   = new TwinVec4(0f, 0f, 0f, 0f);
@@ -2938,18 +2942,21 @@ public static class MeshDecoder
             matSec.AddItem(mat);
             rec.MaterialIds.Add(newMatId); // Amedo 2026-09-20
 
-            var sub = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel
-            {
-                Vertexes = new List<TwinVec4>(), UVW = new List<TwinVec4>(), Colors = new List<TwinVec4>(),
-                Normals = new List<TwinVec4>(), EmitColor = new List<TwinVec4>(),
-                Connection = new List<bool>(), GroupSizes = new List<int>(), UnusedBlob = Array.Empty<byte>(),
-            };
+            var sub = NewImportSubModel(); // Amedo 2026-10-02
+            var subs = new List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> { sub };
 
             var subMin = new SysVec3(float.MaxValue); var subMax = new SysVec3(float.MinValue);
             int triCount = raw.Indices.Length / 3;
             int inGroup = 0;
             for (int t = 0; t < triCount; t++)
             {
+                if (MaxImportSubModelVerts < sub.Vertexes.Count + 3) // Amedo 2026-10-02
+                {
+                    if (inGroup > 0) sub.GroupSizes.Add(inGroup);
+                    sub.Compile();
+                    subs.Add(sub = NewImportSubModel());
+                    inGroup = 0;
+                }
                 if (inGroup + 3 > 36) { sub.GroupSizes.Add(inGroup); inGroup = 0; }
                 for (int k = 0; k < 3; k++)
                 {
@@ -2970,11 +2977,11 @@ public static class MeshDecoder
             if (inGroup > 0) sub.GroupSizes.Add(inGroup);
             sub.Compile();
 
-            model.SubModels.Add(sub);
-            rm.Materials.Add(newMatId);
+            model.SubModels.AddRange(subs); // Amedo 2026-10-02
+            foreach (var _ in subs) rm.Materials.Add(newMatId);
             combMin = SysVec3.Min(combMin, subMin); combMax = SysVec3.Max(combMax, subMax);
             rec.SubmeshCount++;
-            rec.VertexCount += sub.Vertexes.Count;
+            rec.VertexCount += subs.Sum(x => x.Vertexes.Count); // Amedo 2026-10-02
         }
 
         if (rec.SubmeshCount == 0) { log = "no usable triangles found in the imported file"; return null; }
@@ -3164,7 +3171,7 @@ public static class MeshDecoder
         rec.ObjectId = newObjId;
 
         var modelById2 = BuildModelLookup(destGfx);
-        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache)) destTables.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
 
         log = $"reused real scenery mesh 0x{meshId:X} as new object 0x{newObjId:X4} (OGI 0x{newOgiId:X4}, " +
               $"+1 Model, +{matIdMap.Count} Material, +{rec.TextureCount} Texture) — same compiled geometry, " +
@@ -3351,7 +3358,7 @@ public static class MeshDecoder
                 if (!meshById.TryGetValue(meshId, out var entry)) continue;
                 foreach (var (gpuMesh, mat) in entry)
                 {
-                    mat.FogEnabled = false;
+                    mat.FogEnabled = true; // Amedo 2026-09-26
                     mat.DepthWrite = false;
                     RenderPipeline.SkydomeDraws.Add((gpuMesh, mat));
                 }
@@ -3384,7 +3391,17 @@ public static class MeshDecoder
             slotSpecs.Add((i, animId, animItem, slotOgi));
         }
 
-        AnimatedObject? animObj = slotSpecs.Count > 0 ? e.Add(new AnimatedObject()) : null;
+        var modelSpecs = new List<(int Index, PS2AnyOGI Ogi)>(); // Amedo 2026-09-28
+        for (int i = 0; i < obj.OGISlots.Count; i++)
+        {
+            if (slotSpecs.Any(s => s.Index == i)) continue;
+            ushort modelOgiId = obj.OGISlots[i];
+            if (modelOgiId == 0xFFFF || !tables.OGIs.TryGetValue(modelOgiId, out var modelOgi)) continue;
+            modelSpecs.Add((i, modelOgi));
+        }
+        bool anyOtherModel = modelSpecs.Any(m => !ReferenceEquals(m.Ogi, defaultOgi));
+
+        AnimatedObject? animObj = slotSpecs.Count > 0 || anyOtherModel ? e.Add(new AnimatedObject { ReactSlots = obj.ReactJointAmount }) : null; // Amedo
         bool hadAnim = animObj is not null;
 
         AnimatedObject.SlotGroup? defaultGroup = null;
@@ -3427,6 +3444,24 @@ public static class MeshDecoder
             group.AnimId    = animId;
             group.Anim      = animItem;
             animObj.Groups.Add(group);
+        }
+        foreach (var (index, modelOgi) in modelSpecs) // Amedo 2026-09-28
+        {
+            AnimatedObject.SlotGroup model;
+            if (defaultGroup is not null && ReferenceEquals(modelOgi, defaultOgi))
+                model = new AnimatedObject.SlotGroup { Ogi = modelOgi, MeshRoot = defaultGroup.MeshRoot };
+            else
+            {
+                anyAlt = true;
+                var modelRoot = NewChild(e, $"{e.Name}_model{index}");
+                modelRoot.Active = false;
+                var (attached, morphs) = EmitOgiMeshEntities(gl, tables, modelRoot, BuildOgiMeshes(tables, modelOgi), modelOgi, animObj);
+                model = new AnimatedObject.SlotGroup { Ogi = modelOgi, MeshRoot = modelRoot };
+                model.AttachedRigidParts.AddRange(attached);
+                model.MorphMeshes.AddRange(morphs);
+            }
+            model.SlotIndex = (ushort)index;
+            animObj.ModelGroups.Add(model);
         }
         return (hadMesh, hadAnim, anyAlt);
     }
@@ -3538,7 +3573,7 @@ public static class MeshDecoder
         if (verts.Count < 3) return null;
 
         var idx  = Enumerable.Range(0, verts.Count).Select(i => (uint)i).ToArray();
-        var mesh = new GpuMesh(gl, verts.ToArray(), idx);
+        var mesh = GpuMesh.FromOwned(gl, verts.ToArray(), idx); // Amedo 2026-09-29
 
         var localCenter = verts.Aggregate(SysVec3.Zero, (acc, v) => acc + v.Position) / verts.Count;
         var mat = new Material
@@ -3597,7 +3632,7 @@ public static class MeshDecoder
                         if (!meshById.TryGetValue(meshId, out var entry)) continue;
                         foreach (var (gpuMesh, mat) in entry)
                         {
-                            mat.FogEnabled = false;
+                            mat.FogEnabled = true; // Amedo 2026-09-26
                             mat.DepthWrite = false;
                             RenderPipeline.SkydomeDraws.Add((gpuMesh, mat));
                         }
@@ -3606,8 +3641,29 @@ public static class MeshDecoder
                 }
             }
         }
+        else if (gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION) is { } ownSky) // Amedo 2026-09-29
+        {
+            var set = sceneryEnt.Get<SkydomeSet>() ?? sceneryEnt.Add(new SkydomeSet());
+            set.Draws.Clear();
+            for (int i = 0; i < ownSky.GetItemsAmount(); i++)
+            {
+                if (ownSky.GetItem(i) is not PS2AnySkydome sky) continue;
+                var draws = new List<(GpuMesh, Material)>();
+                foreach (var meshId in sky.Meshes)
+                {
+                    if (!meshById.TryGetValue(meshId, out var entry)) continue;
+                    foreach (var (gpuMesh, mat) in entry)
+                    {
+                        mat.FogEnabled = true;
+                        mat.DepthWrite = false;
+                        draws.Add((gpuMesh, mat));
+                    }
+                }
+                set.Draws[sky.GetID()] = draws;
+            }
+        }
 
-        var dyn = sm2.GetItem<PS2AnyDynamicScenery>((uint)Constants.SCENERY_DYNAMIC_SECENERY_ITEM);
+        var dyn =sm2.GetItem<PS2AnyDynamicScenery>((uint)Constants.SCENERY_DYNAMIC_SECENERY_ITEM);
         if (dyn is not null)
         {
             var dynEnt = new Entity("DynamicScenery");
@@ -3615,10 +3671,10 @@ public static class MeshDecoder
             foreach (var model in dyn.DynamicModels)
             {
                 if (!meshById.TryGetValue(model.MeshID, out var entry)) continue;
-                var (pos, rot) = Frame0Transform(model.Animation);
                 var ent = new Entity($"dyn_{model.MeshID:X8}");
-                ent.Transform.Position = pos;
-                ent.Transform.Rotation = rot;
+                var animator = new DynamicSceneryAnimator(model.Animation, model.AnimatedFrames) { Model = model }; // Amedo 2026-10-06
+                ent.Add(animator);
+                animator.Apply();
                 foreach (var (gpuMesh, mat) in entry)
                 {
                     var child = new Entity($"dynm_{model.MeshID:X8}");
@@ -3728,18 +3784,71 @@ public static class MeshDecoder
 
         public Dictionary<uint, (Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinBlendSkin Blend,
             List<(Texture2D? Tex, TwinShader? Shader)> SubMats)> BlendSkinRaw = new();
+
+        public RmTables? GlobalPart; // Amedo 2026-09-29
+        public PS2AnyTwinsanityRM2? GlobalSource;
+        public HashSet<uint>? GlobalMissingTextures;
+        public bool GlobalShareable;
     }
 
     private static RmTables BuildLookupTables(GL gl,
                                               PS2AnyTwinsanityRM2 rm2,
                                               Dictionary<uint, Texture2D> texCache,
-                                              PS2AnyTwinsanityRM2? globalRm2 = null)
+                                              PS2AnyTwinsanityRM2? globalRm2 = null,
+                                              ICollection<uint>? globalTextureIds = null, // Amedo 2026-09-29
+                                              RmTables? shared = null)
     {
         var tables = new RmTables();
-        if (globalRm2 is not null) AddRm2ToTables(gl, globalRm2, texCache, tables);
+        if (globalRm2 is not null) // Amedo 2026-09-29
+        {
+            if (shared is { GlobalPart: { } part, GlobalShareable: true, GlobalMissingTextures: { } missing } &&
+                ReferenceEquals(shared.GlobalSource, globalRm2) && !missing.Overlaps(texCache.Keys))
+            {
+                Console.WriteLine("[MeshDecoder] Default.rm2 models: shared (decoded once)");
+            }
+            else
+            {
+                part = new RmTables();
+                AddRm2ToTables(gl, globalRm2, texCache, part);
+                missing = ReferencedTextures(globalRm2);
+                if (globalTextureIds is not null) missing.ExceptWith(globalTextureIds);
+                bool shareable = globalTextureIds is not null && !missing.Overlaps(texCache.Keys);
+                Console.WriteLine($"[MeshDecoder] Default.rm2 models: decoded ({missing.Count} texture ids missing from Default.rm2, shareable {shareable})");
+                shared = new RmTables { GlobalPart = part, GlobalSource = globalRm2, GlobalMissingTextures = missing, GlobalShareable = shareable };
+            }
+            tables.GlobalPart = shared.GlobalPart;
+            tables.GlobalSource = shared.GlobalSource;
+            tables.GlobalMissingTextures = shared.GlobalMissingTextures;
+            tables.GlobalShareable = shared.GlobalShareable;
+            CopyTables(part, tables);
+        }
         AddRm2ToTables(gl, rm2, texCache, tables);
         Console.WriteLine($"[MeshDecoder] Skins decoded: {tables.SkinGpu.Count}");
         return tables;
+    }
+
+    // Amedo 2026-09-29
+    private static void CopyTables(RmTables from, RmTables to)
+    {
+        foreach (var kv in from.Objects) to.Objects[kv.Key] = kv.Value;
+        foreach (var kv in from.OGIs) to.OGIs[kv.Key] = kv.Value;
+        foreach (var kv in from.RigidModels) to.RigidModels[kv.Key] = kv.Value;
+        foreach (var kv in from.Animations) to.Animations[kv.Key] = kv.Value;
+        foreach (var kv in from.Models) to.Models[kv.Key] = kv.Value;
+        foreach (var kv in from.ModelGpu) to.ModelGpu[kv.Key] = kv.Value;
+        foreach (var kv in from.SkinGpu) to.SkinGpu[kv.Key] = kv.Value;
+        foreach (var kv in from.BlendSkinGpu) to.BlendSkinGpu[kv.Key] = kv.Value;
+        foreach (var kv in from.BlendSkinRaw) to.BlendSkinRaw[kv.Key] = kv.Value;
+    }
+
+    // Amedo 2026-09-29
+    private static HashSet<uint> ReferencedTextures(PS2AnyTwinsanityRM2 rm2)
+    {
+        var ids = new HashSet<uint>();
+        if (rm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION) is { } gfx)
+            foreach (var mat in BuildMaterialLookup(gfx).Values)
+                foreach (var sh in mat.Shaders) ids.Add(sh.TextureId);
+        return ids;
     }
 
     private static void AddRm2ToTables(GL gl, PS2AnyTwinsanityRM2 rm2,
@@ -3764,7 +3873,7 @@ public static class MeshDecoder
 
             var modelById = BuildModelLookup(gfx);
             foreach (var kv in modelById) tables.Models[kv.Key] = kv.Value;
-            foreach (var kv in BuildMeshLookup(gfx, modelById, gl, texCache)) tables.ModelGpu[kv.Key]     = kv.Value;
+            foreach (var kv in BuildMeshLookup(gfx, modelById, gl, texCache, tables.GlobalSource)) tables.ModelGpu[kv.Key]     = kv.Value; // Amedo
             foreach (var kv in BuildSkinLookup(gfx, gl, texCache))            tables.SkinGpu[kv.Key]      = kv.Value;
             foreach (var kv in BuildBlendSkinLookup(gfx, gl, texCache, tables.BlendSkinRaw)) tables.BlendSkinGpu[kv.Key] = kv.Value;
         }
@@ -3827,11 +3936,14 @@ public static class MeshDecoder
         Texture2D?  tex    = null;
         TwinShader? shader = null;
         if (materialsById.TryGetValue(matId, out var mat))
+        {
             foreach (var sh in mat.Shaders)
             {
                 shader ??= sh;
                 if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null) break;
             }
+            RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
+        }
         return (tex, shader);
     }
 
@@ -3877,10 +3989,13 @@ public static class MeshDecoder
         PS2AnyGraphicsSection gfx,
         Dictionary<uint, ITwinModel> modelById,
         GL gl,
-        Dictionary<uint, Texture2D> texCache)
+        Dictionary<uint, Texture2D> texCache,
+        PS2AnyTwinsanityRM2? globalRm2 = null) // Amedo
     {
         var result = new Dictionary<uint, List<(GpuMesh, Material)>>();
         var materialsById = BuildMaterialLookup(gfx);
+        if (globalRm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION) is { } globalGfx && !ReferenceEquals(globalGfx, gfx)) // Amedo
+            foreach (var kv in BuildMaterialLookup(globalGfx)) materialsById.TryAdd(kv.Key, kv.Value);
 
         DecodeMeshSection(gfx, (uint)Constants.GRAPHICS_MESHES_SECTION,
                           modelById, gl, texCache, materialsById, result);
@@ -3922,6 +4037,7 @@ public static class MeshDecoder
                         if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null)
                             break;
                     }
+                    RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
                 }
                 subMats.Add((tex, shader));
             }
@@ -3958,10 +4074,7 @@ public static class MeshDecoder
 
         if (ogi.BlendSkinID != 0 && tables.BlendSkinGpu.TryGetValue(ogi.BlendSkinID, out var blendMeshes))
             foreach (var (mesh, mat) in blendMeshes)
-            {
-                mat.AlwaysOnTop = true;
-                result.Add((mesh, mat, Matrix4x4.Identity, true, true, -1));
-            }
+                result.Add((mesh, mat, Matrix4x4.Identity, true, true, -1)); // Amedo
 
         return result;
     }
@@ -4006,8 +4119,7 @@ public static class MeshDecoder
         {
             foreach (var mm in DecodeBlendSkinMorph(gl, raw.Blend, raw.SubMats))
             {
-                mm.Mat.AlwaysOnTop = true;
-                morphs.Add(mm);
+                morphs.Add(mm); // Amedo
 
                 var child = new Entity($"{parent.Name}_face");
                 var mr = child.Add(new MeshRenderer { Mesh = mm.Mesh, Material = mm.Mat, IsSkinned = true });
@@ -4024,99 +4136,376 @@ public static class MeshDecoder
         var world = new Dictionary<int, Matrix4x4>();
         if (ogi.Joints.Count == 0) return world;
 
-        world[ogi.Joints[0].Index] = Matrix4x4.Identity;
+        world[ogi.Joints[0].Index] = BindLocal(ogi.Joints[0]); // Amedo 2026-09-26
         for (int i = 1; i < ogi.Joints.Count; i++)
         {
             var j = ogi.Joints[i];
-            var q = new Quaternion(j.LocalRotation.X, j.LocalRotation.Y, j.LocalRotation.Z, j.LocalRotation.W);
-            var local = Matrix4x4.CreateFromQuaternion(q) *
-                        Matrix4x4.CreateTranslation(j.LocalTranslation.X, j.LocalTranslation.Y, j.LocalTranslation.Z);
+            var local = BindLocal(j); // Amedo 2026-09-26
             var parent = world.TryGetValue(j.ParentIndex, out var pw) ? pw : Matrix4x4.Identity;
             world[j.Index] = local * parent;
         }
         return world;
     }
 
+    // Amedo 2026-09-26
+    private static Matrix4x4 BindLocal(Twinsanity.TwinsanityInterchange.Common.TwinJoint j)
+    {
+        var q = new Quaternion(j.LocalRotation.X, j.LocalRotation.Y, j.LocalRotation.Z, j.LocalRotation.W);
+        return Matrix4x4.CreateFromQuaternion(q) *
+               Matrix4x4.CreateTranslation(j.LocalTranslation.X, j.LocalTranslation.Y, j.LocalTranslation.Z);
+    }
 
-    public static Matrix4x4[] SampleAnimationPose(PS2AnyOGI ogi, TwinAnimation anim, float frameF)
-        => SampleAnimationPose(ogi, anim, frameF, out _);
 
+    public static Matrix4x4[] SampleAnimationPose(PS2AnyOGI ogi, TwinAnimation anim, float frameF, bool loop = false) // Amedo 2026-09-26
+        => SampleAnimationPose(ogi, anim, frameF, out _, loop);
+
+    // Amedo 2026-09-26
     public static Matrix4x4[] SampleAnimationPose(PS2AnyOGI ogi, TwinAnimation anim, float frameF,
+        out Dictionary<int, Matrix4x4> jointWorlds, bool loop = false)
+    {
+        if (SampleLocalPose(ogi, anim, frameF, loop) is not { } pose)
+        {
+            jointWorlds = new Dictionary<int, Matrix4x4>();
+            return IdentityBones();
+        }
+        return ComposePose(ogi, pose, out jointWorlds);
+    }
+
+    // Amedo 2026-09-26
+    public static Matrix4x4[] SampleBlendedPose(PS2AnyOGI ogi,
+        TwinAnimation from, float fromFrame, bool fromLoop,
+        TwinAnimation to, float toFrame, bool toLoop, float weight,
         out Dictionary<int, Matrix4x4> jointWorlds)
     {
-        var bones = new Matrix4x4[RenderPipeline.MaxBones];
-        for (int i = 0; i < bones.Length; i++) bones[i] = Matrix4x4.Identity;
-        jointWorlds = new Dictionary<int, Matrix4x4>();
-        if (ogi.Joints.Count == 0 || anim.JointSettings.Count == 0 || anim.AnimatedTransformations.Count == 0)
-            return bones;
+        var a = SampleLocalPose(ogi, from, fromFrame, fromLoop);
+        var b = SampleLocalPose(ogi, to, toFrame, toLoop);
+        if (a is null || b is null) return SampleAnimationPose(ogi, to, toFrame, out jointWorlds, toLoop);
+        for (int i = 0; i < b.Length; i++)
+        {
+            b[i].Translate = a[i].Translate + (b[i].Translate - a[i].Translate) * weight;
+            b[i].Scale     = a[i].Scale + (b[i].Scale - a[i].Scale) * weight;
+            b[i].Rot       = GameSlerp(a[i].Rot, b[i].Rot, weight);
+        }
+        return ComposePose(ogi, b, out jointWorlds);
+    }
 
-        var bindWorld = ComputeJointWorlds(ogi);
+    // Amedo 2026-09-27
+    public readonly record struct PoseLayer(TwinAnimation? Anim, int F0, int F1, float Frac, float Weight);
 
-        int lastFrame = anim.AnimatedTransformations.Count - 1;
-        frameF = Math.Clamp(frameF, 0, lastFrame);
-        int f0 = (int)MathF.Floor(frameF);
-        int f1 = Math.Min(f0 + 1, lastFrame);
-        float t = frameF - f0;
+    // Amedo 2026-09-28
+    public interface IJointControllers
+    {
+        void Rotate(int reactId, ref Quaternion rot, bool hasRotation);
+        bool Transform(int reactId, ref Matrix4x4 model);
+    }
 
-        int jn = Math.Min(anim.JointSettings.Count, ogi.Joints.Count);
+    // Amedo 2026-10-02
+    public interface IJointBasis
+    {
+        bool WantsPreWorld(int reactId, out Quaternion rotBefore);
+        void PreWorld(int reactId, in Matrix4x4 world);
+    }
 
-        var rawScale  = new Dictionary<int, SysVec3> { [ogi.Joints[0].Index] = SysVec3.One };
-        var animWorld = new Dictionary<int, Matrix4x4> { [ogi.Joints[0].Index] = Matrix4x4.Identity };
+    // Amedo
+    public interface IJointPoser
+    {
+        bool Pose(int reactId, int joint, ref SysVec3 translate, ref Quaternion rot, ref int flags, in Matrix4x4 current, in Matrix4x4 parent, bool hasParent);
+    }
 
-        for (int i = 1; i < ogi.Joints.Count; i++)
+    // Amedo 2026-09-27
+    public static Matrix4x4[] SampleLayeredPose(PS2AnyOGI ogi, IReadOnlyList<PoseLayer> layers, out Dictionary<int, Matrix4x4> jointWorlds,
+                                                IJointControllers? controllers = null, // Amedo 2026-09-28
+                                                PoseBuffers? buffers = null, // Amedo 2026-09-29
+                                                int reactSlots = 0xFF) // Amedo
+    {
+        int n = ogi.Joints.Count; // Amedo 2026-09-29
+        var bind = Bind(ogi); // Amedo
+        var pose = buffers is null ? new JointPose[n] : buffers.Pose.Length == n ? buffers.Pose : buffers.Pose = new JointPose[n];
+        for (int i = 0; i < ogi.Joints.Count; i++)
         {
             var j = ogi.Joints[i];
-            Matrix4x4 local;
-            SysVec3   jointRawScale;
-
-            if (i < jn)
+            var bindT = new SysVec3(j.LocalTranslation.X, j.LocalTranslation.Y, j.LocalTranslation.Z);
+            var bindR = new Quaternion(j.LocalRotation.X, j.LocalRotation.Y, j.LocalRotation.Z, j.LocalRotation.W);
+            int flags = 0;
+            SysVec3 t = bindT, s = SysVec3.One;
+            Quaternion r = bindR;
+            for (int li = 0; li < layers.Count; li++) // Amedo 2026-09-29
             {
-                var (translate, rot, scale) = SampleJointTRS(anim, anim.JointSettings[i], f0, f1, t, j.AdditionalAnimationRotation);
-                jointRawScale = scale;
+                var layer = layers[li];
+                SysVec3 lt = bindT, ls = SysVec3.One;
+                Quaternion lr = bindR;
+                if (layer.Anim is { } a && i < a.JointSettings.Count && a.AnimatedTransformations.Count > 0)
+                {
+                    var js = a.JointSettings[i];
+                    (lt, lr, ls) = SampleJointTRS(a, js, layer.F0, layer.F1, layer.Frac, j.AdditionalAnimationRotation);
+                    if (js.UseParentJointScale) flags |= 8;
+                }
+                if (1f <= layer.Weight)
+                {
+                    r = lr;
+                    t = lt;
+                    s = ls;
+                }
+                else
+                {
+                    r = GameSlerp((flags & 1) != 0 ? r : bindR, lr, layer.Weight);
+                    var ps = (flags & 4) != 0 ? s : SysVec3.One;
+                    s = ps + (ls - ps) * layer.Weight;
+                    var pt = (flags & 2) != 0 ? t : bindT;
+                    t = pt + (lt - pt) * layer.Weight;
+                }
+                flags |= 7;
+            }
+            if (controllers is not null && ReactJoint_2952A0(ogi, bind, i, reactSlots)) controllers.Rotate(j.ReactId, ref r, (flags & 1) != 0); // Amedo
+            pose[i] = new JointPose { Translate = t, Rot = r, Scale = s, UseParentScale = (flags & 8) != 0, Flags = flags & 7 }; // Amedo
+        }
+        return ComposePose(ogi, pose, out jointWorlds, controllers, buffers, reactSlots);
+    }
 
-                var effScale = scale;
-                if (anim.JointSettings[i].UseParentJointScale && rawScale.TryGetValue(j.ParentIndex, out var pScale))
-                    effScale = new SysVec3(
-                        pScale.X != 0f ? scale.X / pScale.X : scale.X,
-                        pScale.Y != 0f ? scale.Y / pScale.Y : scale.Y,
-                        pScale.Z != 0f ? scale.Z / pScale.Z : scale.Z);
+    // Amedo
+    public static int JointIndexByID_2989E8(PS2AnyOGI ogi, int reactId)
+    {
+        for (int i = 0; i < ogi.Joints.Count; i++)
+            if (ogi.Joints[i].ReactId == (reactId & 0xFF)) return i;
+        return 0xFF;
+    }
 
-                local = Matrix4x4.CreateScale(effScale) * rot * Matrix4x4.CreateTranslation(translate);
+    // Amedo
+    private static bool ReactJoint_2952A0(PS2AnyOGI ogi, BindData bind, int joint, int reactSlots)
+    {
+        int react = ogi.Joints[joint].ReactId;
+        return react < Math.Min((int)ogi.HeaderReactJointAmount, reactSlots) && bind.ReactFirst[joint];
+    }
+
+    // Amedo 2026-09-29
+    public sealed class PoseBuffers
+    {
+        internal readonly Matrix4x4[] Bones = new Matrix4x4[RenderPipeline.MaxBones];
+        internal readonly Dictionary<int, Matrix4x4> Worlds = new();
+        internal readonly Dictionary<int, SysVec3> RawScale = new();
+        internal JointPose[] Pose = [];
+        internal readonly List<PoseLayer> Layers = new();
+    }
+
+    // Amedo 2026-09-29
+    private sealed class BindData
+    {
+        public Matrix4x4[] Inverse = [];
+        public bool[] HasInverse = [];
+        public bool[] ReactFirst = []; // Amedo
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PS2AnyOGI, BindData> Binds = new(); // Amedo 2026-09-29
+
+    // Amedo 2026-09-29
+    private static BindData Bind(PS2AnyOGI ogi) => Binds.GetValue(ogi, o =>
+    {
+        var world = ComputeJointWorlds(o);
+        var data = new BindData { Inverse = new Matrix4x4[o.Joints.Count], HasInverse = new bool[o.Joints.Count], ReactFirst = new bool[o.Joints.Count] };
+        for (int i = 0; i < o.Joints.Count; i++) data.ReactFirst[i] = JointIndexByID_2989E8(o, o.Joints[i].ReactId) == i; // Amedo
+        for (int i = 0; i < o.Joints.Count; i++)
+            if (world.TryGetValue(o.Joints[i].Index, out var bw) && Matrix4x4.Invert(bw, out var inv))
+            {
+                data.Inverse[i] = inv;
+                data.HasInverse[i] = true;
+            }
+        return data;
+    });
+
+    public static int Cvt(float f) => // Amedo 2026-09-27
+        float.IsNaN(f) ? 0 : 2147483520f <= f ? int.MaxValue : f <= -2147483648f ? int.MinValue : (int)f;
+
+    // Amedo 2026-09-26
+    internal struct JointPose // Amedo 2026-09-29 internal
+    {
+        public SysVec3 Translate;
+        public Quaternion Rot;
+        public SysVec3 Scale;
+        public bool UseParentScale;
+        public int Flags; // Amedo
+    }
+
+    // Amedo 2026-09-26
+    private static JointPose[]? SampleLocalPose(PS2AnyOGI ogi, TwinAnimation anim, float frameF, bool loop)
+    {
+        if (ogi.Joints.Count == 0 || anim.JointSettings.Count == 0 || anim.AnimatedTransformations.Count == 0)
+            return null;
+
+        var (f0, f1, t) = AnimFramePair(anim.AnimatedTransformations.Count, frameF, loop);
+        var pose = new JointPose[ogi.Joints.Count];
+        for (int i = 0; i < ogi.Joints.Count; i++)
+        {
+            var j = ogi.Joints[i];
+            if (i < anim.JointSettings.Count)
+            {
+                var js = anim.JointSettings[i];
+                var (translate, rot, scale) = SampleJointTRS(anim, js, f0, f1, t, j.AdditionalAnimationRotation);
+                pose[i] = new JointPose { Translate = translate, Rot = rot, Scale = scale, UseParentScale = js.UseParentJointScale };
             }
             else
             {
-                local = Matrix4x4.Identity;
-                jointRawScale = SysVec3.One;
+                pose[i] = new JointPose
+                {
+                    Translate = new SysVec3(j.LocalTranslation.X, j.LocalTranslation.Y, j.LocalTranslation.Z),
+                    Rot       = new Quaternion(j.LocalRotation.X, j.LocalRotation.Y, j.LocalRotation.Z, j.LocalRotation.W),
+                    Scale     = SysVec3.One,
+                };
             }
+        }
+        return pose;
+    }
 
-            rawScale[j.Index] = jointRawScale;
-            var parent = animWorld.TryGetValue(j.ParentIndex, out var pw) ? pw : Matrix4x4.Identity;
-            animWorld[j.Index] = local * parent;
+    // Amedo 2026-09-26
+    private static Matrix4x4[] ComposePose(PS2AnyOGI ogi, JointPose[] pose, out Dictionary<int, Matrix4x4> jointWorlds,
+                                           IJointControllers? controllers = null, // Amedo 2026-09-28
+                                           PoseBuffers? buffers = null, // Amedo 2026-09-29
+                                           int reactSlots = 0xFF) // Amedo
+    {
+        Matrix4x4[] bones;
+        Dictionary<int, SysVec3> rawScale;
+        Dictionary<int, Matrix4x4> animWorld;
+        if (buffers is null)
+        {
+            bones     = IdentityBones();
+            rawScale  = new Dictionary<int, SysVec3>();
+            animWorld = new Dictionary<int, Matrix4x4>();
+        }
+        else
+        {
+            bones = buffers.Bones;
+            Array.Fill(bones, Matrix4x4.Identity);
+            rawScale = buffers.RawScale;
+            rawScale.Clear();
+            animWorld = buffers.Worlds;
+            animWorld.Clear();
+        }
+        var bind = Bind(ogi);
+
+        for (int i = 0; i < ogi.Joints.Count; i++)
+        {
+            var j = ogi.Joints[i];
+            var p = pose[i];
+            bool hasParent = i > 0 && animWorld.ContainsKey(j.ParentIndex);
+            var local = Matrix4x4.CreateScale(p.Scale) * Matrix4x4.CreateFromQuaternion(p.Rot);
+            if (p.UseParentScale && hasParent && rawScale.TryGetValue(j.ParentIndex, out var ps))
+                local *= Matrix4x4.CreateScale(VuRcp(ps.X), VuRcp(ps.Y), VuRcp(ps.Z));
+            local.Translation = p.Translate;
+
+            rawScale[j.Index]  = p.Scale;
+            var world = hasParent ? local * animWorld[j.ParentIndex] : local; // Amedo 2026-09-28
+            bool react = controllers is not null && ReactJoint_2952A0(ogi, bind, i, reactSlots); // Amedo
+            if (react && controllers is IJointPoser poser) // Amedo
+            {
+                var parent = hasParent ? animWorld[j.ParentIndex] : Matrix4x4.Identity;
+                var t = p.Translate;
+                var r = p.Rot;
+                int f = p.Flags;
+                if (poser.Pose(j.ReactId, i, ref t, ref r, ref f, world, parent, hasParent))
+                {
+                    p.Translate = t;
+                    p.Rot = r;
+                    p.Flags = f;
+                    pose[i] = p;
+                    local = Matrix4x4.CreateScale(p.Scale) * Matrix4x4.CreateFromQuaternion(p.Rot);
+                    if (p.UseParentScale && hasParent && rawScale.TryGetValue(j.ParentIndex, out var ps2))
+                        local *= Matrix4x4.CreateScale(VuRcp(ps2.X), VuRcp(ps2.Y), VuRcp(ps2.Z));
+                    local.Translation = p.Translate;
+                    world = hasParent ? local * parent : local;
+                }
+            }
+            if (react && controllers is IJointBasis basis && basis.WantsPreWorld(j.ReactId, out var before)) // Amedo
+            {
+                var pre = Matrix4x4.CreateScale(p.Scale) * Matrix4x4.CreateFromQuaternion(before);
+                if (p.UseParentScale && hasParent && rawScale.TryGetValue(j.ParentIndex, out var pps))
+                    pre *= Matrix4x4.CreateScale(VuRcp(pps.X), VuRcp(pps.Y), VuRcp(pps.Z));
+                pre.Translation = p.Translate;
+                basis.PreWorld(j.ReactId, hasParent ? pre * animWorld[j.ParentIndex] : pre);
+            }
+            if (react) controllers!.Transform(j.ReactId, ref world); // Amedo
+            animWorld[j.Index] = world;
         }
 
-        foreach (var j in ogi.Joints)
+        for (int i = 0; i < ogi.Joints.Count; i++) // Amedo 2026-09-29
         {
+            var j = ogi.Joints[i];
             if (j.Index < 0 || j.Index >= RenderPipeline.MaxBones) continue;
-            if (!bindWorld.TryGetValue(j.Index, out var bw)) continue;
-            if (!Matrix4x4.Invert(bw, out var invBind)) continue;
-            var aw = animWorld.TryGetValue(j.Index, out var awv) ? awv : bw;
-            bones[j.Index] = invBind * aw;
+            if (!bind.HasInverse[i]) continue;
+            bones[j.Index] = bind.Inverse[i] * animWorld[j.Index];
         }
         jointWorlds = animWorld;
         return bones;
     }
 
-    public static float[] SampleFacialWeights(TwinMorphAnimation facialAnim, float frameF)
+    // Amedo 2026-09-26
+    private static Matrix4x4[] IdentityBones()
+    {
+        var bones = new Matrix4x4[RenderPipeline.MaxBones];
+        for (int i = 0; i < bones.Length; i++) bones[i] = Matrix4x4.Identity;
+        return bones;
+    }
+
+    // Amedo 2026-09-26
+    private static Quaternion GameSlerp(Quaternion a, Quaternion b, float t)
+    {
+        float dot = Quaternion.Dot(a, b);
+        if (dot < 0f)
+        {
+            dot = -dot;
+            b   = Quaternion.Negate(b);
+        }
+        float s0, s1;
+        if (dot >= 0.999f)
+        {
+            s0 = 1f - t;
+            s1 = t;
+        }
+        else
+        {
+            float theta = MathF.Acos(dot), inv = 1f / MathF.Sin(theta);
+            s0 = MathF.Sin((1f - t) * theta) * inv;
+            s1 = MathF.Sin(t * theta) * inv;
+        }
+        return new Quaternion(a.X * s0 + b.X * s1, a.Y * s0 + b.Y * s1, a.Z * s0 + b.Z * s1, a.W * s0 + b.W * s1);
+    }
+
+    // Amedo 2026-09-26
+    private static (int F0, int F1, float T) AnimFramePair(int frames, float frameF, bool loop)
+    {
+        int last = frames - 1;
+        if (loop && frames > 1)
+        {
+            frameF %= frames;
+            if (frameF < 0f) frameF += frames;
+            if (frameF >= frames) frameF = 0f;
+            int cur = (int)frameF;
+            return (cur, cur == last ? 0 : cur + 1, frameF - cur);
+        }
+        frameF = Math.Clamp(frameF, 0, last);
+        int f0 = (int)frameF;
+        return (f0, Math.Min(f0 + 1, last), frameF - f0);
+    }
+
+    private static float VuRcp(float v) => v != 0f ? 1f / v : float.MaxValue; // Amedo 2026-09-26
+
+    private static float GsAlpha(float a) => Math.Clamp(a * (255f / 128f), 0f, 1f); // Amedo 2026-09-27
+
+    public static float[] SampleFacialWeights(TwinMorphAnimation facialAnim, float frameF, bool loop = false) // Amedo 2026-09-26
+    {
+        if (facialAnim.JointSettings.Count == 0 || facialAnim.AnimatedTransformations.Count == 0)
+            return new float[MaxMorphShapes];
+        var (f0, f1, t) = AnimFramePair(facialAnim.AnimatedTransformations.Count, frameF, loop); // Amedo 2026-09-26
+        return SampleFacialWeights(facialAnim, f0, f1, t);
+    }
+
+    // Amedo 2026-09-27
+    public static float[] SampleFacialWeights(TwinMorphAnimation facialAnim, int f0, int f1, float t)
     {
         var weights = new float[MaxMorphShapes];
-        if (facialAnim.JointSettings.Count == 0 || facialAnim.AnimatedTransformations.Count == 0)
+        int frames = facialAnim.AnimatedTransformations.Count;
+        if (facialAnim.JointSettings.Count == 0 || frames == 0)
             return weights;
-
-        int lastFrame = facialAnim.AnimatedTransformations.Count - 1;
-        frameF = Math.Clamp(frameF, 0, lastFrame);
-        int f0 = (int)MathF.Floor(frameF);
-        int f1 = Math.Min(f0 + 1, lastFrame);
-        float t = frameF - f0;
+        f0 = Math.Clamp(f0, 0, frames - 1);
+        f1 = Math.Clamp(f1, 0, frames - 1);
 
         var js = facialAnim.JointSettings[0];
         int staticIdx = js.TransformationIndex;
@@ -4130,7 +4519,7 @@ public static class MeshDecoder
             {
                 float w0 = facialAnim.AnimatedTransformations[f0].Transforms[curIdx++].Value;
                 float w1 = facialAnim.AnimatedTransformations[f1].Transforms[nextIdx++].Value;
-                weights[i] = w0 + (w1 - w0) * t;
+                weights[i] = w1 * t + w0 * (1f - t); // Amedo 2026-09-26
             }
             else
             {
@@ -4140,7 +4529,8 @@ public static class MeshDecoder
         return weights;
     }
 
-    private static (SysVec3 Translate, Matrix4x4 Rot, SysVec3 Scale) SampleJointTRS(
+    // Amedo 2026-09-26
+    private static (SysVec3 Translate, Quaternion Rot, SysVec3 Scale) SampleJointTRS(
         TwinAnimation anim, TwinJointSettings js, int f0, int f1, float t,
         Twinsanity.TwinsanityInterchange.Common.Vector4 additionalRotation)
     {
@@ -4148,34 +4538,40 @@ public static class MeshDecoder
         int curIdx    = js.AnimationTransformationIndex;
         int nextIdx   = js.AnimationTransformationIndex;
 
+        float Lerp(float c, float n) => c - c * t + n * t;
+
         var (cx, nx) = SampleLinear(anim, js.TranslateX, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (cy, ny) = SampleLinear(anim, js.TranslateY, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (cz, nz) = SampleLinear(anim, js.TranslateZ, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
-        var translate = SysVec3.Lerp(new SysVec3(cx, cy, cz), new SysVec3(nx, ny, nz), t);
-
         var (crx, nrx) = SampleRotation(anim, js.RotateX, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (cry, nry) = SampleRotation(anim, js.RotateY, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (crz, nrz) = SampleRotation(anim, js.RotateZ, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
-        var q1 = Quaternion.CreateFromRotationMatrix(
-            Matrix4x4.CreateRotationX(crx) * Matrix4x4.CreateRotationY(cry) * Matrix4x4.CreateRotationZ(crz));
-        var q2 = Quaternion.CreateFromRotationMatrix(
-            Matrix4x4.CreateRotationX(nrx) * Matrix4x4.CreateRotationY(nry) * Matrix4x4.CreateRotationZ(nrz));
-        var q  = Quaternion.Slerp(q1, q2, t);
-
         var (csx, nsx) = SampleLinear(anim, js.ScaleX, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (csy, nsy) = SampleLinear(anim, js.ScaleY, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
         var (csz, nsz) = SampleLinear(anim, js.ScaleZ, f0, f1, ref staticIdx, ref curIdx, ref nextIdx);
-        var scale = SysVec3.Lerp(new SysVec3(csx, csy, csz), new SysVec3(nsx, nsy, nsz), t);
-        if (scale == SysVec3.Zero) scale = SysVec3.One;
 
-        var rot = Matrix4x4.CreateFromQuaternion(q);
+        var translate = new SysVec3(Lerp(cx, nx), Lerp(cy, ny), Lerp(cz, nz));
+        var rot       = GameEulerToQuaternion(Lerp(crx, nrx), Lerp(cry, nry), Lerp(crz, nrz));
+        var scale     = new SysVec3(Lerp(csx, nsx), Lerp(csy, nsy), Lerp(csz, nsz));
+
         if (js.UseAdditionalRotation)
-        {
-            var addQ = new Quaternion(additionalRotation.X, additionalRotation.Y, additionalRotation.Z, additionalRotation.W);
-            rot *= Matrix4x4.CreateFromQuaternion(addQ);
-        }
+            rot = new Quaternion(additionalRotation.X, additionalRotation.Y, additionalRotation.Z, additionalRotation.W) * rot;
 
         return (translate, rot, scale);
+    }
+
+    // Amedo 2026-09-26
+    public static Quaternion GameEulerToQuaternion(float rx, float ry, float rz) // Amedo 2026-10-04
+    {
+        float hx = rx * 0.5f, hy = ry * 0.5f, hz = rz * 0.5f;
+        float sx = MathF.Sin(hx), cx = MathF.Cos(hx);
+        float sy = MathF.Sin(hy), cy = MathF.Cos(hy);
+        float sz = MathF.Sin(hz), cz = MathF.Cos(hz);
+        return new Quaternion(
+            sx * cy * cz - cx * sy * sz,
+            cx * sy * cz + sx * cy * sz,
+            cx * cy * sz - sx * sy * cz,
+            cx * cy * cz + sx * sy * sz);
     }
 
     private static (float cur, float next) SampleLinear(TwinAnimation anim, TwinTransformType type,
@@ -4191,28 +4587,23 @@ public static class MeshDecoder
         return (v, v);
     }
 
+    private static readonly float AnimAngleToRad = BitConverter.Int32BitsToSingle(0x38C90FDB); // Amedo 2026-09-26
+
+    // Amedo 2026-09-26
     private static (float cur, float next) SampleRotation(TwinAnimation anim, TwinTransformType type,
         int f0, int f1, ref int staticIdx, ref int curIdx, ref int nextIdx)
     {
-        if (type == TwinTransformType.Animated)
+        if (type != TwinTransformType.Animated)
         {
-            int rot1 = anim.AnimatedTransformations[f0].Transforms[curIdx++].PureValue * 16;
-            int rot2 = anim.AnimatedTransformations[f1].Transforms[nextIdx++].PureValue * 16;
-            return GetRotationChanges(rot1, rot2);
+            float s = (anim.StaticTransformations[staticIdx++].PureValue << 4) * AnimAngleToRad;
+            return (s, s);
         }
-        float rot = anim.StaticTransformations[staticIdx++].RotationValue;
-        return (rot, rot);
-    }
-
-    private static (float, float) GetRotationChanges(int rot1, int rot2)
-    {
-        var diff = rot1 - rot2;
-        if (diff < -0x8000) rot1 += 0x10000;
-        if (diff > 0x8000)  rot1 -= 0x10000;
-
-        var rot1Rad = rot1 / (float)(ushort.MaxValue + 1) * (float)(Math.PI * 2);
-        var rot2Rad = rot2 / (float)(ushort.MaxValue + 1) * (float)(Math.PI * 2);
-        return (rot1Rad, rot2Rad);
+        int a = anim.AnimatedTransformations[f0].Transforms[curIdx++].PureValue << 4;
+        int b = anim.AnimatedTransformations[f1].Transforms[nextIdx++].PureValue << 4;
+        int d = a - b;
+        if (d > 0x8000) a -= 0x10000;
+        else if (d < -0x8000) a += 0x10000;
+        return (a * AnimAngleToRad, b * AnimAngleToRad);
     }
 
 
@@ -4221,6 +4612,7 @@ public static class MeshDecoder
                                                          IReadOnlyList<(Texture2D? Tex, TwinShader? Shader)>? subMats = null)
     {
         var result = new List<(GpuMesh, Material)>();
+        var parts = new List<(GpuMesh.Vertex[] Verts, uint[] Idx, Material Mat)>(); // Amedo
 
         for (int si = 0; si < model.SubModels.Count; si++)
         {
@@ -4237,59 +4629,65 @@ public static class MeshDecoder
             if (sub.Vertexes.Count < 3) continue;
 
             var triVerts = BuildTriangleListVerts(sub);
-            if (triVerts.Count < 3) continue;
+            if (triVerts.Length < 3) continue;
 
-            if (result.Count == 0)
-            {
-                Console.WriteLine($"[MeshDecoder] First vert pos: {triVerts[0].Position}  tris:{triVerts.Count/3}  alpha:{triVerts[0].Color.W:F3}  color:({triVerts[0].Color.X:F2},{triVerts[0].Color.Y:F2},{triVerts[0].Color.Z:F2})");
-            }
+            var idxArray  = Enumerable.Range(0, triVerts.Length).Select(i => (uint)i).ToArray();
 
-            var vertArray = triVerts.ToArray();
-            var idxArray  = Enumerable.Range(0, triVerts.Count).Select(i => (uint)i).ToArray();
-            var gpuMesh   = new GpuMesh(gl, vertArray, idxArray);
-
-            var localCenter = triVerts.Aggregate(SysVec3.Zero, (a, v) => a + v.Position) / triVerts.Count;
+            var localCenter = triVerts.Aggregate(SysVec3.Zero, (a, v) => a + v.Position) / triVerts.Length;
 
             var mat = BuildTwinMaterial(tex, shader, sub);
             mat.LocalCenter    = localCenter;
             mat.BoundingRadius = triVerts.Max(v => SysVec3.Distance(v.Position, localCenter));
-            result.Add((gpuMesh, mat));
+            parts.Add((triVerts, idxArray, mat)); // Amedo
         }
 
+        SmoothTogether(gl, parts, result); // Amedo
         return result;
     }
 
-    private static List<GpuMesh.Vertex> BuildTriangleListVerts(
+    // Amedo: the parts of one model/skin are smoothed together (no seams where they meet), then become meshes
+    private static void SmoothTogether(GL gl, List<(GpuMesh.Vertex[] Verts, uint[] Idx, Material Mat)> parts, List<(GpuMesh, Material)> result)
+    {
+        GpuMesh.SmoothNormals(parts.ConvertAll(p => p.Verts), parts.ConvertAll(p => p.Idx));
+        foreach (var (verts, idx, mat) in parts) result.Add((GpuMesh.FromOwned(gl, verts, idx), mat));
+    }
+
+    // Amedo
+    private static GpuMesh.Vertex[] BuildTriangleListVerts(
         Twinsanity.TwinsanityInterchange.Interfaces.Items.SubItems.ITwinSubModel sub)
     {
-        var verts = new List<GpuMesh.Vertex>(sub.Vertexes.Count);
-        for (int j = 0; j < sub.Vertexes.Count; j++)
+        int count = sub.Vertexes.Count;
+        int connLen  = sub.Connection.Count;
+        int tris = 0;
+        for (int j = 2; j < count; j++)
+            if (j < connLen && sub.Connection[j]) tris++;
+        var triVerts = new GpuMesh.Vertex[tris * 3];
+        if (tris == 0) return triVerts;
+        var verts = System.Buffers.ArrayPool<GpuMesh.Vertex>.Shared.Rent(count);
+        for (int j = 0; j < count; j++)
         {
             var p = sub.Vertexes[j];
-            var n = j < sub.Normals.Count ? sub.Normals[j]
-                                           : new Twinsanity.TwinsanityInterchange.Common.Vector4(0, 1, 0, 0);
-            var uv = j < sub.UVW.Count ? sub.UVW[j]
-                                        : new Twinsanity.TwinsanityInterchange.Common.Vector4(0, 0, 0, 0);
-            var c = j < sub.Colors.Count ? sub.Colors[j]
-                                         : new Twinsanity.TwinsanityInterchange.Common.Vector4(1, 1, 1, 1);
+            bool hasN = j < sub.Normals.Count, hasUv = j < sub.UVW.Count, hasC = j < sub.Colors.Count; // Amedo
+            var n = hasN ? sub.Normals[j] : default;
+            var uv = hasUv ? sub.UVW[j] : default;
+            var c = hasC ? sub.Colors[j] : default;
 
-            verts.Add(new GpuMesh.Vertex
+            verts[j] = new GpuMesh.Vertex
             {
                 Position = new SysVec3(p.X, p.Y, p.Z),
-                Normal   = new SysVec3(n.X, n.Y, n.Z),
-                UV       = new SysVec2(uv.X, uv.Y),
-                Color    = new SysVec4(
+                Normal   = !hasN ? new SysVec3(0f, 1f, 0f) : new SysVec3(n.X, n.Y, n.Z), // Amedo
+                UV       = !hasUv ? SysVec2.Zero : new SysVec2(uv.X, uv.Y),
+                Color    = !hasC ? SysVec4.One : new SysVec4(
                     Math.Clamp(c.X, 0f, 1f),
                     Math.Clamp(c.Y, 0f, 1f),
                     Math.Clamp(c.Z, 0f, 1f),
                     Math.Clamp(c.W, 0f, 1f))
-            });
+            };
         }
 
-        var triVerts = new List<GpuMesh.Vertex>();
         bool winding = false;
-        int connLen  = sub.Connection.Count;
-        for (int j = 2; j < sub.Vertexes.Count; j++)
+        int k = 0;
+        for (int j = 2; j < count; j++)
         {
             if (j >= connLen || !sub.Connection[j])
             {
@@ -4298,18 +4696,19 @@ public static class MeshDecoder
             }
             if (!winding)
             {
-                triVerts.Add(verts[j - 2]);
-                triVerts.Add(verts[j - 1]);
-                triVerts.Add(verts[j]);
+                triVerts[k++] = verts[j - 2];
+                triVerts[k++] = verts[j - 1];
+                triVerts[k++] = verts[j];
             }
             else
             {
-                triVerts.Add(verts[j - 1]);
-                triVerts.Add(verts[j - 2]);
-                triVerts.Add(verts[j]);
+                triVerts[k++] = verts[j - 1];
+                triVerts[k++] = verts[j - 2];
+                triVerts[k++] = verts[j];
             }
             winding = !winding;
         }
+        System.Buffers.ArrayPool<GpuMesh.Vertex>.Shared.Return(verts);
         return triVerts;
     }
 
@@ -4339,8 +4738,8 @@ public static class MeshDecoder
             if (sub.Vertexes is null || sub.Colors is null) continue;
             var triVerts = BuildTriangleListVerts(sub);
             var gpuMesh = entry[si].Item1;
-            if (triVerts.Count != gpuMesh.VertexCount) continue;
-            gpuMesh.UpdateVertices(gl, triVerts.ToArray());
+            if (triVerts.Length != gpuMesh.VertexCount) continue; // Amedo
+            gpuMesh.UpdateVertices(gl, triVerts);
         }
     }
 
@@ -4355,8 +4754,8 @@ public static class MeshDecoder
             if (sub.Vertexes is null) continue;
             var triVerts = BuildTriangleListVerts(sub);
             var gpuMesh = entry[si].Item1;
-            if (triVerts.Count != gpuMesh.VertexCount) continue;
-            gpuMesh.UpdateVertices(gl, triVerts.ToArray());
+            if (triVerts.Length != gpuMesh.VertexCount) continue; // Amedo
+            gpuMesh.UpdateVertices(gl, triVerts);
         }
     }
 
@@ -4527,9 +4926,12 @@ public static class MeshDecoder
         { log = "chunk is missing a required CODE/GRAPHICS section"; return null; }
 
         var materialsById = BuildMaterialLookup(gfx);
+        if (tables.GlobalSource?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION) is { } globalGfx) // Amedo
+            foreach (var kv in BuildMaterialLookup(globalGfx)) materialsById.TryAdd(kv.Key, kv.Value);
 
         var newObj  = CloneItem(srcObj);
-        uint newObjId = NewCodeLocalId(objSec);
+        uint newObjId;
+        do newObjId = NewCodeLocalId(objSec); while (tables.Objects.ContainsKey(newObjId)); // Amedo
         newObj.SetID(newObjId);
 
         var rmIdMap = new Dictionary<uint, uint>();
@@ -4542,7 +4944,8 @@ public static class MeshDecoder
             if (!tables.OGIs.TryGetValue(oldOgiId, out var srcOgi)) continue;
 
             var newOgi = CloneItem(srcOgi);
-            ushort newOgiId = NewCodeLocalId(ogiSec);
+            ushort newOgiId;
+            do newOgiId = NewCodeLocalId(ogiSec); while (tables.OGIs.ContainsKey(newOgiId)); // Amedo
             newOgi.SetID(newOgiId);
 
             for (int r = 0; r < newOgi.RigidModelIds.Count; r++)
@@ -4552,14 +4955,16 @@ public static class MeshDecoder
                 if (!tables.RigidModels.TryGetValue(oldRmId, out var srcRm)) continue;
 
                 var newRm = CloneItem(srcRm);
-                uint newRmId = NewGraphicsLocalId(rmSec, meshSec);
+                uint newRmId;
+                do newRmId = NewGraphicsLocalId(rmSec, meshSec); while (tables.RigidModels.ContainsKey(newRmId) || tables.ModelGpu.ContainsKey(newRmId)); // Amedo
                 newRm.SetID(newRmId);
 
                 PS2AnyModel? newModel = null;
                 if (tables.Models.TryGetValue(srcRm.Model, out var srcModelItem) && srcModelItem is PS2AnyModel srcModel)
                 {
                     newModel = CloneItem(srcModel);
-                    uint newModelId = NewGraphicsLocalId(modelSec);
+                    uint newModelId;
+                    do newModelId = NewGraphicsLocalId(modelSec); while (tables.Models.ContainsKey(newModelId)); // Amedo
                     newModel.SetID(newModelId);
                     modelSec.AddItem(newModel);
                     tables.Models[newModelId] = newModel;
@@ -4578,8 +4983,11 @@ public static class MeshDecoder
                     {
                         Texture2D? tex = null; TwinShader? shader = null;
                         if (materialsById.TryGetValue(matId, out var mat))
+                        {
                             foreach (var sh in mat.Shaders)
                             { shader ??= sh; if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null) break; }
+                            RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
+                        }
                         subMats.Add((tex, shader));
                     }
                     var gpuList = DecodeModel(gl, newModel, subMats);
@@ -4657,8 +5065,8 @@ public static class MeshDecoder
                         if (sub.Vertexes is null) continue;
                         var triVerts = BuildTriangleListVerts(sub);
                         var gpuMesh  = gpuList[si].Item1;
-                        if (triVerts.Count != gpuMesh.VertexCount) continue;
-                        gpuMesh.UpdateVertices(gl, triVerts.ToArray());
+                        if (triVerts.Length != gpuMesh.VertexCount) continue; // Amedo
+                        gpuMesh.UpdateVertices(gl, triVerts);
                     }
                 }
             }
@@ -4672,6 +5080,7 @@ public static class MeshDecoder
         IReadOnlyList<(Texture2D? Tex, TwinShader? Shader)>? subMats = null)
     {
         var result = new List<(GpuMesh, Material)>();
+        var parts = new List<(GpuMesh.Vertex[] Verts, uint[] Idx, Material Mat)>(); // Amedo
 
         for (int si = 0; si < blend.SubBlends.Count; si++)
         {
@@ -4694,11 +5103,11 @@ public static class MeshDecoder
                     return new()
                     {
                         Position = new SysVec3(model.Vertexes[j].X, model.Vertexes[j].Y, model.Vertexes[j].Z),
-                        Normal   = SysVec3.UnitY,
+                        Normal   = new SysVec3(model.Vertexes[j].W, model.UVW[j].Z, model.UVW[j].W), // Amedo 2026-09-26
                         UV       = new System.Numerics.Vector2(model.UVW[j].X, model.UVW[j].Y),
                         Color    = new SysVec4(
                             Math.Clamp(model.Colors[j].X, 0f, 1f), Math.Clamp(model.Colors[j].Y, 0f, 1f),
-                            Math.Clamp(model.Colors[j].Z, 0f, 1f), Math.Clamp(model.Colors[j].W, 0f, 1f)),
+                            Math.Clamp(model.Colors[j].Z, 0f, 1f), GsAlpha(model.Colors[j].W)), // Amedo 2026-09-27
                         BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
                         BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
                     };
@@ -4714,13 +5123,14 @@ public static class MeshDecoder
             if (tri.Count < 3) continue;
 
             var idx = Enumerable.Range(0, tri.Count).Select(k => (uint)k).ToArray();
-            var gpu = new GpuMesh(gl, tri.ToArray(), idx);
+            var triArray = tri.ToArray(); // Amedo
             var mat = BuildTwinMaterial(tex, shader);
             var localCenter = tri.Aggregate(SysVec3.Zero, (a, v) => a + v.Position) / tri.Count;
             mat.LocalCenter    = localCenter;
             mat.BoundingRadius = tri.Max(v => SysVec3.Distance(v.Position, localCenter));
-            result.Add((gpu, mat));
+            parts.Add((triArray, idx, mat)); // Amedo
         }
+        SmoothTogether(gl, parts, result); // Amedo
         return result;
     }
 
@@ -4733,6 +5143,7 @@ public static class MeshDecoder
         private readonly GpuMesh.Vertex[] _base;
         private readonly SysVec3[][]      _shapeOffsets;
         private readonly GpuMesh.Vertex[] _scratch;
+        private bool _atBase = true; // Amedo
 
         public MorphMesh(GpuMesh mesh, Material mat, GpuMesh.Vertex[] baseVerts, SysVec3[][] shapeOffsets)
         {
@@ -4742,6 +5153,10 @@ public static class MeshDecoder
 
         public void ApplyWeights(GL gl, ReadOnlySpan<float> weights)
         {
+            bool zero = true; // Amedo
+            foreach (float w in weights) zero &= w == 0f;
+            if (zero && _atBase) return;
+            _atBase = zero;
             Array.Copy(_base, _scratch, _base.Length);
             for (int s = 0; s < _shapeOffsets.Length && s < weights.Length; s++)
             {
@@ -4754,20 +5169,38 @@ public static class MeshDecoder
         }
     }
 
+    // Amedo 2026-10-02
+    private sealed record MorphData(int SubIndex, GpuMesh.Vertex[] Base, uint[] Index, SysVec3[][] Shapes, SysVec3 Center, float Radius);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinBlendSkin, List<MorphData>> MorphCache = new();
+
     public static List<MorphMesh> DecodeBlendSkinMorph(GL gl,
         Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinBlendSkin blend,
         IReadOnlyList<(Texture2D? Tex, TwinShader? Shader)>? subMats = null)
     {
         var result = new List<MorphMesh>();
+        foreach (var d in MorphCache.GetValue(blend, DecodeMorphData)) // Amedo 2026-10-02
+        {
+            var (tex, shader) = subMats is { Count: > 0 }
+                ? subMats[Math.Min(d.SubIndex, subMats.Count - 1)]
+                : (null, null);
+            var gpu = new GpuMesh(gl, d.Base, d.Index);
+            var mat = BuildTwinMaterial(tex, shader);
+            mat.LocalCenter    = d.Center;
+            mat.BoundingRadius = d.Radius;
+            result.Add(new MorphMesh(gpu, mat, d.Base, d.Shapes));
+        }
+        return result;
+    }
+
+    // Amedo 2026-10-02
+    private static List<MorphData> DecodeMorphData(Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinBlendSkin blend)
+    {
+        var result = new List<MorphData>();
 
         for (int si = 0; si < blend.SubBlends.Count; si++)
         {
             var sb = blend.SubBlends[si];
             if (sb.Models.Count == 0) continue;
-
-            var (tex, shader) = subMats is { Count: > 0 }
-                ? subMats[Math.Min(si, subMats.Count - 1)]
-                : (null, null);
 
             var tri = new List<GpuMesh.Vertex>();
             var shapeLists = new List<SysVec3>[MaxMorphShapes];
@@ -4785,11 +5218,11 @@ public static class MeshDecoder
                     return new()
                     {
                         Position = new SysVec3(model.Vertexes[j].X, model.Vertexes[j].Y, model.Vertexes[j].Z),
-                        Normal   = SysVec3.UnitY,
+                        Normal   = new SysVec3(model.Vertexes[j].W, model.UVW[j].Z, model.UVW[j].W), // Amedo 2026-09-26
                         UV       = new System.Numerics.Vector2(model.UVW[j].X, model.UVW[j].Y),
                         Color    = new SysVec4(
                             Math.Clamp(model.Colors[j].X, 0f, 1f), Math.Clamp(model.Colors[j].Y, 0f, 1f),
-                            Math.Clamp(model.Colors[j].Z, 0f, 1f), Math.Clamp(model.Colors[j].W, 0f, 1f)),
+                            Math.Clamp(model.Colors[j].Z, 0f, 1f), GsAlpha(model.Colors[j].W)), // Amedo 2026-09-27
                         BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
                         BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
                     };
@@ -4821,18 +5254,16 @@ public static class MeshDecoder
 
             var idx = Enumerable.Range(0, tri.Count).Select(k => (uint)k).ToArray();
             var baseVerts = tri.ToArray();
-            var gpu = new GpuMesh(gl, baseVerts, idx);
-            var mat = BuildTwinMaterial(tex, shader);
             var localCenter = tri.Aggregate(SysVec3.Zero, (a, v) => a + v.Position) / tri.Count;
-            mat.LocalCenter    = localCenter;
-            mat.BoundingRadius = tri.Max(v => SysVec3.Distance(v.Position, localCenter));
+            float radius = tri.Max(v => SysVec3.Distance(v.Position, localCenter)); // Amedo 2026-10-02
 
             var shapeArrays = new SysVec3[MaxMorphShapes][];
             for (int s = 0; s < MaxMorphShapes; s++)
                 shapeArrays[s] = shapeLists[s].Any(v => v != SysVec3.Zero) ? shapeLists[s].ToArray() : Array.Empty<SysVec3>();
 
-            result.Add(new MorphMesh(gpu, mat, baseVerts, shapeArrays));
+            result.Add(new MorphData(si, baseVerts, idx, shapeArrays, localCenter, radius)); // Amedo 2026-10-02
         }
+        GpuMesh.SmoothNormals(result.ConvertAll(d => d.Base), result.ConvertAll(d => d.Index)); // Amedo
         return result;
     }
 
@@ -4841,6 +5272,7 @@ public static class MeshDecoder
         IReadOnlyList<(Texture2D? Tex, TwinShader? Shader)>? subMats = null, bool recalculate = true)
     {
         var result = new List<(GpuMesh, Material)>();
+        var parts = new List<(GpuMesh.Vertex[] Verts, uint[] Idx, Material Mat)>(); // Amedo
 
         for (int si = 0; si < skin.SubSkins.Count; si++)
         {
@@ -4852,7 +5284,7 @@ public static class MeshDecoder
                 ? subMats[Math.Min(si, subMats.Count - 1)]
                 : (null, null);
 
-            var tri = new List<GpuMesh.Vertex>();
+            var tri = new List<GpuMesh.Vertex>(Math.Max(0, (sub.Vertexes.Count - 2) * 3)); // Amedo 2026-09-29
             bool winding = false;
             GpuMesh.Vertex V(int j)
             {
@@ -4860,13 +5292,13 @@ public static class MeshDecoder
                 return new()
                 {
                     Position = new SysVec3(sub.Vertexes[j].X, sub.Vertexes[j].Y, sub.Vertexes[j].Z),
-                    Normal   = SysVec3.UnitY,
+                    Normal   = new SysVec3(sub.Vertexes[j].W, sub.UVW[j].Z, sub.UVW[j].W), // Amedo 2026-09-26
                     UV       = new System.Numerics.Vector2(sub.UVW[j].X, sub.UVW[j].Y),
                     Color    = new SysVec4(
                         Math.Clamp(sub.Colors[j].X, 0f, 1f),
                         Math.Clamp(sub.Colors[j].Y, 0f, 1f),
                         Math.Clamp(sub.Colors[j].Z, 0f, 1f),
-                        Math.Clamp(sub.Colors[j].W, 0f, 1f)),
+                        GsAlpha(sub.Colors[j].W)), // Amedo 2026-09-27
                     BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
                     BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
                 };
@@ -4886,19 +5318,102 @@ public static class MeshDecoder
             if (tri.Count < 3) continue;
 
             var idx = Enumerable.Range(0, tri.Count).Select(k => (uint)k).ToArray();
-            var gpu = new GpuMesh(gl, tri.ToArray(), idx);
+            var triArray = tri.ToArray(); // Amedo
             var localCenter = tri.Aggregate(SysVec3.Zero, (a, v) => a + v.Position) / tri.Count;
 
             var mat = BuildTwinMaterial(tex, shader);
             mat.LocalCenter    = localCenter;
             mat.BoundingRadius = tri.Max(v => SysVec3.Distance(v.Position, localCenter));
-            result.Add((gpu, mat));
+            parts.Add((triArray, idx, mat)); // Amedo
         }
+        SmoothTogether(gl, parts, result); // Amedo
         return result;
+    }
+
+    // Amedo 2026-09-26
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TwinShader, List<(Texture2D? Tex, TwinShader Shader)>> _upperLayers = new();
+
+    // Amedo 2026-09-26
+    private static readonly Random _clothRandom = new(1);
+
+    // Amedo 2026-09-26
+    private static float ClothRand() => (float)((_clothRandom.NextDouble() * 2.0 - 1.0) * Math.PI);
+
+    // Amedo
+    public sealed class ClothState
+    {
+        public readonly SysVec3[] Phases = new SysVec3[16];
+        public readonly SysVec3[] Phases100 = new SysVec3[16];
+        public readonly System.Runtime.CompilerServices.StrongBox<double> Clock = new();
+        public required TwinShader Shader { get; init; }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TwinShader, ClothState> _clothStates = new(); // Amedo
+
+    // Amedo
+    public static ClothState ClothStateOf(TwinShader shader) => _clothStates.GetValue(shader, s =>
+    {
+        var c = new ClothState { Shader = s };
+        lock (_clothRandom)
+            for (int i = 0; i < 16; i++)
+                c.Phases[i] = new SysVec3(ClothRand(), ClothRand(), ClothRand());
+        return c;
+    });
+
+    // Amedo
+    public static List<ClothState> ClothShadersOf(PS2AnyTwinsanitySM2? sm2)
+    {
+        var list = new List<ClothState>();
+        var gfx = sm2?.GetItem<BaseTwinSection>((uint)Constants.SCENERY_GRAPHICS_SECTION);
+        if (gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION) is not { } mats) return list;
+        for (int i = 0; i < mats.GetItemsAmount(); i++)
+        {
+            if (mats.GetItem(i) is not PS2AnyMaterial mat) continue;
+            foreach (var sh in mat.Shaders)
+                if (sh.ShaderType is TwinShader.Type.UnlitClothDeformation or TwinShader.Type.UnlitClothDeformation2) list.Add(ClothStateOf(sh));
+        }
+        return list;
+    }
+
+    // Amedo 2026-09-26
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TwinShader, System.Runtime.CompilerServices.StrongBox<uint>> _dmaChainOf = new();
+
+    // Amedo 2026-09-26
+    private static void RegisterUpperLayers(PS2AnyMaterial mat, Dictionary<uint, Texture2D> texCache)
+    {
+        if (mat.Shaders.Count == 0) return;
+        _dmaChainOf.AddOrUpdate(mat.Shaders[0], new System.Runtime.CompilerServices.StrongBox<uint>(mat.DmaChainIndex));
+        if (mat.Shaders.Count < 2) return;
+        var layers = new List<(Texture2D? Tex, TwinShader Shader)>();
+        for (int i = 1; i < mat.Shaders.Count; i++)
+            layers.Add((texCache.TryGetValue(mat.Shaders[i].TextureId, out var t) ? t : null, mat.Shaders[i]));
+        _upperLayers.AddOrUpdate(mat.Shaders[0], layers);
     }
 
     public static Material BuildTwinMaterial(Texture2D? tex, TwinShader? shader,
         Twinsanity.TwinsanityInterchange.Interfaces.Items.SubItems.ITwinSubModel? sourceSubModel = null)
+    {
+        var baseMat = BuildTwinLayer(tex, shader, sourceSubModel); // Amedo 2026-09-26
+        if (shader is not null && _upperLayers.TryGetValue(shader, out var upper)) // Amedo 2026-09-26
+            baseMat.Layers = upper.Select(l => BuildTwinLayer(l.Tex, l.Shader, sourceSubModel)).ToList();
+        if (shader is not null && _dmaChainOf.TryGetValue(shader, out var chain)) // Amedo 2026-09-26
+        {
+            baseMat.DmaChain = chain.Value;
+            if (baseMat.Layers is { } ls) foreach (var l in ls) l.DmaChain = chain.Value;
+        }
+        return baseMat;
+    }
+
+    // Amedo
+    private static bool GsMipClass(TwinShader.Type type) => type is TwinShader.Type.StandardUnlit or TwinShader.Type.StandardLit
+        or TwinShader.Type.LitSkinnedModel or TwinShader.Type.SHADER_20 or TwinShader.Type.UnlitGlossy
+        or TwinShader.Type.UnlitEnvironmentMap or TwinShader.Type.UnlitClothDeformation or TwinShader.Type.SHADER_25
+        or TwinShader.Type.UnlitClothDeformation2 or TwinShader.Type.UnlitBillboard or TwinShader.Type.SHADER_30
+        or TwinShader.Type.SHADER_31 or TwinShader.Type.SHADER_32;
+
+    // Amedo 2026-09-26
+    private static Material BuildTwinLayer(Texture2D? tex, TwinShader? shader,
+        Twinsanity.TwinsanityInterchange.Interfaces.Items.SubItems.ITwinSubModel? sourceSubModel)
     {
         if (shader is null)
             return new Material { Culling = Material.CullMode.Both, DoubleColor = 1f };
@@ -4916,18 +5431,25 @@ public static class MeshDecoder
                                         or TwinShader.Type.UnlitEnvironmentMap;
 
         var uvScroll = SysVec2.Zero;
-        if (shader.XScrollSettings != TwinShader.XScrollFormula.Disabled)
-            uvScroll.X = shader.UvScrollSpeed.Z;
-        if (shader.YScrollSettings != TwinShader.YScrollFormula.Disabled)
-            uvScroll.Y = shader.UvScrollSpeed.W;
+        var uvPhase = SysVec2.Zero; // Amedo 2026-09-26
+        if ((int)shader.XScrollSettings >= (int)TwinShader.XScrollFormula.Linear) // Amedo 2026-09-26
+            (uvScroll.X, uvPhase.X) = (shader.UvScrollSpeed.Z, shader.UvScrollSpeed.X);
+        if ((int)shader.YScrollSettings >= (int)TwinShader.YScrollFormula.Linear) // Amedo 2026-09-26
+            (uvScroll.Y, uvPhase.Y) = (shader.UvScrollSpeed.W, shader.UvScrollSpeed.Y);
+        var uvScrollMode = new SysVec2( // Amedo 2026-09-26
+            shader.XScrollSettings == TwinShader.XScrollFormula.Disabled ? 1 : (int)shader.XScrollSettings,
+            shader.YScrollSettings == TwinShader.YScrollFormula.Disabled ? 1 : (int)shader.YScrollSettings);
 
         var deform = SysVec2.Zero;
-        if (shader.ShaderType is TwinShader.Type.UnlitClothDeformation
-                              or TwinShader.Type.UnlitClothDeformation2)
+        int clothKind = shader.ShaderType switch // Amedo 2026-09-26
         {
-            deform.X = shader.FloatParam[0];
-            deform.Y = shader.FloatParam[1];
-        }
+            TwinShader.Type.UnlitClothDeformation  => 1,
+            TwinShader.Type.UnlitClothDeformation2 => 2,
+            _ => 0,
+        };
+        SysVec3[]? clothPhases = null; // Amedo 2026-09-26
+        ClothState? cloth = clothKind > 0 ? ClothStateOf(shader) : null; // Amedo
+        if (cloth is not null) clothPhases = cloth.Phases; // Amedo
 
         var blend = shader.AlphaRegSettingsIndex switch
         {
@@ -4942,50 +5464,45 @@ public static class MeshDecoder
             Culling         = Material.CullMode.Both,
             DoubleColor     = unlit ? 1f : 2f,
             AlphaBlend      = shader.ABlending == TwinShader.AlphaBlending.ON,
-            AlphaTest       = shader.ATest == TwinShader.AlphaTest.ON
-                                  ? shader.AlphaValueToBeComparedTo / 255f : 0f,
+            AlphaTest       = shader.ATest == TwinShader.AlphaTest.ON // Amedo 2026-09-26
+                                  ? shader.AlphaValueToBeComparedTo / 128f : 0f,
             BillboardRender = shader.ShaderType == TwinShader.Type.UnlitBillboard,
-            ReflectDist     = shader.ShaderType == TwinShader.Type.LitReflectionSurface
-                                  ? new SysVec2(1f, shader.FloatParam[0]) : SysVec2.Zero,
-            MetalicSpecular = shader.ShaderType is TwinShader.Type.LitMetallic
-                                                or TwinShader.Type.UnlitGlossy ? 1f : 0f,
+            ReflectDist     = shader.ShaderType == TwinShader.Type.LitReflectionSurface // Amedo 2026-09-26
+                                  ? new SysVec2(0f, shader.FloatParam[0]) : SysVec2.Zero,
+            MetalicSpecular = 0f, // Amedo 2026-09-26
             DeformSpeed     = deform,
-            EnvMap          = envMap ? 1f : 0f,
+            EnvMap          = envMap ? 1f : shader.ShaderType switch // Amedo 2026-09-26
+            {
+                TwinShader.Type.LitMetallic          => 2f,
+                TwinShader.Type.LitReflectionSurface => 3f,
+                _                                     => 0f,
+            },
             UvScrollSpeed   = uvScroll,
+            UvScrollMode    = uvScrollMode, // Amedo 2026-09-26
+            UvScrollPhase   = uvPhase, // Amedo 2026-09-26
+            ClothKind       = clothKind, // Amedo 2026-09-26
+            ClothMode       = (int)shader.IntParam, // Amedo 2026-09-26
+            ClothSpeed      = shader.FloatParam[0], // Amedo 2026-09-26
+            ClothAmplitude  = clothKind == 2 // Amedo 2026-09-26
+                                  ? new SysVec3(shader.FloatParam[1], shader.FloatParam[2], shader.FloatParam[3])
+                                  : new SysVec3(shader.FloatParam[1]),
+            ClothPhases     = clothPhases, // Amedo 2026-09-26
+            ClothClock      = cloth?.Clock, // Amedo
             Blend           = blend,
             DepthWrite      = shader.ZValueDrawingMask == TwinShader.ZValueDrawMask.UPDATE,
-            FogEnabled      = shader.Fog == TwinShader.Fogging.ON,
+            FogEnabled      = true, // Amedo 2026-09-26
             ShaderType      = shader.ShaderType.ToString(),
+            GameLit         = shader.ShaderType is TwinShader.Type.StandardLit or TwinShader.Type.LitSkinnedModel // Amedo 2026-09-26
+                                                 or TwinShader.Type.LitEnvironmentMap or TwinShader.Type.LitMetallic
+                                                 or TwinShader.Type.LitReflectionSurface or TwinShader.Type.SHADER_17,
+            ShadowReceiver  = shader.AlphaCorrectionValue, // Amedo 2026-09-26
+            GsMipmaps       = GsMipClass(shader.ShaderType), // Amedo
+            GsLodK          = ((shader.LodParamK & 0xFFF) ^ 0x800) - 0x800 is var k ? k / 16f : 0f, // Amedo
+            GsLodL          = 1 << (shader.LodParamL & 3), // Amedo
             SourceShader    = shader,
             SourceSubModel  = sourceSubModel,
         };
     }
-
-    private static (SysVec3, Quaternion) Frame0Transform(
-        Twinsanity.TwinsanityInterchange.Common.DynamicScenery.TwinDynamicSceneryAnimation? anim)
-    {
-        if (anim is null || anim.ModelSettings.Count == 0)
-            return (SysVec3.Zero, Quaternion.Identity);
-
-        var m  = anim.ModelSettings[0];
-        int si = m.StaticTransformationIndex;
-        int ai = m.AnimationTransformationIndex;
-
-        float Get(Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType t) =>
-            t == Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType.Animated
-                ? (anim.AnimatedTransformations.Count > 0
-                    ? anim.AnimatedTransformations[0].TransformationValues[ai++] : 0f)
-                : anim.StaticTransformations[si++].Value;
-
-        float x  = Get(m.TranslateX), y  = Get(m.TranslateY), z  = Get(m.TranslateZ);
-        float rx = Get(m.RotateX),    ry = Get(m.RotateY),    rz = Get(m.RotateZ);
-        Get(m.RotateW);
-
-        var rot = Quaternion.CreateFromRotationMatrix(
-            Matrix4x4.CreateRotationX(rx) * Matrix4x4.CreateRotationY(ry) * Matrix4x4.CreateRotationZ(rz));
-        return (new SysVec3(x, y, z), rot);
-    }
-
 
     public static Matrix4x4 TwinMatToSys(TwinMat4 m)
     {
@@ -5022,36 +5539,207 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
         public Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyAnimation Anim { get; set; } = null!;
         public Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI Ogi { get; set; } = null!;
         public Entity MeshRoot { get; set; } = null!;
+        public bool StaticMesh { get; set; } // Amedo 2026-09-28
         public List<(Entity Child, int JointIndex, System.Numerics.Matrix4x4 BindLocal)> AttachedRigidParts { get; } = new();
         public List<MeshDecoder.MorphMesh> MorphMeshes { get; } = new();
     }
 
     public List<SlotGroup> Groups { get; } = new();
+    public List<SlotGroup> ModelGroups { get; } = new(); // Amedo 2026-09-28
     public SlotGroup? DefaultGroup { get; set; }
     public SlotGroup? CurrentGroup { get; private set; }
+    private Entity? _modelRoot; // Amedo 2026-09-28
+    public SlotGroup? ModelGroup { get; private set; } // Amedo 2026-10-01
+    public Entity? VisibleRoot => _modelRoot ?? (CurrentGroup ?? DefaultGroup)?.MeshRoot; // Amedo 2026-09-28
 
     public Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyAnimation? Current => CurrentGroup?.Anim;
-    public float Frame   { get; set; }
-    public bool  Playing { get; set; }
-    public bool  Loop    { get; set; } = true;
     public System.Numerics.Matrix4x4[] BoneMatrices { get; private set; } = RenderPipeline.IdentityBoneMatrices;
+    public Dictionary<int, System.Numerics.Matrix4x4>? JointWorlds { get; private set; } // Amedo 2026-09-26
+    public Dictionary<int, System.Numerics.Matrix4x4>? ShownJointWorlds { get; private set; } // Amedo 2026-10-01
+    public MeshDecoder.IJointControllers? Controllers { get; set; } // Amedo 2026-09-28
+    public int ReactSlots { get; set; } = 0xFF; // Amedo
+    private readonly MeshDecoder.PoseBuffers _pose = new(); // Amedo 2026-09-29
+    private readonly MeshDecoder.PoseBuffers _shownPose = new(); // Amedo 2026-10-01
 
-    public void Play(SlotGroup group)
+    public static float LogicAlpha { get; set; } = 1f; // Amedo 2026-10-01
+    public static int LogicNowTicks { get; set; } // Amedo 2026-10-02
+    public static int LogicStepTicks { get; set; }
+    public static bool InLogicCompose { get; private set; } // Amedo 2026-10-02
+    private bool _logicDriven;
+    private bool _rebase;
+    private int _prevNow;
+    private int _version, _shownVersion = -1, _shownTicks = int.MinValue;
+
+    // Amedo 2026-10-01
+    public bool LogicDriven
     {
+        get => _logicDriven;
+        set
+        {
+            if (_logicDriven == value) return;
+            _logicDriven = value;
+            if (value) _rebase = true;
+            else _clock = _now * TickTime;
+            _version++;
+        }
+    }
+
+    public float Speed { get; set; } = 1f; // Amedo 2026-09-26
+
+    // Amedo 2026-09-27
+    public const uint LoopFlag = 0x1000, BlendFlag = 0x2000, StartPhaseFlag = 0x20000, SyncPhaseFlag = 0x40000,
+                      ReverseFlag = 0x80000, AppendFlag = 0x100000;
+
+    private const float TickRate = 9000f;
+    private const float TickTime = 1f / 9000f;
+
+    // Amedo 2026-09-27
+    private sealed class Layer
+    {
+        public SlotGroup? Group;
+        public Layer? Twin;
+        public uint Flags;
+        public float Phase;
+        public int Start, Duration, Elapsed, BlendStart, BlendTicks;
+        public float Frac, Weight = 1f;
+        public int F0, F1;
+        public int PrevStart = int.MinValue; // Amedo 2026-10-02
+
+        public int Frames => (int)((Flags >> 5) & 0xFFFF);
+        public bool Loop => (Flags & 4) != 0;
+        public bool HasBody => Group is { } g && g.Anim.HasAnimationData;
+        public bool HasFace => Group is { } g && g.Anim.HasFacialAnimationData;
+    }
+
+    private readonly List<Layer> _body = new();
+    private readonly List<Layer> _face = new();
+    private double _clock;
+    private int _now;
+    private bool _paused;
+    private bool _defaultLoop = true;
+
+    public bool AllowBlend { get; set; } = true; // Amedo 2026-09-27
+
+    private float[]? _faceOut;
+    private float[]? _faceSrc;
+    private int _faceCount;
+    private bool _faceApplied;
+    public IReadOnlyList<float>? FaceWeights => _faceCount > 0 ? _faceOut : null; // Amedo 2026-09-26
+
+    public (SlotGroup? From, float FromFrame, bool FromLoop, float Weight) BlendState => // Amedo 2026-09-27
+        _body.Count >= 2 ? (_body[^2].Group, FramePosition(_body[^2]), _body[^2].Loop, _body[^1].Weight) : (null, 0f, false, 1f);
+
+    public int LayerCount => _body.Count; // Amedo 2026-09-27
+
+    public float Frame
+    {
+        get => _body.Count == 0 ? 0f : FramePosition(_body[^1]);
+        set
+        {
+            if (_body.Count == 0) return;
+            Seek(_body[^1], value);
+            if (_body[^1].Twin is { } twin) Seek(twin, value);
+        }
+    }
+
+    public bool Playing
+    {
+        get => !_paused && _body.Count > 0 && (_body[^1].Flags & 2) == 0;
+        set => _paused = !value;
+    }
+
+    public bool Loop
+    {
+        get => _body.Count > 0 ? _body[^1].Loop : _defaultLoop;
+        set
+        {
+            _defaultLoop = value;
+            if (_body.Count == 0) return;
+            SetLoop(_body[^1], value);
+            if (_body[^1].Twin is { } twin) SetLoop(twin, value);
+        }
+    }
+
+    private static void SetLoop(Layer l, bool loop) => l.Flags = loop ? l.Flags | 4u : l.Flags & ~4u;
+
+    // Amedo 2026-09-26
+    public void Play(SlotGroup group, float blendSeconds = 0f, float speed = 1f) =>
+        Request(group, (_defaultLoop ? LoopFlag : 0u) | (0f < blendSeconds ? BlendFlag : 0u), blendSeconds, speed);
+
+    // Amedo 2026-09-27
+    public void Request(SlotGroup group, uint flags, float blendSeconds, float speed, float startPhase = 0f)
+    {
+        int blendTicks = (flags & BlendFlag) != 0 ? MeshDecoder.Cvt(blendSeconds * TickRate) : 0;
+        bool sameModel = CurrentGroup is null || (CurrentGroup.Ogi == group.Ogi && CurrentGroup.MeshRoot == group.MeshRoot);
+        bool blend = AllowBlend && blendTicks != 0 && sameModel;
+        uint req = ((flags >> 12) & 1) | (blendTicks != 0 ? 2u : 0u) | ((flags >> 17) & 4) | ((flags >> 15) & 0x20);
+        if ((flags & SyncPhaseFlag) != 0) req |= 8;
+        else if ((flags & StartPhaseFlag) != 0) req |= 0x10;
+        int duration = DurationTicks(group, speed);
+        var body = Insert(_body, group, req, duration, blendTicks, startPhase, blend);
+        var face = Insert(_face, group, req, duration, blendTicks, startPhase, blend);
+        if (body is not null && face is not null)
+        {
+            body.Twin = face;
+            face.Twin = body;
+        }
+
+        if (_modelRoot is not null && _modelRoot != group.MeshRoot) _modelRoot.Active = false; // Amedo 2026-09-28
+        _modelRoot = null;
+        ModelGroup = null; // Amedo 2026-10-01
         var previouslyVisible = CurrentGroup ?? DefaultGroup;
         if (previouslyVisible is not null && previouslyVisible.MeshRoot != group.MeshRoot)
             previouslyVisible.MeshRoot.Active = false;
         group.MeshRoot.Active = true;
 
         CurrentGroup = group;
-        Frame        = 0f;
-        Playing      = true;
+        Speed = speed;
+        _version++; // Amedo 2026-10-01
+    }
+
+    // Amedo 2026-09-28
+    public void ShowModel(SlotGroup group, float blendSeconds)
+    {
+        var visible = VisibleRoot;
+        if (visible is not null && visible != group.MeshRoot) visible.Active = false;
+        group.MeshRoot.Active = true;
+        _modelRoot = group.MeshRoot;
+        ModelGroup = group; // Amedo 2026-10-01
+        RequestNone(blendSeconds);
+    }
+
+    // Amedo 2026-09-27
+    public void RequestNone(float blendSeconds)
+    {
+        int blendTicks = MeshDecoder.Cvt(blendSeconds * TickRate);
+        var body = Insert(_body, null, 0u, 0, blendTicks, 0f, false);
+        var face = Insert(_face, null, 0u, 0, blendTicks, 0f, false);
+        _version++; // Amedo 2026-10-01
+        if (body is null || face is null) return;
+        body.Twin = face;
+        face.Twin = body;
     }
 
     public void Stop()
     {
-        Playing      = false;
+        _body.Clear(); // Amedo 2026-09-27
+        _face.Clear();
+        _paused = false;
+        _faceOut = null;
+        _faceSrc = null;
+        _faceCount = 0;
+        _faceApplied = false;
         BoneMatrices = RenderPipeline.IdentityBoneMatrices;
+        JointWorlds  = null; // Amedo 2026-09-26
+        ShownJointWorlds = null; // Amedo 2026-10-01
+        _version++;
+        if (_modelRoot is not null) // Amedo 2026-09-28
+        {
+            _modelRoot.Active = false;
+            if (DefaultGroup is not null) DefaultGroup.MeshRoot.Active = true;
+            _modelRoot = null;
+            ModelGroup = null; // Amedo 2026-10-01
+        }
         if (CurrentGroup is not null)
         {
             foreach (var (child, _, bindLocal) in CurrentGroup.AttachedRigidParts)
@@ -5077,34 +5765,424 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
 
     public override void OnUpdate()
     {
-        var g = CurrentGroup;
-        if (g is null || !g.Anim.HasAnimationData) return;
-
-        int lastFrame = g.Anim.MainAnimation.AnimatedTransformations.Count - 1;
-        if (lastFrame < 0) return;
-
-        if (Playing)
+        if (_body.Count == 0 && _face.Count == 0) return; // Amedo 2026-09-27
+        if (_logicDriven) // Amedo 2026-10-01
         {
-            float fps = g.Anim.DefaultFPS > 0 ? g.Anim.DefaultFPS : 30f;
-            Frame += EngineTime.Delta * fps;
-            if (Frame > lastFrame)
+            ShowLogicPose();
+            return;
+        }
+        if (!_paused)
+        {
+            _clock += EngineTime.Delta;
+            _now = (int)(_clock * TickRate);
+        }
+        foreach (var l in _body) Advance(l, true);
+        Cleanup(_body, true);
+        foreach (var l in _face) Advance(l, false);
+        Cleanup(_face, false);
+        if (CurrentGroup is not { } g) return;
+        ComposeBody(g);
+        UpdateFace(g);
+    }
+
+    // Amedo 2026-10-01
+    public void AdvanceTo_294980(int ticks)
+    {
+        if (_rebase)
+        {
+            Rebase(ticks - _now);
+            _rebase = false;
+        }
+        _prevNow = _now;
+        if (!_paused) _now = ticks;
+        foreach (var l in _body) Advance(l, true);
+        Cleanup(_body, true);
+        foreach (var l in _face) Advance(l, false);
+        Cleanup(_face, false);
+        _version++;
+    }
+
+    // Amedo 2026-10-02
+    public void SkipLogicStep() { }
+
+    // Amedo
+    private System.Numerics.Matrix4x4[] _exitPoints = [];
+    private ulong _exitPointsKept;
+
+    // Amedo
+    public void MarkExitPoints_295690() => _exitPointsKept = 0;
+
+    // Amedo
+    public bool KeptExitPoint(int exit, out System.Numerics.Matrix4x4 m)
+    {
+        if ((uint)exit < 64 && (_exitPointsKept & (1UL << exit)) != 0)
+        {
+            m = _exitPoints[exit];
+            return true;
+        }
+        m = default;
+        return false;
+    }
+
+    // Amedo
+    public void KeepExitPoint(int exit, System.Numerics.Matrix4x4 m)
+    {
+        if ((uint)exit >= 64) return;
+        if (_exitPoints.Length <= exit) Array.Resize(ref _exitPoints, exit + 1);
+        _exitPoints[exit] = m;
+        _exitPointsKept |= 1UL << exit;
+    }
+
+    // Amedo 2026-10-01
+    public void Compose_294B18()
+    {
+        if (CurrentGroup is not { } g) return;
+        if (_body.Count == 0 && Controllers is null) // Amedo
+        {
+            JointWorlds = null;
+            return;
+        }
+        InLogicCompose = true; // Amedo 2026-10-02
+        try { _logicBones = SamplePose(g, _pose, 0, false, out var worlds); JointWorlds = worlds; }
+        finally { InLogicCompose = false; }
+        _composedVersion = _version;
+    }
+
+    private System.Numerics.Matrix4x4[]? _logicBones; // Amedo 2026-10-01
+    private int _composedVersion = -1;
+
+    // Amedo 2026-10-01
+    private void Rebase(int delta)
+    {
+        if (delta == 0) return;
+        _now += delta;
+        foreach (var l in _body) { l.Start += delta; l.BlendStart += delta; if (l.PrevStart != int.MinValue) l.PrevStart += delta; } // Amedo 2026-10-02
+        foreach (var l in _face) { l.Start += delta; l.BlendStart += delta; }
+    }
+
+    // Amedo 2026-10-01
+    private void ShowLogicPose()
+    {
+        if (CurrentGroup is not { } g) return;
+        if (_rebase && LogicStepTicks > 0) // Amedo 2026-10-02
+        {
+            Rebase(LogicNowTicks - _now);
+            _prevNow = _now;
+            _rebase = false;
+        }
+        int shown = _paused || _rebase || LogicStepTicks <= 0 || _now != LogicNowTicks ? _now // Amedo 2026-10-02
+            : _now - MeshDecoder.Cvt((1f - Math.Clamp(LogicAlpha, 0f, 1f)) * (_now - _prevNow));
+        if (Controllers is null && shown == _shownTicks && _version == _shownVersion) return;
+        _shownTicks = shown;
+        _shownVersion = _version;
+        if (_body.Count == 0 && Controllers is null) // Amedo
+        {
+            BoneMatrices = RenderPipeline.IdentityBoneMatrices;
+            ShownJointWorlds = null;
+            foreach (var (child, _, bindLocal) in g.AttachedRigidParts)
+                child.Transform.LocalMatrix = bindLocal;
+        }
+        else
+        {
+            Dictionary<int, System.Numerics.Matrix4x4> worlds;
+            if (Controllers is null && shown == _now && _composedVersion == _version && _logicBones is { } bones && JointWorlds is { } logicWorlds) // Amedo 2026-10-02
             {
-                if (Loop) Frame %= MathF.Max(1f, lastFrame);
-                else { Frame = lastFrame; Playing = false; }
+                BoneMatrices = bones;
+                worlds = logicWorlds;
+            }
+            else BoneMatrices = SamplePose(g, _shownPose, shown, true, out worlds);
+            ShownJointWorlds = worlds;
+            foreach (var (child, jointIndex, _) in g.AttachedRigidParts)
+                if (worlds.TryGetValue(jointIndex, out var jw))
+                    child.Transform.LocalMatrix = jw;
+        }
+        UpdateFace(g);
+    }
+
+    // Amedo 2026-10-01
+    private System.Numerics.Matrix4x4[] SamplePose(SlotGroup g, MeshDecoder.PoseBuffers buffers, int ticks, bool shown,
+                                                   out Dictionary<int, System.Numerics.Matrix4x4> worlds)
+    {
+        var layers = buffers.Layers;
+        layers.Clear();
+        foreach (var l in _body)
+        {
+            int f0 = l.F0, f1 = l.F1;
+            float frac = l.Frac, weight = l.Weight;
+            if (shown) ShownFrame(l, ticks, out f0, out f1, out frac, out weight);
+            layers.Add(new MeshDecoder.PoseLayer(l.HasBody ? l.Group!.Anim.MainAnimation : null, f0, f1, frac, weight));
+        }
+        return MeshDecoder.SampleLayeredPose(g.Ogi, layers, out worlds, Controllers, buffers, ReactSlots);
+    }
+
+    // Amedo 2026-10-01
+    private static void ShownFrame(Layer l, int ticks, out int f0, out int f1, out float frac, out float weight)
+    {
+        f0 = l.F0;
+        f1 = l.F1;
+        frac = l.Frac;
+        weight = l.Weight;
+        if ((l.Flags & 2) != 0) return;
+        if ((l.Flags & 1) == 0) // Amedo 2026-10-02
+        {
+            if (l.HasBody) (f0, f1, frac) = FrameAt(l, 0);
+            if ((l.Flags & 0x10) != 0) weight = 0f;
+            return;
+        }
+        if (!l.HasBody) return;
+        int e = ticks - l.Start;
+        if (e < 0 && l.PrevStart != int.MinValue && l.PrevStart <= ticks) e = ticks - l.PrevStart; // Amedo 2026-10-02
+        if (e < 0) e = 0;
+        if (l.Duration <= e)
+        {
+            if (!l.Loop) e = l.Duration;
+            else if (0 < l.Duration) e -= l.Duration * MeshDecoder.Cvt(e * TickTime / (l.Duration * TickTime));
+        }
+        (f0, f1, frac) = FrameAt(l, e);
+        if ((l.Flags & 0x10) == 0) return;
+        int b = ticks - l.BlendStart;
+        weight = b < 0 ? 0f : b < l.BlendTicks ? b * TickTime / (l.BlendTicks * TickTime) : 1f;
+    }
+
+    // Amedo 2026-09-27
+    private Layer? Insert(List<Layer> list, SlotGroup? group, uint req, int duration, int blendTicks, float phase, bool blend)
+    {
+        var layer = new Layer { Group = group, Duration = duration, BlendTicks = blendTicks };
+        layer.Flags = blendTicks != 0 ? 0x10u : 0u;
+        if (group is null) layer.Flags |= blendTicks == 0 ? 2u : 0u;
+        else layer.Flags |= (uint)(FrameCount(group) & 0xFFFF) << 5;
+        layer.Flags = (layer.Flags & ~4u) | ((req & 1) << 2);
+        layer.Flags = (layer.Flags & ~8u) | ((req << 1) & 8);
+        if ((req & 0x10) != 0)
+        {
+            layer.Phase = phase;
+            layer.Flags |= 0x200000;
+        }
+        if (!blend)
+        {
+            list.Clear();
+            list.Add(layer);
+            return layer;
+        }
+        if (list.Count == 0)
+        {
+            list.Add(layer);
+            return layer;
+        }
+        var last = list[^1];
+        bool append = (req & 0x20) != 0 || ((last.Flags >> 2) & 1) != (req & 1) ||
+                      ((last.Flags >> 3) & 1) != ((req >> 2) & 1) || !SameAnimation(last, layer);
+        if (!append) return null;
+        list.Add(layer);
+        if ((req & 8) != 0) SyncPhase(layer, last);
+        return layer;
+    }
+
+    private static bool SameAnimation(Layer a, Layer b)
+    {
+        if (a.HasBody != b.HasBody || a.HasFace != b.HasFace) return false;
+        return !(a.HasBody || a.HasFace) || ReferenceEquals(a.Group!.Anim, b.Group!.Anim);
+    }
+
+    private static void SyncPhase(Layer layer, Layer last)
+    {
+        if ((last.Flags & 1) == 0) return;
+        float phase = last.Duration > 0 ? last.Elapsed * TickTime / (last.Duration * TickTime) : 0f;
+        if (((layer.Flags >> 3) & 1) != ((last.Flags >> 3) & 1)) phase = 1f - phase;
+        layer.Phase = phase;
+        layer.Flags = (layer.Flags & ~1u) | 0x200000;
+    }
+
+    // Amedo 2026-09-27
+    private void Advance(Layer l, bool body)
+    {
+        uint f = l.Flags;
+        if ((f & 2) == 0)
+        {
+            if ((f & 1) == 0)
+            {
+                l.Start = (f & 0x200000) == 0 ? _now : _now - MeshDecoder.Cvt(l.Duration * TickTime * l.Phase * TickRate);
+                l.Flags |= 1;
+                if ((l.Flags & 0x10) != 0) l.BlendStart = _now;
+            }
+            else
+            {
+                int e = _now - l.Start;
+                l.Elapsed = e;
+                if (l.Duration <= e)
+                {
+                    if ((f & 4) == 0)
+                    {
+                        l.Elapsed = l.Duration;
+                        l.Flags |= 2;
+                    }
+                    else if (0 < l.Duration)
+                    {
+                        int k = MeshDecoder.Cvt(e * TickTime / (l.Duration * TickTime));
+                        l.PrevStart = l.Start; // Amedo 2026-10-02
+                        l.Start  += l.Duration * k;
+                        l.Elapsed = e - l.Duration * k;
+                    }
+                }
             }
         }
+        FramePair(l, body);
+        if ((l.Flags & 0x10) == 0) return;
+        int b = _now - l.BlendStart;
+        if (b < l.BlendTicks) l.Weight = b * TickTime / (l.BlendTicks * TickTime);
+        else
+        {
+            l.Flags &= ~0x10u;
+            l.Weight = 1f;
+        }
+    }
 
-        BoneMatrices = MeshDecoder.SampleAnimationPose(g.Ogi, g.Anim.MainAnimation, Frame, out var jointWorlds);
+    private static void FramePair(Layer l, bool body)
+    {
+        if (!(body ? l.HasBody : l.HasFace)) return;
+        (l.F0, l.F1, l.Frac) = FrameAt(l, l.Elapsed); // Amedo 2026-10-01
+    }
 
+    // Amedo 2026-10-01
+    private static (int F0, int F1, float Frac) FrameAt(Layer l, int elapsed)
+    {
+        int n = l.Frames, last = n - 1;
+        int span = l.Loop ? n : last;
+        float t = 0 < l.Duration ? elapsed * TickTime / (l.Duration * TickTime) : 1f;
+        float pos = span * t;
+        int f0 = MeshDecoder.Cvt(pos);
+        float frac = pos - f0;
+        int f1 = f0 == last ? (l.Loop ? 0 : f0) : f0 + 1;
+        if ((l.Flags & 8) != 0)
+        {
+            int r0 = last - f1;
+            f1 = last - f0;
+            f0 = r0;
+            frac = 1f - frac;
+        }
+        return (Math.Clamp(f0, 0, Math.Max(0, last)), Math.Clamp(f1, 0, Math.Max(0, last)), frac);
+    }
+
+    private static void Cleanup(List<Layer> list, bool body)
+    {
+        for (int i = 0; i < list.Count;)
+        {
+            bool remove = i == list.Count - 1
+                ? (list[i].Flags & 0x10) == 0 && !(body ? list[i].HasBody : list[i].HasFace)
+                : (list[i + 1].Flags & 0x10) == 0;
+            if (remove) list.RemoveAt(i);
+            else i++;
+        }
+    }
+
+    // Amedo 2026-09-27
+    private void ComposeBody(SlotGroup g)
+    {
+        if (_body.Count == 0)
+        {
+            BoneMatrices = RenderPipeline.IdentityBoneMatrices;
+            JointWorlds  = null;
+            ShownJointWorlds = null; // Amedo 2026-10-01
+            foreach (var (child, _, bindLocal) in g.AttachedRigidParts)
+                child.Transform.LocalMatrix = bindLocal;
+            return;
+        }
+        BoneMatrices = SamplePose(g, _pose, 0, false, out var jointWorlds); // Amedo 2026-10-01
+        JointWorlds  = jointWorlds;
+        ShownJointWorlds = jointWorlds;
         foreach (var (child, jointIndex, _) in g.AttachedRigidParts)
             if (jointWorlds.TryGetValue(jointIndex, out var jw))
                 child.Transform.LocalMatrix = jw;
+    }
 
-        if (g.Anim.HasFacialAnimationData && g.MorphMeshes.Count > 0)
+    // Amedo 2026-09-27
+    private void UpdateFace(SlotGroup g)
+    {
+        _faceCount = 0;
+        float[]? current = null;
+        foreach (var l in _face)
         {
-            var weights = MeshDecoder.SampleFacialWeights(g.Anim.FacialAnimation, Frame);
-            var gl = Engine.Instance.GL;
-            foreach (var mm in g.MorphMeshes) mm.ApplyWeights(gl, weights);
+            float w = l.Weight;
+            if (l.HasFace)
+            {
+                var anim  = l.Group!.Anim.FacialAnimation;
+                int count = anim.JointSettings.Count > 0 ? Math.Min((int)anim.JointSettings[0].FacialShapesAmount, MeshDecoder.MaxMorphShapes) : 0;
+                var value = MeshDecoder.SampleFacialWeights(anim, l.F0, l.F1, l.Frac);
+                _faceSrc = _faceOut;
+                if (_faceCount < count)
+                {
+                    current = new float[MeshDecoder.MaxMorphShapes];
+                    _faceCount = count;
+                }
+                _faceOut = current;
+                for (int i = 0; i < count; i++)
+                    _faceOut![i] = _faceSrc is null ? value[i] * w : value[i] * w + _faceSrc[i] * (1f - w);
+            }
+            else
+                for (int i = 0; i < _faceCount; i++)
+                    _faceOut![i] = _faceSrc is null ? 0f : _faceSrc[i] * (1f - w);
+        }
+        if (g.MorphMeshes.Count == 0) return;
+        if (_faceCount == 0)
+        {
+            if (!_faceApplied) return;
+            _faceApplied = false;
+            ResetFace(g);
+            return;
+        }
+        var gl = Engine.Instance.GL;
+        var weights = new float[MeshDecoder.MaxMorphShapes];
+        Array.Copy(_faceOut!, weights, _faceCount);
+        foreach (var mm in g.MorphMeshes) mm.ApplyWeights(gl, weights);
+        _faceApplied = true;
+    }
+
+    private void Seek(Layer l, float frame)
+    {
+        int n = l.Frames, span = l.Loop ? n : n - 1;
+        if (span <= 0 || l.Duration <= 0) return;
+        int e = (int)(Math.Clamp(frame / span, 0f, 1f) * l.Duration);
+        l.Start   = _now - e;
+        l.Elapsed = e;
+        l.Flags   = (l.Flags | 1u) & ~(2u | 0x200000u);
+        if (!l.Loop && l.Duration <= e) l.Flags |= 2;
+        FramePair(l, l.HasBody);
+        _version++; // Amedo 2026-10-01
+    }
+
+    private static float FramePosition(Layer l) => l.F0 + l.Frac;
+
+    private static int FrameCount(SlotGroup g) => g.Anim.HasAnimationData
+        ? g.Anim.MainAnimation.AnimatedTransformations.Count
+        : g.Anim.FacialAnimation.AnimatedTransformations.Count;
+
+    private static int DurationTicks(SlotGroup g, float speed)
+    {
+        int frames = FrameCount(g);
+        float fps  = g.Anim.DefaultFPS > 0 ? g.Anim.DefaultFPS : 30f;
+        return MeshDecoder.Cvt((float)frames / fps / speed * TickRate);
+    }
+
+    // Amedo 2026-09-26
+    public static float NaturalDuration(SlotGroup g)
+    {
+        int frames = g.Anim.MainAnimation.AnimatedTransformations.Count;
+        float fps  = g.Anim.DefaultFPS > 0 ? g.Anim.DefaultFPS : 30f;
+        return frames / fps;
+    }
+
+    // Amedo 2026-09-27
+    public float RemainingSeconds
+    {
+        get
+        {
+            float best = 0f;
+            foreach (var l in _body)
+            {
+                float s = MeshDecoder.Cvt((l.Duration * TickTime - l.Elapsed * TickTime) * TickRate) * TickTime;
+                if (best < s) best = s;
+            }
+            return best;
         }
     }
 }

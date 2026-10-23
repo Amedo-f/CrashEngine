@@ -214,9 +214,11 @@ public static class BlankSceneTemplate
 
     private static void SetPos(PS2AnyInstance inst, float x, float y, float z)
     {
-        inst.Position.X = x;
-        inst.Position.Y = y;
-        inst.Position.Z = z;
+        var pos = inst.Position; // Amedo
+        pos.X = x;
+        pos.Y = y;
+        pos.Z = z;
+        inst.Position = pos; // Amedo
     }
 
     private static void ZeroRotation(PS2AnyInstance inst)

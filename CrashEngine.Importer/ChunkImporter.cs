@@ -20,13 +20,12 @@ public static class ChunkImporter
 {
     private const float INV_SCALE = 1f;
 
-    public static Entity LoadChunk(GL gl, PackageReader pkg,
-                                   string rm2Path, string sm2Path,
-                                   out ScriptDumper.ChunkScripts scripts)
-    {
-        var root = new Entity(System.IO.Path.GetFileNameWithoutExtension(rm2Path));
-        root.Transform.Scale = new SysVec3(-1f, 1f, 1f);
+    // Amedo 2026-09-28
+    public sealed record ParsedChunk(string Rm2Path, string Sm2Path, PS2AnyTwinsanityRM2 Rm2, PS2AnyTwinsanitySM2? Sm2);
 
+    // Amedo 2026-09-28
+    public static ParsedChunk ParseChunk(PackageReader pkg, string rm2Path, string sm2Path)
+    {
         var rm2 = new PS2AnyTwinsanityRM2();
         using (var stream = pkg.OpenByPath(rm2Path)
                ?? throw new FileNotFoundException($"RM2 not found: {rm2Path}"))
@@ -41,13 +40,58 @@ public static class ChunkImporter
             using var reader = new BinaryReader(sm2Stream);
             sm2.Read(reader, (int)sm2Stream.Length);
         }
+        return new ParsedChunk(rm2Path, sm2Path, rm2, sm2);
+    }
+
+    public static Entity LoadChunk(GL gl, PackageReader pkg,
+                                   string rm2Path, string sm2Path,
+                                   out ScriptDumper.ChunkScripts scripts,
+                                   bool applyGlobalEffects = true, bool linkedScenery = true) // Amedo 2026-09-28
+    {
+        var timing = System.Diagnostics.Stopwatch.StartNew(); // Amedo 2026-09-28
+        var parsed = ParseChunk(pkg, rm2Path, sm2Path);
+        long parseMs = timing.ElapsedMilliseconds;
+        var root = BuildChunk(gl, pkg, parsed, out scripts, applyGlobalEffects, linkedScenery);
+        Console.WriteLine($"[ChunkImporter] {rm2Path}: parse {parseMs} ms");
+        return root;
+    }
+
+    // Amedo 2026-09-28
+    public static Entity BuildChunk(GL gl, PackageReader? pkg, ParsedChunk parsed,
+                                    out ScriptDumper.ChunkScripts scripts,
+                                    bool applyGlobalEffects = true, bool linkedScenery = true,
+                                    ChunkSource? shared = null, bool editorExtras = true)
+    {
+        var timing = System.Diagnostics.Stopwatch.StartNew();
+        using var smoothCache = CrashEngine.Renderer.SmoothNormalCache.Scope(parsed.Rm2Path); // Amedo
+        var phases = new List<string>();
+        long phaseBytes = GC.GetAllocatedBytesForCurrentThread(); // Amedo 2026-09-29
+        void Phase(string name)
+        {
+            long now = GC.GetAllocatedBytesForCurrentThread();
+            phases.Add($"{name} {timing.ElapsedMilliseconds} ({(now - phaseBytes) / 1048576.0:0} MB)");
+            phaseBytes = now;
+            timing.Restart();
+        }
+        string rm2Path = parsed.Rm2Path, sm2Path = parsed.Sm2Path;
+        var rm2 = parsed.Rm2;
+        var sm2 = parsed.Sm2;
+        var root = new Entity(System.IO.Path.GetFileNameWithoutExtension(rm2Path));
+        root.Transform.Scale = new SysVec3(-1f, 1f, 1f);
 
         var texCache = BuildTextures(gl, rm2);
+        Phase("rm2 textures");
 
         PS2AnyTwinsanityRM2? globalRm2 = null;
         var globalTexCache = new Dictionary<uint, Texture2D>();
-        var defStream = pkg.OpenByPath(@"Startup\Default.rm2");
-        if (defStream is not null)
+        if (shared?.GlobalRm2 is { } sharedGlobal)
+        {
+            globalRm2 = sharedGlobal;
+            globalTexCache = shared.GlobalTexCache;
+            foreach (var kv in globalTexCache)
+                texCache[kv.Key] = kv.Value;
+        }
+        else if (pkg?.OpenByPath(@"Startup\Default.rm2") is { } defStream)
         {
             var def = new PS2Default();
             using (var reader = new BinaryReader(defStream))
@@ -57,6 +101,8 @@ public static class ChunkImporter
             foreach (var kv in globalTexCache)
                 texCache[kv.Key] = kv.Value;
         }
+        Phase("default");
+        if (GameShadowDefs.CratesReceiveShadows) GameShadowDefs.ApplyCrateReceivers(rm2, globalRm2, true); // Amedo
 
         var pathMap = ExtractPaths(rm2);
         ImportInstances(rm2, root, pathMap);
@@ -64,7 +110,9 @@ public static class ChunkImporter
         var instRoot = root.Children.FirstOrDefault(c => c.Name == "Instances");
         object? meshTables = null;
         if (instRoot is not null)
-            meshTables = MeshDecoder.BuildInstanceMeshes(gl, rm2, instRoot, texCache, globalRm2);
+            meshTables = MeshDecoder.BuildInstanceMeshes(gl, rm2, instRoot, texCache, globalRm2,
+                                                         globalTexCache.Keys, shared?.MeshTables); // Amedo 2026-09-29
+        Phase("instances"); // Amedo 2026-09-28
 
         object? sceneryTables = null;
         var sm2Tex = new Dictionary<uint, Texture2D>();
@@ -73,13 +121,14 @@ public static class ChunkImporter
             var sceneryEnt = new Entity("Scenery");
             root.AddChild(sceneryEnt);
             sm2Tex = BuildSm2Textures(gl, sm2);
-            sceneryTables = MeshDecoder.BuildSceneryMeshes(gl, sm2, sceneryEnt, sm2Tex);
+            sceneryTables = MeshDecoder.BuildSceneryMeshes(gl, sm2, sceneryEnt, sm2Tex, applyGlobalEffects); // Amedo 2026-09-28
 
-            BuildLinkedScenery(gl, pkg, sm2, root);
+            if (linkedScenery && pkg is not null) BuildLinkedScenery(gl, pkg, sm2, root);
         }
+        Phase("scenery"); // Amedo 2026-09-28
 
-        var collData = rm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData>(
-            (uint)Constants.LEVEL_COLLISION_ITEM);
+        var collData = editorExtras ? rm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData>(
+            (uint)Constants.LEVEL_COLLISION_ITEM) : null;
         var surfaceTypes = MeshDecoder.BuildSurfaceTypeLookup(rm2, globalRm2);
         if (collData is not null && MeshDecoder.DecodeCollision(gl, collData, surfaceTypes) is { } collision)
         {
@@ -90,8 +139,11 @@ public static class ChunkImporter
             collChild.Add(new MeshRenderer { Mesh = collision.Mesh, Material = collision.Mat });
             collRoot.AddChild(collChild);
         }
+        Phase("collision"); // Amedo 2026-09-28
 
-        scripts = ScriptDumper.DumpChunk(rm2);
+        scripts = editorExtras ? ScriptDumper.DumpChunk(rm2) : new ScriptDumper.ChunkScripts();
+        Phase("scripts");
+        Console.WriteLine($"[ChunkImporter] {rm2Path} ms: {string.Join(", ", phases)}");
 
         root.Add(new ChunkSource
         {
@@ -204,33 +256,122 @@ public static class ChunkImporter
         return map;
     }
 
-    public static Texture2D? DecodeTexture(GL gl, PS2AnyTexture tex)
+    public static Texture2D? DecodeTexture(GL gl, PS2AnyTexture tex, bool gameMips = true) // Amedo
     {
         try
         {
-            tex.CalculateData();
-            if (tex.Colors.Count == 0) return null;
-
-            int w = tex.ImageWidthPower  > 0 ? (1 << tex.ImageWidthPower)  : 1;
-            int h = tex.ImageHeightPower > 0 ? (1 << tex.ImageHeightPower) : 1;
-
-            var rgba = new byte[Math.Max(tex.Colors.Count, w * h) * 4];
-            int idx  = 0;
-            foreach (TwinColor c in tex.Colors)
+            if (DecodeRgba(tex, out int w, out int h) is not { } rgba) return null; // Amedo 2026-10-02
+            if (HdTextureDir is null && TextureDumpDir is null) return new Texture2D(gl, rgba, (uint)w, (uint)h, gameMips ? GameMips(tex) : null); // Amedo 2026-10-02
+            string key = TextureKey(rgba, w, h);
+            if (TextureDumpDir is { } dump)
             {
-                rgba[idx++] = c.R;
-                rgba[idx++] = c.G;
-                rgba[idx++] = c.B;
-                rgba[idx++] = c.A;
+                DumpTexture(dump, key, rgba, w, h);
+                HdLog?.Invoke($"[texdump] {key} id {tex.GetID():X8} format {tex.TextureFormat}");
             }
-
-            return new Texture2D(gl, rgba, (uint)w, (uint)h);
+            if (HdTextureDir is { } dir && LoadHd(dir, key, w, h) is { } hd)
+                return new Texture2D(gl, hd.Rgba, (uint)hd.W, (uint)hd.H, (uint)w, (uint)h, true) { SourceKey = key };
+            return new Texture2D(gl, rgba, (uint)w, (uint)h, gameMips ? GameMips(tex) : null) { SourceKey = key }; // Amedo
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ChunkImporter] Texture {tex.GetID():X8} decode failed: {ex.Message}");
             return null;
         }
+    }
+
+    // Amedo
+    private static List<(byte[] Rgba, uint W, uint H)>? GameMips(PS2AnyTexture tex)
+    {
+        try
+        {
+            var levels = tex.CalculateMipLevels();
+            if (levels.Count == 0) return null;
+            var result = new List<(byte[] Rgba, uint W, uint H)>(levels.Count);
+            foreach (var (lw, lh, colors) in levels)
+            {
+                var rgba = new byte[lw * lh * 4];
+                int i = 0;
+                foreach (TwinColor c in colors)
+                {
+                    rgba[i++] = c.R;
+                    rgba[i++] = c.G;
+                    rgba[i++] = c.B;
+                    rgba[i++] = c.A;
+                }
+                result.Add((rgba, (uint)lw, (uint)lh));
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ChunkImporter] Texture {tex.GetID():X8} mip levels failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Amedo 2026-10-02
+    public static byte[]? DecodeRgba(PS2AnyTexture tex, out int w, out int h)
+    {
+        tex.CalculateData();
+        w = tex.ImageWidthPower  > 0 ? (1 << tex.ImageWidthPower)  : 1;
+        h = tex.ImageHeightPower > 0 ? (1 << tex.ImageHeightPower) : 1;
+        if (tex.Colors.Count == 0) return null;
+        var rgba = new byte[Math.Max(tex.Colors.Count, w * h) * 4];
+        int idx  = 0;
+        foreach (TwinColor c in tex.Colors)
+        {
+            rgba[idx++] = c.R;
+            rgba[idx++] = c.G;
+            rgba[idx++] = c.B;
+            rgba[idx++] = c.A;
+        }
+        return rgba;
+    }
+
+    // Amedo 2026-10-02
+    public static string? SaveHd(PS2AnyTexture tex, byte[] rgba, int w, int h)
+    {
+        if (HdTextureDir is not { } dir || DecodeRgba(tex, out int sw, out int sh) is not { } small) return null;
+        string key = TextureKey(small, sw, sh);
+        Directory.CreateDirectory(dir);
+        using (var fs = File.Create(Path.Combine(dir, key + ".png")))
+            new StbImageWriteSharp.ImageWriter().WritePng(rgba, w, h, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, fs);
+        return key;
+    }
+
+    public static string? HdTextureDir { get; set; } // Amedo 2026-10-02
+    public static string? TextureDumpDir { get; set; }
+    public static Action<string>? HdLog { get; set; }
+
+    // Amedo 2026-10-02
+    public static string TextureKey(byte[] rgba, int w, int h)
+    {
+        var hash = System.Security.Cryptography.SHA1.HashData(rgba.AsSpan(0, Math.Min(rgba.Length, w * h * 4)));
+        return $"{w}x{h}_{Convert.ToHexString(hash, 0, 8)}";
+    }
+
+    // Amedo 2026-10-02
+    private static (byte[] Rgba, int W, int H)? LoadHd(string dir, string key, int w, int h)
+    {
+        string path = Path.Combine(dir, key + ".png");
+        if (!File.Exists(path) || Texture2D.LoadRgba(path, out int hw, out int hh) is not { } data) return null;
+        if (hw <= 0 || hh <= 0) return null;
+        HdLog?.Invoke($"[hd] {key}: {w}x{h} -> {hw}x{hh}");
+        return (data, hw, hh);
+    }
+
+    // Amedo 2026-10-02
+    private static void DumpTexture(string dir, string key, byte[] rgba, int w, int h)
+    {
+        string path = Path.Combine(dir, key + ".png");
+        if (File.Exists(path)) return;
+        try
+        {
+            Directory.CreateDirectory(dir);
+            using var fs = new FileStream(path, FileMode.CreateNew);
+            new StbImageWriteSharp.ImageWriter().WritePng(rgba, w, h, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, fs);
+        }
+        catch (IOException) { }
     }
 
     private static Dictionary<uint, Texture2D> BuildSm2Textures(GL gl, PS2AnyTwinsanitySM2 sm2)
@@ -297,12 +438,17 @@ public static class ChunkImporter
             {
                 if (instSec.GetItem(i) is not PS2AnyInstance inst) continue;
 
-                if (inst.StateFlags == 0) continue;
+                if (IsNeutered(inst)) continue; // Amedo
 
                 ImportInstance(inst, instRoot, pathMap, instSec);
             }
         }
     }
+
+    // Amedo
+    public static bool IsNeutered(PS2AnyInstance inst) =>
+        inst.StateFlags == 0 && inst.OnSpawnHeaderScriptID == 0xFFFF && inst.ParamList1.Count == 0 && inst.ParamList2.Count == 0 &&
+        inst.ParamList3.Count == 0 && inst.Instances.Count == 0 && inst.Positions.Count == 0 && inst.Paths.Count == 0;
 
     public static Entity ImportInstance(PS2AnyInstance inst, Entity parent,
                                        Dictionary<uint, PatrolPath> pathMap,
@@ -435,6 +581,11 @@ public sealed class InstanceData : CrashEngine.Core.Component
     public List<uint> LinkedInstances { get; set; } = new();
 
     public bool        IsUserAdded    { get; set; }
+
+    public bool?       ShadowOverride { get; set; } // Amedo 2026-09-28
+    public uint?       RuntimeFlags   { get; set; } // Amedo 2026-10-01
+    public GameShadowShape?[]? RuntimeShadowSlots { get; set; } // Amedo
+    public int         RuntimeShadowActive { get; set; } // Amedo
 
     public Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Source { get; set; } = null!;
 

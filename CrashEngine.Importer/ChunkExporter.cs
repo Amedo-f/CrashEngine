@@ -92,9 +92,11 @@ public static class ChunkExporter
     public static bool SyncInstance(Entity e, InstanceData inst)
     {
         if (e.Transform.LocalMatrix is not { } lm) return false;
-        inst.Source.Position.X = lm.M41;
-        inst.Source.Position.Y = lm.M42;
-        inst.Source.Position.Z = lm.M43;
+        var pos = inst.Source.Position; // Amedo
+        pos.X = lm.M41;
+        pos.Y = lm.M42;
+        pos.Z = lm.M43;
+        inst.Source.Position = pos; // Amedo
 
         float ry = MathF.Asin(Math.Clamp(-lm.M13, -1f, 1f));
         float rx = MathF.Atan2(lm.M23, lm.M33);

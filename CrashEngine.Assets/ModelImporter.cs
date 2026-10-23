@@ -37,8 +37,11 @@ public static class ModelImporter
         "OBJ\0*.obj\0" +
         "All Files\0*.*\0\0";
 
+    public static string LastReport { get; private set; } = ""; // Amedo 2026-10-02
+
     public static List<RawSubmesh>? ExtractRawSubmeshes(string path)
     {
+        LastReport = ""; // Amedo 2026-10-02
         try
         {
             var ext = Path.GetExtension(path).ToLowerInvariant();
@@ -102,6 +105,14 @@ public static class ModelImporter
 
         var result   = new List<RawSubmesh>();
         var modelDir = Path.GetDirectoryName(path) ?? "";
+        float unit = 1f; // Amedo 2026-10-02
+        var notes = new List<string>();
+        var missing = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (Path.GetExtension(path).Equals(".fbx", StringComparison.OrdinalIgnoreCase) && FbxUnitScaleFactor(path) is { } cm && cm > 0)
+        {
+            unit = (float)(cm / 100.0);
+            if (unit != 1f) notes.Add(FormattableString.Invariant($"FBX unit = {cm:0.###} cm, scaled x{unit:0.####} to meters"));
+        }
 
         (byte[] Pixels, int W, int H)? DecodeEmbedded(EmbeddedTexture tex)
         {
@@ -177,6 +188,7 @@ public static class ModelImporter
                         scene.HasTextures && ei >= 0 && ei < scene.TextureCount)
                         result2 = DecodeEmbedded(scene.Textures[ei]);
                     if (result2 is null && !fp.StartsWith("*")) result2 = DecodeExternal(fp);
+                    if (result2 is null) missing.Add(fp); // Amedo 2026-10-02
                 }
             }
             texPixelCache[matIdx] = result2;
@@ -202,7 +214,7 @@ public static class ModelImporter
                 {
                     var p  = ai.Vertices[i];
                     var wp = world * p;
-                    positions[i] = new SysVec3(wp.X, wp.Y, wp.Z);
+                    positions[i] = new SysVec3(wp.X, wp.Y, wp.Z) * unit; // Amedo 2026-10-02
 
                     var n  = hasN ? ai.Normals[i] : new Vector3D(0, 1, 0);
                     var wn  = world * n;
@@ -238,7 +250,43 @@ public static class ModelImporter
             foreach (var c in node.Children) Walk(c, world);
         }
         Walk(scene.RootNode, Matrix4x4.Identity);
+        foreach (var fp in missing) // Amedo 2026-10-02
+            notes.Add($"texture not found: '{fp}' (looked at that path, then for '{Path.GetFileName(fp)}' in {modelDir} and its subfolders) — the mesh uses white");
+        if (scene.HasAnimations || scene.Meshes.Any(m => m.HasBones))
+            notes.Add($"skeleton/animations ({scene.AnimationCount} clips) are not imported yet — the model comes in its bind pose");
+        LastReport = string.Join("; ", notes);
         return result;
+    }
+
+    // Amedo 2026-10-02
+    public static double? FbxUnitScaleFactor(string path)
+    {
+        try
+        {
+            var d = File.ReadAllBytes(path);
+            var key = System.Text.Encoding.ASCII.GetBytes("UnitScaleFactor");
+            bool binary = d.Length > 20 && System.Text.Encoding.ASCII.GetString(d, 0, 18) == "Kaydara FBX Binary";
+            for (int at = d.AsSpan().IndexOf(key); at >= 0;)
+            {
+                int i = at + key.Length;
+                if (at > 0 && char.IsLetter((char)d[at - 1])) { }
+                else if (binary)
+                {
+                    for (int s = 0; s < 3 && i + 5 <= d.Length && d[i] == (byte)'S'; s++) i += 5 + BitConverter.ToInt32(d, i + 1);
+                    if (i + 9 <= d.Length && d[i] == (byte)'D') return BitConverter.ToDouble(d, i + 1);
+                }
+                else
+                {
+                    var line = System.Text.Encoding.ASCII.GetString(d, i, Math.Min(120, d.Length - i));
+                    var m = System.Text.RegularExpressions.Regex.Match(line, "^\"\\s*,\\s*\"double\"\\s*,\\s*\"Number\"\\s*,\\s*\"[^\"]*\"\\s*,\\s*([-+0-9.eE]+)");
+                    if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v)) return v;
+                }
+                int next = d.AsSpan(at + 1).IndexOf(key);
+                at = next < 0 ? -1 : at + 1 + next;
+            }
+        }
+        catch { }
+        return null;
     }
 
     private static List<RawSubmesh> ExtractRawGltf(string path)
