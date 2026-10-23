@@ -18,8 +18,37 @@ public class Transform
         * Matrix4x4.CreateFromQuaternion(Rotation)
         * Matrix4x4.CreateTranslation(Position));
 
-    public Matrix4x4 World =>
-        Parent is null ? Local : Local * Parent.World;
+    public Matrix4x4 World
+    {
+        get
+        {
+            if (_cacheEpoch != 0 && _worldEpoch == _cacheEpoch && Environment.CurrentManagedThreadId == _cacheThread) return _world; // Amedo
+            var world = Parent is null ? Local : Local * Parent.World;
+            if (_cacheEpoch != 0 && Environment.CurrentManagedThreadId == _cacheThread) // Amedo
+            {
+                _world = world;
+                _worldEpoch = _cacheEpoch;
+            }
+            return world;
+        }
+    }
+
+    // Amedo: while a scene renders nothing moves, so each world matrix is computed once per render (main thread only)
+    private static int _cacheEpoch, _nextEpoch, _cacheThread;
+    private int _worldEpoch;
+    private Matrix4x4 _world;
+
+    public static bool CacheWhileRendering { get; set; } = true; // Amedo
+
+    // Amedo
+    internal static void BeginRenderCache()
+    {
+        if (!CacheWhileRendering) return;
+        _cacheThread = Environment.CurrentManagedThreadId;
+        _cacheEpoch = ++_nextEpoch;
+    }
+
+    internal static void EndRenderCache() => _cacheEpoch = 0; // Amedo
 
     public Vector3 Forward => Vector3.Normalize(Vector3.Transform(-Vector3.UnitZ, Rotation));
     public Vector3 Right   => Vector3.Normalize(Vector3.Transform( Vector3.UnitX, Rotation));

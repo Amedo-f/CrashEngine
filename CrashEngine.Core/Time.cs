@@ -6,4 +6,5 @@ public static class EngineTime
     public static float FixedDelta { get; internal set; }
     public static float Total      { get; internal set; }
     public static float TimeScale  { get; set; } = 1f;
+    public static double? FrameOverride { get; set; } // Amedo 2026-09-27
 }

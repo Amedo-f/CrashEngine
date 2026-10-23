@@ -6,6 +6,7 @@ public class Entity
 {
     public string Name    { get; set; }
     public bool   Active  { get; set; } = true;
+    public int    DrawSlot { get; set; } = -1; // Amedo
     public Transform Transform { get; } = new();
 
     public Scene?  Scene  { get; internal set; }
@@ -26,9 +27,20 @@ public class Entity
         return c;
     }
 
-    public T? Get<T>() where T : Component => _components.OfType<T>().FirstOrDefault();
+    // Amedo 2026-10-01
+    public T? Get<T>() where T : Component
+    {
+        foreach (var c in _components)
+            if (c is T found) return found;
+        return null;
+    }
 
-    public bool Has<T>() where T : Component => _components.OfType<T>().Any();
+    public bool Has<T>() where T : Component
+    {
+        foreach (var c in _components)
+            if (c is T) return true;
+        return false;
+    }
 
     public bool RemoveComponent<T>() where T : Component
     {
@@ -70,11 +82,47 @@ public class Entity
         foreach (var ch in _children)   ch.FixedUpdate();
     }
 
-    internal void Render(GL gl, bool translucentPass)
+    // Amedo 2026-10-01
+    internal void Render(GL gl, List<Component> translucent, List<Component> overlay, RenderIsolation? isolation = null, bool inside = false) // Amedo 2026-10-04
     {
         if (!Active) return;
-        foreach (var c  in _components) { if (c.Enabled && c.IsTranslucent == translucentPass) c.OnRender(gl); }
-        foreach (var ch in _children)   ch.Render(gl, translucentPass);
+        if (!inside && isolation is not null) // Amedo 2026-10-04
+        {
+            if (isolation.Path.Contains(this))
+            {
+                foreach (var ch in _children) ch.Render(gl, translucent, overlay, isolation);
+                return;
+            }
+            if (!ReferenceEquals(this, isolation.Target) && !isolation.Keep.Contains(this)) return;
+            inside = true;
+        }
+        foreach (var c in _components)
+        {
+            if (!c.Enabled) continue;
+            if (c.IsOverlay) overlay.Add(c); // Amedo 2026-10-02
+            else if (c.IsTranslucent) translucent.Add(c);
+            else c.OnRender(gl);
+        }
+        foreach (var ch in _children) ch.Render(gl, translucent, overlay, isolation, inside);
+    }
+
+    // Amedo
+    internal void RenderDepth(GL gl, RenderIsolation? isolation = null, bool inside = false)
+    {
+        if (!Active) return;
+        if (!inside && isolation is not null)
+        {
+            if (isolation.Path.Contains(this))
+            {
+                foreach (var ch in _children) ch.RenderDepth(gl, isolation);
+                return;
+            }
+            if (!ReferenceEquals(this, isolation.Target) && !isolation.Keep.Contains(this)) return;
+            inside = true;
+        }
+        foreach (var c in _components)
+            if (c.Enabled && !c.IsOverlay) c.OnRenderDepth(gl);
+        foreach (var ch in _children) ch.RenderDepth(gl, isolation, inside);
     }
 
     internal void Resize(int w, int h)
