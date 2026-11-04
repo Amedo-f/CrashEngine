@@ -52,7 +52,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
         {
             foreach (var model in Models)
             {
-                model.CompileScale = CompileScale;
+                if (CompileScale != 0) model.CompileScale = CompileScale; // Amedo
                 model.Compile();
             }
         }

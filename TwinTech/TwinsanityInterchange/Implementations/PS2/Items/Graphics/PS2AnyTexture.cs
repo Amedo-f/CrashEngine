@@ -33,6 +33,8 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
         public Byte[] UnkBytes2 { get; set; }
         public Byte[] UnkBytes3 { get; set; }
         public Byte[] UnusedMetadata { get; set; }
+        private Int32 _clutBufferWidth = 1, _reserved1, _reserved2; // Amedo
+        private Int16 _reserved3; // Amedo
         public Byte[] TextureData { get; set; }
 
         // Amedo 2026-09-11 -- expose TextureDescriptorHelper read-only: it's a fixed 15-size
@@ -41,6 +43,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
         {
             if (TextureDescriptorHelper != null) return;
             string codeBase = Assembly.GetExecutingAssembly().Location;
+            if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
             UriBuilder uri = new(codeBase);
             string path = Uri.UnescapeDataString(uri.Path);
             using FileStream stream = new(Path.Combine(Path.GetDirectoryName(path), @"TextureDescriptionHelper.json"), FileMode.Open, FileAccess.Read);
@@ -131,12 +134,12 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
                 MipLevelsTBW[i] = reader.ReadInt32();
             }
             ClutBufferBasePointer = reader.ReadInt32();
-            reader.ReadInt32(); // CLUT buffer width, always 1 meaning always 64
+            _clutBufferWidth = reader.ReadInt32(); // Amedo
             UnkBytes2 = reader.ReadBytes(4);
-            reader.ReadInt32(); // Reserved
-            reader.ReadInt32(); // Reserved
+            _reserved1 = reader.ReadInt32(); // Amedo
+            _reserved2 = reader.ReadInt32(); // Amedo
             UnkBytes3 = reader.ReadBytes(2);
-            reader.ReadBytes(2); // Reserved
+            _reserved3 = reader.ReadInt16(); // Amedo
             reader.Read(UnusedMetadata, 0, UnusedMetadata.Length);
             TextureData = reader.ReadBytes(dataLen - 96 - UnusedMetadata.Length);
         }
@@ -165,12 +168,12 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
                 writer.Write(MipLevelsTBW[i]);
             }
             writer.Write(ClutBufferBasePointer);
-            writer.Write(1); // CLUT buffer width
+            writer.Write(_clutBufferWidth); // Amedo
             writer.Write(UnkBytes2);
-            writer.Write(0); // Reserved
-            writer.Write(0); // Reserved
+            writer.Write(_reserved1); // Amedo
+            writer.Write(_reserved2); // Amedo
             writer.Write(UnkBytes3);
-            writer.Write((Int16)0); // Reserved
+            writer.Write(_reserved3); // Amedo
             writer.Write(UnusedMetadata);
             writer.Write(TextureData);
         }

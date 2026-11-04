@@ -10,8 +10,11 @@ namespace Twinsanity.TwinsanityInterchange.Common
 
         public TwinObjectTriggerBehaviour() { }
 
+        private UInt32 _raw; // Amedo
+
         public TwinObjectTriggerBehaviour(UInt32 value)
         {
+            _raw = value; // Amedo
             MessageID = (UInt16)(value & 0x3FF);
             TriggerBehaviour = (UInt16)(value >> 0xA & 0x3FFF);
             BehaviourCallerIndex = (Byte)(value >> 0x18 & 0x1);
@@ -22,6 +25,7 @@ namespace Twinsanity.TwinsanityInterchange.Common
             UInt32 result = MessageID;
             result |= (UInt32)((TriggerBehaviour & 0x3FFF) << 0xA);
             result |= (UInt32)((BehaviourCallerIndex & 0x1) << 0x18);
+            result |= _raw & 0xFE000000; // Amedo
 
             return result;
         }

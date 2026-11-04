@@ -70,6 +70,7 @@ namespace Twinsanity.TwinsanityInterchange.Common.DynamicScenery
                 packer |= (UInt32)(AnimatedTransformations[0].TransformationValues.Count << 0x16);
             }
 
+            packer |= dataPacker & 0x780; // Amedo
             dataPacker = packer;
             writer.Write(packer);
 

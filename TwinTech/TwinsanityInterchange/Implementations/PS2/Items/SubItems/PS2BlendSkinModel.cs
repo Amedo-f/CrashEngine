@@ -68,6 +68,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
                 var verts = data[i][0].GetBinaryX() & 0xFF;
                 var fields = (data[i + 1][0].GetBinaryX() & 0xFF) / verts;
                 var scaleVec = data[i + 2][0];
+                CompileScale = scaleVec.GetBinaryX(); // Amedo
 
                 var positionVertexBatch = data[i + VERT_DATA_INDEX];
                 var uvVertexBatch = data[i + VERT_DATA_INDEX + 1];

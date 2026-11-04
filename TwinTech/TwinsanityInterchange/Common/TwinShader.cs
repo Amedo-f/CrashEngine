@@ -14,6 +14,7 @@ namespace Twinsanity.TwinsanityInterchange.Common
         public Single[] FloatParam { get; set; }
         public AlphaBlending ABlending;
         public AlphaBlendPresets AlphaRegSettingsIndex;
+        private Byte _alphaRegRaw; // Amedo
         public AlphaTest ATest;
         public AlphaTestMethod ATestMethod;
         public byte AlphaValueToBeComparedTo;
@@ -95,7 +96,8 @@ namespace Twinsanity.TwinsanityInterchange.Common
                     break;
             }
             ABlending = (AlphaBlending)reader.ReadByte();
-            AlphaRegSettingsIndex = ((Int32)reader.ReadByte()).ToEnum();
+            _alphaRegRaw = reader.ReadByte(); // Amedo
+            AlphaRegSettingsIndex = ((Int32)_alphaRegRaw).ToEnum(); // Amedo
             ATest = (AlphaTest)reader.ReadByte();
             ATestMethod = (AlphaTestMethod)reader.ReadByte();
             AlphaValueToBeComparedTo = reader.ReadByte();
@@ -168,7 +170,7 @@ namespace Twinsanity.TwinsanityInterchange.Common
                     break;
             }
             writer.Write((byte)ABlending);
-            writer.Write((byte)AlphaRegSettingsIndex);
+            writer.Write(AlphaRegSettingsIndex == ((Int32)_alphaRegRaw).ToEnum() ? _alphaRegRaw : (byte)AlphaRegSettingsIndex); // Amedo
             writer.Write((byte)ATest);
             writer.Write((byte)ATestMethod);
             writer.Write(AlphaValueToBeComparedTo);

@@ -21,6 +21,24 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2
         public List<PointLight> PointLights { get; set; }
         public List<NegativeLight> NegativeLights { get; set; }
         public List<TwinSceneryBaseType> Sceneries { get; set; }
+        private Byte[]? _lightTable; // Amedo
+        private (Int32 A, Int32 D, Int32 P, Int32 N) _lightTableCounts; // Amedo
+
+        // Amedo
+        public Boolean LightTableKept => _lightTable is not null && _lightTableCounts == (AmbientLights.Count, DirectionalLights.Count, PointLights.Count, NegativeLights.Count);
+
+        // Amedo
+        public (Int32 Type, Int32 Index) LightAt(Int32 bit)
+        {
+            if (LightTableKept) return (BitConverter.ToInt32(_lightTable!, bit * 8 + 4), BitConverter.ToInt32(_lightTable!, bit * 8));
+            if (bit < AmbientLights.Count) return (0, bit);
+            bit -= AmbientLights.Count;
+            if (bit < DirectionalLights.Count) return (1, bit);
+            bit -= DirectionalLights.Count;
+            if (bit < PointLights.Count) return (2, bit);
+            bit -= PointLights.Count;
+            return bit < NegativeLights.Count ? (3, bit) : (-1, -1);
+        }
 
         public PS2AnyScenery()
         {
@@ -58,12 +76,13 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2
             }
             if (HasLighting)
             {
-                reader.ReadBytes(0x400); // Lights accessor buffer
+                _lightTable = reader.ReadBytes(0x400); // Amedo
                 reader.ReadInt32(); // Total lights amount
                 var ambientLights = reader.ReadInt32();
                 var dirLights = reader.ReadInt32();
                 var pointLights = reader.ReadInt32();
                 var negativeLights = reader.ReadInt32();
+                _lightTableCounts = (ambientLights, dirLights, pointLights, negativeLights); // Amedo
                 // GetLength methods can be used here since all these classes have static length
                 for (var i = 0; i < ambientLights; ++i)
                 {
@@ -121,6 +140,9 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2
             }
             if (HasLighting)
             {
+                if (LightTableKept) writer.Write(_lightTable!); // Amedo
+                else
+                {
                 for (var i = 0; i < AmbientLights.Count; ++i)
                 {
                     writer.Write(i);
@@ -141,8 +163,9 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2
                     writer.Write(i);
                     writer.Write((Int32)LightIdentifier.Negative);
                 }
+                writer.Write(ITwinScenery.GetReservedBlob(), 0, 0x400 - (8 * (AmbientLights.Count + DirectionalLights.Count + PointLights.Count + NegativeLights.Count)));
+                }
                 var totalLightCount = AmbientLights.Count + DirectionalLights.Count + PointLights.Count + NegativeLights.Count;
-                writer.Write(ITwinScenery.GetReservedBlob(), 0, 0x400 - (8 * totalLightCount));
                 writer.Write(totalLightCount);
                 writer.Write(AmbientLights.Count);
                 writer.Write(DirectionalLights.Count);

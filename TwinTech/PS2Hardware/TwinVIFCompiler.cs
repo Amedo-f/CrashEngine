@@ -329,7 +329,7 @@ namespace Twinsanity.PS2Hardware
                             for (Int32 j = 0; j < colors.Count; j++)
                             {
                                 var color = colors[j];
-                                color.A &= 127;
+                                color.A = (Byte)(color.A >> 1); // Amedo
                                 var uv = uvs[j];
                                 var compiledVector = new Vector4();
                                 compiledVector.SetBinaryX((uv.GetBinaryX() & 0xFFFFFF00) | color.R);
@@ -404,7 +404,7 @@ namespace Twinsanity.PS2Hardware
                                     compiledColor.SetBinaryX(toColor.R);
                                     compiledColor.SetBinaryY(toColor.G);
                                     compiledColor.SetBinaryZ(toColor.B);
-                                    compiledColor.SetBinaryW((UInt32)toColor.A >> 1);
+                                    compiledColor.SetBinaryW(((UInt32)toColor.A >> 1) | (toColor.AlphaBlendFlag ? 0x80u : 0u)); // Amedo
                                     compiledColors.Add(compiledColor);
                                 }
                                 interpreter.Pack(compiledColors, packedEmits, PackFormat.V4_8);
@@ -435,10 +435,10 @@ namespace Twinsanity.PS2Hardware
                                 compiledPosition.SetBinaryY((UInt32)((Int16)Math.Round(compiledPosition.Y)));
                                 compiledPosition.SetBinaryZ((UInt32)((Int16)Math.Round(compiledPosition.Z)));
                                 compiledPosition.SetBinaryW((UInt32)((Int16)Math.Round(compiledPosition.W)));
-                                compiledUv.SetBinaryX((UInt32)((Int16)compiledUv.X));
-                                compiledUv.SetBinaryY((UInt32)((Int16)compiledUv.Y));
-                                compiledUv.SetBinaryZ((UInt32)((Int16)compiledUv.Z));
-                                compiledUv.SetBinaryW((UInt32)((Int16)compiledUv.W));
+                                compiledUv.SetBinaryX((UInt32)((Int16)Math.Round(compiledUv.X))); // Amedo
+                                compiledUv.SetBinaryY((UInt32)((Int16)Math.Round(compiledUv.Y))); // Amedo
+                                compiledUv.SetBinaryZ((UInt32)((Int16)Math.Round(compiledUv.Z))); // Amedo
+                                compiledUv.SetBinaryW((UInt32)((Int16)Math.Round(compiledUv.W))); // Amedo
                                 compiledPositions.Add(compiledPosition);
                                 compiledUvs.Add(compiledUv);
                             }
