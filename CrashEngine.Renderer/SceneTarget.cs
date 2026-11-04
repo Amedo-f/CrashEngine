@@ -96,6 +96,7 @@ public sealed class SceneTarget : IDisposable
     private float _gamma = 1f;
     private float _sharpen; // Amedo
     private bool _failed;
+    private bool _tiled;
 
     public int Width => _width;
     public int Height => _height;
@@ -118,44 +119,139 @@ public sealed class SceneTarget : IDisposable
         Instance = new SceneTarget(gl);
         Engine.BeginScene = Instance.Begin;
         Engine.EndScene = Instance.End;
+        Engine.ReuseScene = Instance.Reuse;
+    }
+
+    public static bool ReuseHeldFrames { get; set; }
+
+    private readonly record struct PictureKey(int W, int H, int Samples, int SettingsVersion, int ScreenW, int ScreenH,
+        (int X, int Y, int W, int H)? Viewport, Matrix4x4 View, Matrix4x4 Projection, long Uploads);
+
+    private PictureKey _lastKey;
+    private int _heldFrames;
+    private static int _freshFrames;
+
+    public static void DrawFresh(int frames) => _freshFrames = Math.Max(_freshFrames, frames);
+
+    private bool Wanted(out int w, out int h, out int samples)
+    {
+        var settings = GraphicsSettings.Current;
+        var engine = Engine.Instance;
+        w = h = samples = 0;
+        if (_failed || engine.Width < 1 || engine.Height < 1) return false; // Amedo
+        if (engine.ViewWidth < 1 || engine.ViewHeight < 1) return false; // Amedo
+        var (rw, rh) = GraphicsSettings.SceneSize(settings.RenderHeight, engine.ViewWidth, engine.ViewHeight, engine.ScreenHeight); // Amedo
+        w = Math.Clamp(rw, 1, _maxSize);
+        h = Math.Clamp(rh, 1, _maxSize);
+        samples = Math.Min(settings.Msaa, _maxSamples);
+        return !(engine.SceneViewport is null && w == engine.Width && h == engine.Height && samples == 1 && settings.Brightness == GraphicsSettings.BrightnessDefault && settings.Sharpness == 0); // Amedo
+    }
+
+    private static PictureKey KeyFor(int w, int h, int samples)
+    {
+        var engine = Engine.Instance;
+        var camera = RenderPipeline.Instance?.Camera;
+        return new PictureKey(w, h, samples, GraphicsSettings.Version, engine.Width, engine.Height, engine.SceneViewport,
+                              camera?.View ?? default, camera?.Projection ?? default, GpuUploadQueue.LastFrame);
+    }
+
+    private const float CameraNoise = 1e-5f, CameraNoiseScale = 2e-6f;
+
+    private static bool Near(in Matrix4x4 a, in Matrix4x4 b)
+    {
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 4; c++)
+                if (MathF.Abs(a[r, c] - b[r, c]) > MathF.Max(CameraNoise, CameraNoiseScale * MathF.Max(MathF.Abs(a[r, c]), MathF.Abs(b[r, c])))) return false;
+        return true;
+    }
+
+    private static bool Same(in PictureKey a, in PictureKey b) =>
+        a with { View = default, Projection = default } == b with { View = default, Projection = default } && Near(a.View, b.View) && Near(a.Projection, b.Projection);
+
+    private static string Changed(PictureKey a, PictureKey b)
+    {
+        var parts = new List<string>();
+        if ((a.W, a.H, a.Samples) != (b.W, b.H, b.Samples)) parts.Add($"scene size {a.W}x{a.H}x{a.Samples} -> {b.W}x{b.H}x{b.Samples}");
+        if (a.SettingsVersion != b.SettingsVersion) parts.Add("graphics settings");
+        if ((a.ScreenW, a.ScreenH) != (b.ScreenW, b.ScreenH) || a.Viewport != b.Viewport) parts.Add("screen");
+        if (!Near(a.View, b.View)) parts.Add($"camera moved {a.View.Translation} -> {b.View.Translation}");
+        if (!Near(a.Projection, b.Projection)) parts.Add("camera lens");
+        if (a.Uploads != b.Uploads) parts.Add($"new GPU data (frame {b.Uploads})");
+        return string.Join(", ", parts);
+    }
+
+    private bool Reuse(GL gl)
+    {
+        if (_freshFrames > 0)
+        {
+            _freshFrames--;
+            _heldFrames = 0;
+            return false;
+        }
+        if (!ReuseHeldFrames || _heldFrames < 2 || _fbo == 0) return false;
+        if (!Wanted(out int w, out int h, out int samples) || w != _width || h != _height || samples != _samples) return false;
+        if (!Same(KeyFor(w, h, samples), _lastKey)) return false;
+        Present(gl);
+        return true;
     }
 
     private bool Begin(GL gl)
     {
+        if (!Wanted(out int w, out int h, out int samples)) return false;
         var settings = GraphicsSettings.Current;
         var engine = Engine.Instance;
-        if (_failed || engine.Width < 1 || engine.Height < 1) return false; // Amedo
-        if (engine.ViewWidth < 1 || engine.ViewHeight < 1) return false; // Amedo
-        var (rw, rh) = GraphicsSettings.SceneSize(settings.RenderHeight, engine.ViewWidth, engine.ViewHeight, engine.ScreenHeight); // Amedo
-        int w = Math.Clamp(rw, 1, _maxSize), h = Math.Clamp(rh, 1, _maxSize);
-        int samples = Math.Min(settings.Msaa, _maxSamples);
-        if (engine.SceneViewport is null && w == engine.Width && h == engine.Height && samples == 1 && settings.Brightness == GraphicsSettings.BrightnessDefault && settings.Sharpness == 0) return false; // Amedo
         if (!Ensure(gl, w, h, samples)) return false;
         _gamma = settings.Gamma;
         _sharpen = settings.SharpenAmount; // Amedo
-        uint fbo = samples > 1 ? _msFbo : _fbo;
+        uint fbo = samples > 1 && !_tiled ? _msFbo : _fbo;
         engine.SceneFramebuffer = fbo;
         engine.SceneWidth = w;
         engine.SceneHeight = h;
         engine.SceneSamples = samples;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
         gl.Viewport(0, 0, (uint)w, (uint)h);
+        Clear(gl);
+        return true;
+    }
+
+    private static void Clear(GL gl)
+    {
         gl.ClearColor(0.10f, 0.10f, 0.12f, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        return true;
+    }
+
+    public void ResumeAfterOffscreen(GL gl)
+    {
+        if (_tiled && Engine.Instance.SceneFramebuffer == _fbo) Clear(gl);
     }
 
     private void End(GL gl)
     {
         var engine = Engine.Instance;
         int w = _width, h = _height;
-        if (_samples > 1)
+        if (_samples > 1 && !_tiled)
         {
             gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
             gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _fbo);
             gl.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
         }
+        if (GlCaps.InvalidateFramebuffer) Discard(gl, _samples > 1 && !_tiled ? _msFbo : _fbo, color: _samples > 1 && !_tiled);
+        var key = KeyFor(w, h, _samples);
+        bool held = Engine.SceneHeld?.Invoke() == true;
+        bool same = Same(key, _lastKey);
+        if (held && _heldFrames >= 2 && !same && ReuseHeldFrames) Console.WriteLine($"[SceneTarget] held picture drawn again: {Changed(_lastKey, key)}");
+        _heldFrames = !held ? 0 : same ? _heldFrames + 1 : 1;
+        _lastKey = key;
+        Present(gl);
+    }
+
+    private void Present(GL gl)
+    {
+        var engine = Engine.Instance;
+        int w = _width, h = _height;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, engine.TargetFramebuffer);
+        if (GlCaps.InvalidateFramebuffer && engine.TargetFramebuffer == 0)
+            gl.InvalidateFramebuffer(FramebufferTarget.Framebuffer, [InvalidateFramebufferAttachment.Depth, InvalidateFramebufferAttachment.Stencil]);
         var view = engine.SceneViewport ?? (0, 0, engine.Width, engine.Height); // Amedo
         int originY = engine.Height - view.Y - view.H;
         gl.Viewport(view.X, originY, (uint)view.W, (uint)view.H);
@@ -171,16 +267,18 @@ public sealed class SceneTarget : IDisposable
         _present.Set("SourceSize", new Vector2(w, h));
         _present.Set("TargetSize", new Vector2(view.W, view.H)); // Amedo
         _present.Set("TargetOrigin", new Vector2(view.X, originY));
-        _present.Set("Taps", ratio >= 2f ? (int)MathF.Ceiling(ratio) : 0); // Amedo
+        _present.Set("Taps", ratio >= 2f ? (int)MathF.Ceiling(ratio) : GlCaps.Gles ? 1 : 0); // Amedo
         _present.Set("InvGamma", 1f / _gamma);
         _present.Set("Sharpen", _sharpen); // Amedo
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, _color);
         GlState.VertexArray(gl, _vao);
+        GlState.SendLater(gl);
         gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         GpuStats.Draws++;
         GlState.VertexArray(gl, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        GlState.ForgetTextures();
         gl.UseProgram(0);
         gl.Viewport(0, 0, (uint)engine.Width, (uint)engine.Height); // Amedo
         GlState.DepthTest(gl, true);
@@ -195,12 +293,15 @@ public sealed class SceneTarget : IDisposable
     private unsafe bool Ensure(GL gl, int w, int h, int samples)
     {
         if (_fbo != 0 && _width == w && _height == h && _samples == samples) return true;
-        if (_fbo == 0)
+        if (_fbo != 0)
         {
-            _fbo = gl.GenFramebuffer();
-            _color = gl.GenTexture();
-            _depth = gl.GenRenderbuffer();
+            gl.DeleteFramebuffer(_fbo);
+            gl.DeleteTexture(_color);
+            gl.DeleteRenderbuffer(_depth);
         }
+        _fbo = gl.GenFramebuffer();
+        _color = gl.GenTexture();
+        _depth = gl.GenRenderbuffer();
         gl.BindTexture(TextureTarget.Texture2D, _color);
         gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -208,13 +309,17 @@ public sealed class SceneTarget : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        GlState.ForgetTextures();
+        bool tiled = samples > 1 && GlCaps.TiledMsaa;
         gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _depth);
-        gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8, (uint)w, (uint)h);
+        if (tiled) GlesExtensions.RenderbufferStorageMultisample((uint)RenderbufferTarget.Renderbuffer, samples, (uint)InternalFormat.Depth24Stencil8, w, h);
+        else gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8, (uint)w, (uint)h);
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
-        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _color, 0);
+        if (tiled) GlesExtensions.FramebufferTexture2DMultisample((uint)FramebufferTarget.Framebuffer, (uint)FramebufferAttachment.ColorAttachment0, (uint)TextureTarget.Texture2D, _color, 0, samples);
+        else gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _color, 0);
         gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, RenderbufferTarget.Renderbuffer, _depth);
         bool ok = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer) == GLEnum.FramebufferComplete;
-        if (ok && samples > 1)
+        if (ok && samples > 1 && !tiled)
         {
             if (_msFbo == 0)
             {
@@ -236,9 +341,17 @@ public sealed class SceneTarget : IDisposable
         _width = w;
         _height = h;
         _samples = samples;
-        Console.WriteLine($"[SceneTarget] scene {w}x{h}, MSAA {samples}x{(ok ? "" : " - incomplete, drawing straight to the screen")}");
+        _tiled = tiled;
+        Console.WriteLine($"[SceneTarget] scene {w}x{h}, MSAA {samples}x{(tiled ? " (tiled)" : "")}{(ok ? "" : " - incomplete, drawing straight to the screen")}");
         if (!ok) _failed = true;
         return ok;
+    }
+
+    private static void Discard(GL gl, uint fbo, bool color)
+    {
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+        Span<InvalidateFramebufferAttachment> attachments = [InvalidateFramebufferAttachment.DepthStencilAttachment, InvalidateFramebufferAttachment.ColorAttachment0];
+        gl.InvalidateFramebuffer(FramebufferTarget.Framebuffer, color ? attachments : attachments[..1]);
     }
 
     public void Dispose()
@@ -248,6 +361,7 @@ public sealed class SceneTarget : IDisposable
             _gl.DeleteFramebuffer(_fbo);
             _gl.DeleteTexture(_color);
             _gl.DeleteRenderbuffer(_depth);
+            GlState.ForgetTextures();
         }
         if (_msFbo != 0)
         {

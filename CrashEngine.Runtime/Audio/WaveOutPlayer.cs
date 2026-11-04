@@ -5,7 +5,7 @@ namespace CrashEngine.Runtime.Audio;
 
 // Amedo 2026-09-28
 [SupportedOSPlatform("windows")]
-public sealed class WaveOutPlayer : IDisposable
+public sealed class WaveOutPlayer : IAudioOutput // Amedo 2026-10-26
 {
     [StructLayout(LayoutKind.Sequential, Pack = 2)]
     private struct WaveFormat

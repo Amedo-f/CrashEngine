@@ -107,6 +107,7 @@ public sealed class MovieScaler : IDisposable
         _program.Set("SourceSize", new Vector2(sourceWidth, sourceHeight));
         _program.Set("TargetSize", new Vector2(width, height));
         gl.BindVertexArray(_vao);
+        GlState.SendLater(gl);
         gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         gl.BindVertexArray(0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
@@ -133,6 +134,7 @@ public sealed class MovieScaler : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        GlState.ForgetTextures();
         _fbo = gl.GenFramebuffer();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _color, 0);
@@ -155,6 +157,7 @@ public sealed class MovieScaler : IDisposable
     {
         if (_fbo != 0) _gl.DeleteFramebuffer(_fbo);
         if (_color != 0) _gl.DeleteTexture(_color);
+        GlState.ForgetTextures();
         _fbo = _color = 0;
         _width = _height = 0;
     }

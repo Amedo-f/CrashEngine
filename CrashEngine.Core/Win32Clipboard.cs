@@ -74,6 +74,7 @@ public static class Win32Clipboard
 
     public static unsafe void Hook(ImGuiIOPtr io)
     {
+        if (!OperatingSystem.IsWindows()) return; // Amedo 2026-10-26
         io.NativePtr->GetClipboardTextFn = s_getPtr;
         io.NativePtr->SetClipboardTextFn = s_setPtr;
     }

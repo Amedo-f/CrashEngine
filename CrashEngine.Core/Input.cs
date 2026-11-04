@@ -27,11 +27,13 @@ public static class Input
 
     private static float _large = -1f, _small = -1f; // Amedo
 
+    public static Func<float, float, bool>? Rumble;
+
     // Amedo
     public static void SetVibration(float large, float small)
     {
         if (large == _large && small == _small) return;
-        if (XInput.Set(large, small))
+        if (XInput.Set(large, small) || Rumble?.Invoke(large, small) == true)
         {
             _large = large;
             _small = small;

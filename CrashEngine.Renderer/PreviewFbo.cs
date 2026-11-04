@@ -23,6 +23,7 @@ public sealed class PreviewFbo : IDisposable
 
         _color = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, _color);
+        GlState.ForgetTextures();
         _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                        (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -82,6 +83,7 @@ public sealed class PreviewFbo : IDisposable
     {
         _gl.DeleteFramebuffer(_fbo);
         _gl.DeleteTexture(_color);
+        GlState.ForgetTextures();
         _gl.DeleteRenderbuffer(_depth);
     }
 

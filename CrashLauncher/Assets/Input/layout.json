@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "opacity": 0.8,
+  "controls": [
+    { "id": "l2",       "pad": "L2",       "image": "l2.png",       "anchor": "top-left",     "x": 0.162, "y": 0.071, "w": 0.173, "h": 0.075 },
+    { "id": "l1",       "pad": "L1",       "image": "l1.png",       "anchor": "top-left",     "x": 0.162, "y": 0.162, "w": 0.173, "h": 0.075 },
+    { "id": "r2",       "pad": "R2",       "image": "r2.png",       "anchor": "top-right",    "x": 0.162, "y": 0.071, "w": 0.173, "h": 0.075 },
+    { "id": "r1",       "pad": "R1",       "image": "r1.png",       "anchor": "top-right",    "x": 0.162, "y": 0.162, "w": 0.173, "h": 0.075 },
+    { "id": "select",   "pad": "Select",   "image": "select.png",   "anchor": "top-center",   "x": -0.124, "y": 0.073, "w": 0.188, "h": 0.064 },
+    { "id": "start",    "pad": "Start",    "image": "start.png",    "anchor": "top-center",   "x": 0.086, "y": 0.073, "w": 0.188, "h": 0.064 },
+    { "id": "left_stick",  "pad": "LeftStick",  "press": "L3", "image": "stick_base.png", "knob": "stick_knob.png", "anchor": "bottom-left",  "x": 0.263, "y": 0.586, "w": 0.263, "h": 0.263 },
+    { "id": "right_stick", "pad": "RightStick", "press": "R3", "image": "stick_base.png", "knob": "stick_knob.png", "anchor": "bottom-right", "x": 0.575, "y": 0.274, "w": 0.263, "h": 0.263 },
+    { "id": "dpad_up",    "pad": "Up",    "image": "dpad_up.png",    "anchor": "bottom-left", "x": 0.585, "y": 0.359, "w": 0.094, "h": 0.094 },
+    { "id": "dpad_down",  "pad": "Down",  "image": "dpad_down.png",  "anchor": "bottom-left", "x": 0.585, "y": 0.171, "w": 0.094, "h": 0.094 },
+    { "id": "dpad_left",  "pad": "Left",  "image": "dpad_left.png",  "anchor": "bottom-left", "x": 0.491, "y": 0.265, "w": 0.094, "h": 0.094 },
+    { "id": "dpad_right", "pad": "Right", "image": "dpad_right.png", "anchor": "bottom-left", "x": 0.679, "y": 0.265, "w": 0.094, "h": 0.094 },
+    { "id": "triangle", "pad": "Triangle", "image": "triangle.png", "round": true, "anchor": "bottom-right", "x": 0.301, "y": 0.671, "w": 0.132, "h": 0.132 },
+    { "id": "cross",    "pad": "Cross",    "image": "cross.png", "round": true,    "anchor": "bottom-right", "x": 0.301, "y": 0.427, "w": 0.132, "h": 0.132 },
+    { "id": "square",   "pad": "Square",   "image": "square.png", "round": true,   "anchor": "bottom-right", "x": 0.423, "y": 0.549, "w": 0.132, "h": 0.132 },
+    { "id": "circle",   "pad": "Circle",   "image": "circle.png", "round": true,   "anchor": "bottom-right", "x": 0.179, "y": 0.549, "w": 0.132, "h": 0.132 }
+  ]
+}

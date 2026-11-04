@@ -38,6 +38,9 @@
   <ItemGroup>
     <None Include="Assets\Icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Assets\Models\**\*.glb" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Amedo 2026-10-26 -->
+    <None Include="Assets\Input\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\Devices\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs).

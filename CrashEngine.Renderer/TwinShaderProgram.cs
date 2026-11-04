@@ -14,8 +14,9 @@ public sealed class TwinShaderProgram : IDisposable
     public TwinShaderProgram(GL gl, string shaderDir, string vertFile, string fragFile)
     {
         _gl = gl;
-        uint v = Compile(gl, shaderDir, vertFile, ShaderType.VertexShader);
-        uint f = Compile(gl, shaderDir, fragFile, ShaderType.FragmentShader);
+        var defaults = new List<CrashEngine.Core.GlslSource.UniformDefault>();
+        uint v = Compile(gl, shaderDir, vertFile, ShaderType.VertexShader, defaults);
+        uint f = Compile(gl, shaderDir, fragFile, ShaderType.FragmentShader, defaults);
 
         _id = gl.CreateProgram();
         gl.AttachShader(_id, v);
@@ -26,13 +27,14 @@ public sealed class TwinShaderProgram : IDisposable
 
         gl.DetachShader(_id, v); gl.DetachShader(_id, f);
         gl.DeleteShader(v);      gl.DeleteShader(f);
+        CrashEngine.Core.GlslSource.ApplyDefaults(gl, _id, defaults);
     }
 
-    private static uint Compile(GL gl, string dir, string file, ShaderType type)
+    private static uint Compile(GL gl, string dir, string file, ShaderType type, List<CrashEngine.Core.GlslSource.UniformDefault> defaults)
     {
         var src = "#version 450 core\r\n" + LoadWithIncludes(Path.Combine(dir, file));
         uint s = gl.CreateShader(type);
-        gl.ShaderSource(s, src);
+        gl.ShaderSource(s, CrashEngine.Core.GlslSource.ForContext(src, defaults));
         gl.CompileShader(s);
         gl.GetShader(s, ShaderParameterName.CompileStatus, out int ok);
         if (ok == 0) throw new Exception($"{type} ({file}) compile failed:\n" + gl.GetShaderInfoLog(s));
@@ -84,6 +86,61 @@ public sealed class TwinShaderProgram : IDisposable
         internal int I;
         internal Vector4 V;
         internal Matrix4x4 M;
+        internal bool Later, Queued;
+        internal int LaterKind, LaterI;
+        internal Vector4 LaterV;
+    }
+
+    private readonly List<Slot> _later = new();
+    private static readonly List<TwinShaderProgram> _withLater = new();
+
+    public void SetLater(Slot s, int v) => Later(s, 1, v, default);
+    public void SetLater(Slot s, float v) => Later(s, 2, 0, new Vector4(v, 0f, 0f, 0f));
+    public void SetLater(Slot s, Vector2 v) => Later(s, 3, 0, new Vector4(v, 0f, 0f));
+    public void SetLater(Slot s, Vector4 v) => Later(s, 5, 0, v);
+
+    private void Later(Slot s, int kind, int i, Vector4 v)
+    {
+        if (s.Loc < 0) return;
+        if (s.Kind == kind && (kind == 1 ? s.I == i : Same(s.V, v)))
+        {
+            s.Later = false;
+            return;
+        }
+        s.Later = true;
+        s.LaterKind = kind;
+        s.LaterI = i;
+        s.LaterV = v;
+        if (s.Queued) return;
+        s.Queued = true;
+        if (_later.Count == 0) _withLater.Add(this);
+        _later.Add(s);
+    }
+
+    public static void SendLater()
+    {
+        if (_withLater.Count == 0) return;
+        foreach (var p in _withLater)
+        {
+            foreach (var s in p._later)
+            {
+                s.Queued = false;
+                if (!s.Later) continue;
+                s.Later = false;
+                s.Kind = s.LaterKind;
+                s.I = s.LaterI;
+                s.V = s.LaterV;
+                switch (s.Kind)
+                {
+                    case 1: p._gl.ProgramUniform1(p._id, s.Loc, s.I); break;
+                    case 2: p._gl.ProgramUniform1(p._id, s.Loc, s.V.X); break;
+                    case 3: p._gl.ProgramUniform2(p._id, s.Loc, s.V.X, s.V.Y); break;
+                    case 5: p._gl.ProgramUniform4(p._id, s.Loc, s.V.X, s.V.Y, s.V.Z, s.V.W); break;
+                }
+            }
+            p._later.Clear();
+        }
+        _withLater.Clear();
     }
 
     // Amedo 2026-10-01
@@ -122,6 +179,7 @@ public sealed class TwinShaderProgram : IDisposable
 
     private bool Changed(Slot s, int kind, Vector4 v)
     {
+        s.Later = false;
         if (s.Loc < 0 || (s.Kind == kind && Same(s.V, v))) return false;
         s.Kind = kind;
         s.V = v;
@@ -133,6 +191,7 @@ public sealed class TwinShaderProgram : IDisposable
     // Amedo 2026-10-01
     public void Set(Slot s, int v)
     {
+        s.Later = false;
         if (s.Loc < 0 || (s.Kind == 1 && s.I == v)) return;
         s.Kind = 1;
         s.I = v;
@@ -155,6 +214,7 @@ public sealed class TwinShaderProgram : IDisposable
     // Amedo 2026-10-01
     public void Set(Slot s, Matrix4x4 m)
     {
+        s.Later = false;
         if (s.Loc < 0) return;
         if (s.Kind == 6 && System.Runtime.InteropServices.MemoryMarshal.AsBytes(new ReadOnlySpan<Matrix4x4>(in s.M))
                 .SequenceEqual(System.Runtime.InteropServices.MemoryMarshal.AsBytes(new ReadOnlySpan<Matrix4x4>(in m)))) return;
@@ -189,5 +249,10 @@ public sealed class TwinShaderProgram : IDisposable
             _gl.Uniform4(l, (uint)v.Length, (float*)p);
     }
 
-    public void Dispose() => _gl.DeleteProgram(_id);
+    public void Dispose()
+    {
+        _withLater.Remove(this);
+        _later.Clear();
+        _gl.DeleteProgram(_id);
+    }
 }

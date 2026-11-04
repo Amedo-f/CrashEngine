@@ -150,7 +150,7 @@ public sealed class Material
         if (Culling == CullMode.Both) GlState.Culling(gl, false); // Amedo 2026-10-01
         else { GlState.Culling(gl, true); GlState.CullFace(gl, Culling == CullMode.Back ? TriangleFace.Front : TriangleFace.Back); }
 
-        GlState.DepthMask(gl, DepthWrite && !AlphaBlend); // Amedo 2026-10-01
+        GlState.DepthMask(gl, DepthWrite && (!AlphaBlend || SourceShader is not null)); // Amedo 2026-10-01
         GlState.DepthFunc(gl, DepthFunction.Lequal);
         if (IgnoreDepthTest) GlState.DepthTest(gl, false);
 
@@ -170,10 +170,10 @@ public sealed class Material
         if (Culling != CullMode.Both) GlState.Culling(gl, false);
         GlBlend.Set(gl, _blendWasOn); // Amedo 2026-09-30
         var u = U(sh); // Amedo 2026-10-01
-        sh.Set(u.UvScrollMode,  Vector2.Zero); // Amedo 2026-09-26
-        sh.Set(u.UvScrollPhase, Vector2.Zero); // Amedo 2026-09-26
-        sh.Set(u.ClothKind,     0f); // Amedo 2026-09-26
-        sh.Set(u.BlendFunc,     0); // Amedo 2026-09-26
+        sh.SetLater(u.UvScrollMode,  Vector2.Zero); // Amedo 2026-09-26
+        sh.SetLater(u.UvScrollPhase, Vector2.Zero); // Amedo 2026-09-26
+        sh.SetLater(u.ClothKind,     0f); // Amedo 2026-09-26
+        sh.SetLater(u.BlendFunc,     0); // Amedo 2026-09-26
     }
 
     // Amedo

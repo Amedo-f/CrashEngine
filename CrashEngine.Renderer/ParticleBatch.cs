@@ -101,6 +101,7 @@ public sealed class ParticleBatch : IDisposable
         }
         _shader.Set("Opaque", blend == BlendKind.Opaque ? 1 : 0);
         _shader.Set("AlphaRef", alphaRef); // Amedo
+        GlState.SendLater(_gl);
         _gl.DrawElements(PrimitiveType.Triangles, (uint)(quads * 6), DrawElementsType.UnsignedInt, (void*)0);
         GpuStats.Draws++; // Amedo 2026-09-30
         GpuStats.Triangles += quads * 2;

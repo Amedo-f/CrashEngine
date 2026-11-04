@@ -69,6 +69,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.Xbox.Items.Graphics
             if (TextureDescriptorHelper == null)
             {
                 string codeBase = Assembly.GetExecutingAssembly().Location;
+                if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
                 UriBuilder uri = new(codeBase);
                 string path = Uri.UnescapeDataString(uri.Path);
                 using FileStream stream = new(Path.Combine(Path.GetDirectoryName(path), @"TextureDescriptionHelper.json"), FileMode.Open, FileAccess.Read);

@@ -105,7 +105,7 @@ public sealed class GameShadowPass : Component
         if (w < 2 || h < 2) return;
 
         gl.Disable(EnableCap.ScissorTest);
-        bool half = !_halfResFailed && EnsureTargets(gl, w / 2, h / 2);
+        bool half = !GlCaps.Gles && !_halfResFailed && EnsureTargets(gl, w / 2, h / 2); // Amedo 2026-10-26
         if (half)
         {
             if (!_blitVerified) ClearErrors(gl); // Amedo 2026-10-01
@@ -149,7 +149,7 @@ public sealed class GameShadowPass : Component
         GlState.DepthFunc(gl, DepthFunction.Lequal);
         GlState.Culling(gl, false);
         GlBlend.Set(gl, false); // Amedo 2026-09-30
-        gl.StencilFunc(StencilFunction.Equal, 0, ReceiverBit);
+        GlState.StencilFunc(gl, StencilFunction.Equal, 0, ReceiverBit);
         _volumeShader!.Use();
         foreach (var (type, model) in _volumes)
         {
@@ -166,7 +166,7 @@ public sealed class GameShadowPass : Component
 
         GlState.DepthTest(gl, false); // Amedo 2026-10-01
         gl.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
-        gl.StencilFunc(StencilFunction.Notequal, 0, CountBits);
+        GlState.StencilFunc(gl, StencilFunction.Notequal, 0, CountBits);
         GlState.VertexArray(gl, _screenVao); // Amedo 2026-10-01
         if (half)
         {
@@ -190,6 +190,7 @@ public sealed class GameShadowPass : Component
         gl.BindTexture(TextureTarget.Texture2D, half ? _mask : 0);
         gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        GlState.ForgetTextures();
 
         gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
         GlBlend.Set(gl, false); // Amedo 2026-09-30
@@ -218,6 +219,7 @@ public sealed class GameShadowPass : Component
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        GlState.ForgetTextures();
 
         gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _depthStencil);
         gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8, (uint)w, (uint)h);
@@ -284,6 +286,7 @@ public sealed class GameShadowPass : Component
             _gl.DeleteFramebuffer(_fbo);
             _gl.DeleteRenderbuffer(_depthStencil);
             _gl.DeleteTexture(_mask);
+            GlState.ForgetTextures();
         }
         if (_resolveFbo != 0) // Amedo
         {

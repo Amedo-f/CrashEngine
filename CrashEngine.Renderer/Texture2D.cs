@@ -69,6 +69,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         var gl = _gl;
         _id    = GlNames.Texture(gl); // Amedo 2026-09-30
         gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.ForgetTextures();
 
         uint w = _uploadW, h = _uploadH; // Amedo 2026-10-02
         if (GpuStats.TextureStressScale > 1 && !HighRes) rgba = StressUpscale(rgba, ref w, ref h);
@@ -160,6 +161,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
             if (gl.GetError() != GLEnum.NoError) _maxAnisotropy = 0f;
         }
         gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.ForgetTextures();
         if (_gameMips is not null) // Amedo
         {
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
@@ -192,6 +194,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         _clamp = true;
         if (!Uploaded) return;
         _gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.ForgetTextures();
         SetWrap();
         _gl.BindTexture(TextureTarget.Texture2D, 0);
     }
@@ -277,6 +280,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         _uploadH = uploadH;
         _mipmaps = true;
         _gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.ForgetTextures();
         fixed (byte* p = rgba)
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                           uploadW, uploadH, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
@@ -300,6 +304,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         _uploadW = w; // Amedo 2026-10-02
         _uploadH = h;
         _gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.ForgetTextures();
         fixed (byte* p = rgba)
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                           w, h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
@@ -320,8 +325,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
     public void Bind(uint slot = 0)
     {
         if (!Uploaded) Upload(); // Amedo 2026-09-29
-        _gl.ActiveTexture(TextureUnit.Texture0 + (int)slot);
-        _gl.BindTexture(TextureTarget.Texture2D, _id);
+        GlState.Texture(_gl, slot, _id);
     }
 
     public void Dispose()
@@ -333,5 +337,6 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         GpuStats.TextureBytes -= _bytes; // Amedo 2026-09-30
         GpuStats.Textures--;
         _gl.DeleteTexture(_id);
+        GlState.ForgetTextures();
     }
 }

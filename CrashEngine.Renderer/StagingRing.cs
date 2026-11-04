@@ -21,7 +21,7 @@ internal static class StagingRing
     // Amedo
     public static unsafe bool Copy(GL gl, uint target, long targetOffset, void* data, long bytes)
     {
-        if (!Enabled || bytes <= 0 || bytes > Size / 4 || !Ready(gl)) return false;
+        if (!Enabled || !GlCaps.Dsa || bytes <= 0 || bytes > Size / 4 || !Ready(gl)) return false;
         long now = PerfStats.FrameNumber;
         if (now != _frame)
         {

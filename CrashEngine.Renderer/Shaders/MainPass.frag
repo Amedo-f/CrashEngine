@@ -32,8 +32,9 @@ layout (binding = 9) uniform samplerCubeArrayShadow PointMap;
 
 // Amedo: the level's point lights, the game's falloff (f = 25 / (d^2 + 25), Radius * f^exp * dot(N, d * f)),
 // each one shadowed by its cube map; returns the light that reaches p, `blocked` = the part its shadow takes away
-vec3 PointLighting(vec3 p, vec3 n, float wrap, out vec3 blocked)
+vec3 PointLighting(highp vec3 p, vec3 n, float wrap, out vec3 blocked)
 {
+    precision highp float;
     vec3 lit = vec3(0.0);
     blocked = vec3(0.0);
     for (int i = 0; i < PointCount; i++)
@@ -73,8 +74,9 @@ float SunPenumbraNow;
 bool SunUseFocus;
 
 // Amedo
-float SunSample(int cascade, float texel, vec3 worldPos, vec3 n, out float edge)
+float SunSample(int cascade, float texel, highp vec3 worldPos, vec3 n, out float edge)
 {
+    precision highp float;
     float radius = clamp(SunPenumbraNow / texel, 0.5, 3.0);
     vec4 clip = SunViewProj[cascade] * vec4(worldPos + n * texel * (1.0 + radius), 1.0);
     vec3 ndc = clip.xyz / clip.w;
@@ -101,8 +103,9 @@ float SunSample(int cascade, float texel, vec3 worldPos, vec3 n, out float edge)
 }
 
 // Amedo
-float SunVisibility(vec3 worldPos, vec3 n, out int cascade)
+float SunVisibility(highp vec3 worldPos, vec3 n, out int cascade)
 {
+    precision highp float;
     cascade = SunCascades;
     float focusLit = -1.0, focusBlend = 1.0;
     if (SunFocus != 0 && SunUseFocus)
@@ -137,8 +140,9 @@ float SunVisibility(vec3 worldPos, vec3 n, out int cascade)
 }
 
 // Amedo 2026-09-26
-vec2 ScrollOffset()
+highp vec2 ScrollOffset()
 {
+    precision highp float;
     const float TAU = 6.2831853;
     vec2 a = twin_material.uv_scroll_phase + twin_material.uv_scroll_speed * Time;
     int mx = int(twin_material.uv_scroll_mode.x + 0.5);
@@ -154,7 +158,7 @@ vec2 ScrollOffset()
 }
 
 // Amedo
-vec4 GameTexture(vec2 uv)
+vec4 GameTexture(highp vec2 uv)
 {
     int mode = int(twin_material.gs_lod.x + 0.5);
     if (mode == 0) return texture(Texture[0], uv, MipBias);
@@ -165,14 +169,43 @@ vec4 GameTexture(vec2 uv)
 void main()
 {
     // Amedo
+#ifdef LEAN_PIXELS
+    vec3 faceNormal = vec3(0.0);
+    if (SunShadows != 0)
+    {
+        faceNormal = normalize(cross(dFdx(ViewPosition), dFdy(ViewPosition)));
+        if (dot(faceNormal, EyePosition - ViewPosition) < 0.0) faceNormal = -faceNormal;
+    }
+#else
     vec3 faceNormal = normalize(cross(dFdx(ViewPosition), dFdy(ViewPosition)));
     if (dot(faceNormal, EyePosition - ViewPosition) < 0.0) faceNormal = -faceNormal;
-    vec2 screenUvs = gl_FragCoord.xy / Resolution;
-    vec2 uvs = (twin_material.env_map > 0.5 ? EnvTexpos : Texpos) + ScrollOffset(); // Amedo 2026-09-26
+#endif
+    highp vec2 screenUvs = gl_FragCoord.xy / Resolution;
+    highp vec2 uvs =(twin_material.env_map > 0.5 ? EnvTexpos : Texpos) + ScrollOffset(); // Amedo 2026-09-26
     uvs.y = mix(uvs.y, 1.0 - uvs.y, FlipY);
     vec4 textureColor = mix(vec4(1.0), GameTexture(uvs), twin_material.use_texture); // Amedo
     vec3 resultColor = textureColor.rgb * Color.rgb;
     float resultAlpha = textureColor.a * Color.a;
+#ifdef LEAN_PIXELS
+    if (resultAlpha < twin_material.alpha_test)
+    {
+        discard;
+        return;
+    }
+    if (twin_material.reflect_dist.x != 0.0)
+    {
+        vec4 screenColorReflected = texture(Screen, screenUvs + twin_material.reflect_dist.yy);
+        resultColor = mix(resultColor, screenColorReflected.rgb * Color.rgb * resultColor, twin_material.reflect_dist.x);
+    }
+    float specular = 0.0;
+    if (twin_material.metalic_specular != 0.0)
+    {
+        vec3 surfaceNormal = normalize(Normal);
+        if (!gl_FrontFacing && twin_material.two_sided_lighting) surfaceNormal = -surfaceNormal;
+        vec3 eyeDirection = normalize(EyePosition - ViewPosition);
+        specular = specularGaussian(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
+    }
+#else
     vec4 screenColor = texture(Screen, screenUvs);
     vec2 reflectUv = vec2(screenUvs.x + twin_material.reflect_dist.y, screenUvs.y + twin_material.reflect_dist.y);
     vec4 screenColorReflected = texture(Screen, reflectUv);
@@ -190,6 +223,7 @@ void main()
         discard;
         return;
     }
+#endif
 
     // 2026-09-06 -- real bug, confirmed against a real UnlitGlossy scenery tile (Ice Hub,
     // labext.rm2) that was showing wrong near-black patches in CrashEngine's own preview: the
@@ -205,7 +239,9 @@ void main()
     // 0.3 intensity scalar -- tames the additive highlight (user-reported "too bright/blown
     // out" after the additive fix above); a plain tunable brightness knob, not derived from any
     // real per-material data (none exists for this).
+#ifndef LEAN_PIXELS
     float specular = specularGaussian(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
+#endif
     vec4 resultBlend = vec4(resultColor, mix(1.0, resultAlpha, twin_material.alpha_blend));
     resultBlend.rgb += Color.rgb * specular;
     resultBlend.rgb *= Diffuse.rgb;
@@ -261,8 +297,8 @@ void main()
     }
 
     // Fog
-    float viewDepth = -(View * vec4(ViewPosition, 1.0)).z; // Amedo 2026-09-26
-    float zbuf = GAME_FOG_Z_SCALE / max(viewDepth, 0.0001) + GAME_FOG_Z_BIAS; // Amedo 2026-09-26
+    highp float viewDepth = -(View * vec4(ViewPosition, 1.0)).z; // Amedo 2026-09-26
+    highp float zbuf = GAME_FOG_Z_SCALE / max(viewDepth, 0.0001) + GAME_FOG_Z_BIAS; // Amedo 2026-09-26
     vec4 fogEntry = texelFetch(FogPalette, ivec2(clamp(int(zbuf) >> 8, 0, 255), 0), 0); // Amedo 2026-09-26
     float fogPower = zbuf < 65536.0 ? twin_material.perform_fog * FogAmount * (1.0 - fogEntry.a * 255.0 / 128.0) : 0.0; // Amedo 2026-09-26
     if (twin_material.alpha_blend > 0.5 && twin_material.blend_func != 0) resultBlend.rgb *= 1.0 - fogPower; // Amedo 2026-09-26

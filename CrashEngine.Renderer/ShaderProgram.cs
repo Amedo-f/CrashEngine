@@ -11,8 +11,9 @@ public sealed class ShaderProgram : IDisposable
     public ShaderProgram(GL gl, string vert, string frag)
     {
         _gl = gl;
-        uint v = Compile(ShaderType.VertexShader,   vert);
-        uint f = Compile(ShaderType.FragmentShader, frag);
+        var defaults = new List<CrashEngine.Core.GlslSource.UniformDefault>();
+        uint v = Compile(ShaderType.VertexShader,   vert, defaults);
+        uint f = Compile(ShaderType.FragmentShader, frag, defaults);
 
         _id = gl.CreateProgram();
         gl.AttachShader(_id, v);
@@ -23,12 +24,13 @@ public sealed class ShaderProgram : IDisposable
 
         gl.DeleteShader(v);
         gl.DeleteShader(f);
+        CrashEngine.Core.GlslSource.ApplyDefaults(gl, _id, defaults);
     }
 
-    private uint Compile(ShaderType type, string src)
+    private uint Compile(ShaderType type, string src, List<CrashEngine.Core.GlslSource.UniformDefault> defaults)
     {
         uint s = _gl.CreateShader(type);
-        _gl.ShaderSource(s, src);
+        _gl.ShaderSource(s, CrashEngine.Core.GlslSource.ForContext(src, defaults));
         _gl.CompileShader(s);
         _gl.GetShader(s, ShaderParameterName.CompileStatus, out int ok);
         if (ok == 0) throw new Exception($"{type}:\n" + _gl.GetShaderInfoLog(s));

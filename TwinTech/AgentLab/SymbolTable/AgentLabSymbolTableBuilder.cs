@@ -29,6 +29,7 @@ public class AgentLabSymbolTableBuilder
     public AgentLabSymbolTableBuilder BuildConditions()
     {
         string codeBase = Assembly.GetExecutingAssembly().Location;
+        if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
         UriBuilder uri = new(codeBase);
         string path = Uri.UnescapeDataString(uri.Path);
         using FileStream fs = new(Path.Combine(Path.GetDirectoryName(path), @"AgentLab\ConditionDefinitions.lab"), FileMode.Open, FileAccess.Read);
@@ -45,6 +46,7 @@ public class AgentLabSymbolTableBuilder
         if (actionDefinitionFile != "")
         {
             string codeBase = Assembly.GetExecutingAssembly().Location;
+            if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
             UriBuilder uri = new(codeBase);
             string path = Uri.UnescapeDataString(uri.Path);
             using FileStream fs = new(Path.Combine(Path.GetDirectoryName(path), @$"AgentLab\{actionDefinitionFile}"), FileMode.Open, FileAccess.Read);

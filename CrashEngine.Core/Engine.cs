@@ -12,7 +12,8 @@ public sealed class Engine
     public static Action? UiStateReset { get; set; } // Amedo
     public static int MainThreadId { get; private set; } = -1; // Amedo 2026-09-29
     
-    private readonly IWindow _win;
+    private readonly IView _win; // Amedo 2026-10-26
+    private IWindow? Desktop => _win as IWindow; // Amedo 2026-10-26
     private GL      _gl    = null!;
     private ImGuiController? _imgui;
     private ImGuiRenderer? _imguiRenderer; // Amedo
@@ -49,6 +50,19 @@ public sealed class Engine
         if (KeepFullSpeedInBackground) DisablePowerThrottling(); // Amedo 2026-09-30
         Width = w; Height = h;
 
+        var api = GraphicsApi ?? DefaultGraphicsApi; // Amedo 2026-10-26
+        Gles = api.API == ContextAPI.OpenGLES;
+        if (Window.IsViewOnly) // Amedo 2026-10-26
+        {
+            _win = Window.GetView(ViewOptions.Default with
+            {
+                PreferredDepthBufferBits   = 24,
+                PreferredStencilBufferBits = 8,
+                API = api,
+            });
+        }
+        else
+        {
         var opts = WindowOptions.Default with
         {
             Title = title,
@@ -56,14 +70,11 @@ public sealed class Engine
             IsVisible = visible, // Amedo 2026-09-28
             PreferredDepthBufferBits   = 24, // Amedo 2026-09-26
             PreferredStencilBufferBits = 8, // Amedo 2026-09-26
-            API   = new GraphicsAPI(
-                       ContextAPI.OpenGL,
-                      ContextProfile.Core,
-                        ContextFlags.ForwardCompatible,
-                     new APIVersion(4, 6))
+            API   = api // Amedo 2026-10-26
         };
 
         _win = Window.Create(opts);
+        }
         _win.Load              += OnLoad;
         _win.Update            += OnUpdate;
         _win.Render            += OnRender;
@@ -95,6 +106,16 @@ public sealed class Engine
 
     public void Quit() => _win.Close();
 
+    // Amedo 2026-10-26
+    public static GraphicsAPI? GraphicsApi { get; set; }
+    public static bool AlwaysVSync { get; set; } // Amedo 2026-10-26
+    public bool Gles { get; }
+
+    // Amedo 2026-10-26
+    private static GraphicsAPI DefaultGraphicsApi => OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
+        ? new GraphicsAPI(ContextAPI.OpenGLES, ContextProfile.Compatability, ContextFlags.Default, new APIVersion(3, 2))
+        : new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(4, 6));
+
     // Amedo
     private string _baseTitle = "CrashEngine";
     private string _titleDetail = "";
@@ -102,13 +123,14 @@ public sealed class Engine
     {
         if (detail == _titleDetail) return;
         _titleDetail = detail;
-        _win.Title = detail.Length == 0 ? _baseTitle : $"{_baseTitle}  —  {detail}";
+        if (Desktop is { } win) win.Title = detail.Length == 0 ? _baseTitle : $"{_baseTitle}  —  {detail}"; // Amedo 2026-10-26
     }
 
     public uint TargetFramebuffer { get; set; } // Amedo 2026-09-30
 
-    public int ScreenWidth => _win.Monitor?.VideoMode.Resolution is { X: > 0 } r ? r.X : Width; // Amedo
-    public int ScreenHeight => _win.Monitor?.VideoMode.Resolution is { Y: > 0 } r ? r.Y : Height; // Amedo
+    public int ScreenWidth => ScreenMode.Resolution is { X: > 0 } r ? r.X : Width; // Amedo
+    public int ScreenHeight => ScreenMode.Resolution is { Y: > 0 } r ? r.Y : Height; // Amedo
+    private VideoMode ScreenMode => Desktop is { } win ? win.Monitor?.VideoMode ?? default : _win.VideoMode; // Amedo 2026-10-26
 
     public uint SceneFramebuffer { get; set; } // Amedo
     public int SceneWidth { get; set; }
@@ -116,6 +138,9 @@ public sealed class Engine
     public int SceneSamples { get; set; } = 1;
     public static Func<GL, bool>? BeginScene { get; set; } // Amedo
     public static Action<GL>? EndScene { get; set; }
+
+    public static Func<bool>? SceneHeld { get; set; }
+    public static Func<GL, bool>? ReuseScene { get; set; }
 
     // Amedo
     public (int X, int Y, int W, int H)? SceneViewport { get; set; }
@@ -157,7 +182,7 @@ public sealed class Engine
     public static FrameMode FrameMode => Array.Find(FrameCycle, m => SettingsFor(m) == GraphicsSettings.Current); // Amedo
     public static int FrameCap => GraphicsSettings.Current.FrameLimit; // Amedo
     public static string FrameModeName => GraphicsSettings.Current.FrameRateName; // Amedo
-    public float FrameBudgetMs => 1000f / (FrameCap > 0 ? FrameCap : _win.Monitor?.VideoMode.RefreshRate is > 0 and var hz ? hz : 60);
+    public float FrameBudgetMs => 1000f / (FrameCap > 0 ? FrameCap : ScreenMode.RefreshRate is > 0 and var hz ? hz : 60); // Amedo 2026-10-26
 
     // Amedo
     private static GraphicsSettings SettingsFor(FrameMode mode) => GraphicsSettings.Current with
@@ -172,7 +197,7 @@ public sealed class Engine
     // Amedo
     private void ApplyFrameSettings(GraphicsSettings old, GraphicsSettings now)
     {
-        _win.VSync = now.VSync;
+        _win.VSync = now.VSync || AlwaysVSync; // Amedo 2026-10-26
         if (old.VSync != now.VSync || old.FrameLimit != now.FrameLimit) _frameToast = 1.5;
     }
 
@@ -197,19 +222,40 @@ public sealed class Engine
     {
         _gl    = GL.GetApi(_win);
         Console.WriteLine($"[Engine] OpenGL {_gl.GetStringS(StringName.Version)} on {_gl.GetStringS(StringName.Renderer)} ({_gl.GetStringS(StringName.Vendor)})"); // Amedo 2026-09-30
+        GlCaps.Detect(_gl, Gles); // Amedo 2026-10-26
+        if (Desktop is null && _win.FramebufferSize is { X: > 0, Y: > 0 } fb) (Width, Height) = (fb.X, fb.Y); // Amedo 2026-10-26
 
         // Amedo 2026-09-22
-        if (_pendingIcons is { Length: > 0 })
+        if (_pendingIcons is { Length: > 0 } && Desktop is { } win) // Amedo 2026-10-26
         {
             var raws = new Silk.NET.Core.RawImage[_pendingIcons.Length];
             for (int i = 0; i < raws.Length; i++)
                 raws[i] = new Silk.NET.Core.RawImage(_pendingIcons[i].W, _pendingIcons[i].H, _pendingIcons[i].Rgba);
-            try { _win.SetWindowIcon(raws); } catch { }
+            try { win.SetWindowIcon(raws); } catch { }
         }
 
         _input = _win.CreateInput();
         Input.Initialize(_input);
 
+        if (UseImGui) SetupImGui(); // Amedo 2026-10-26
+
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.Enable(EnableCap.CullFace);
+        _gl.CullFace(TriangleFace.Back);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        _win.VSync = GraphicsSettings.Current.VSync || AlwaysVSync; // Amedo
+        GraphicsSettings.Changed += ApplyFrameSettings;
+        _activeScene?.Load(_gl);
+    }
+
+    // Amedo 2026-10-26
+    public static bool UseImGui { get; set; } = true;
+
+    // Amedo 2026-10-26
+    private void SetupImGui()
+    {
         _imgui = new ImGuiController(_gl, _win, _input, null,
             () => CustomFontSetup?.Invoke(ImGui.GetIO().Fonts));
         _imguiRenderer = new ImGuiRenderer(_gl); // Amedo
@@ -236,16 +282,22 @@ public sealed class Engine
             colors[(int)ImGuiCol.PopupBg].W  = 1f;
         }
         CustomStyleSetup?.Invoke(); // Amedo
+        if (Gles) UploadImGuiFontGles(); // Amedo 2026-10-26
+    }
 
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.Enable(EnableCap.CullFace);
-        _gl.CullFace(TriangleFace.Back);
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-        _win.VSync = GraphicsSettings.Current.VSync; // Amedo
-        GraphicsSettings.Changed += ApplyFrameSettings;
-        _activeScene?.Load(_gl);
+    // Amedo 2026-10-26
+    private unsafe void UploadImGuiFontGles()
+    {
+        var fonts = ImGui.GetIO().Fonts;
+        fonts.GetTexDataAsRGBA32(out byte* pixels, out int w, out int h);
+        uint tex = _gl.GenTexture();
+        _gl.BindTexture(TextureTarget.Texture2D, tex);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+        _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+        _gl.BindTexture(TextureTarget.Texture2D, 0);
+        fonts.SetTexID((nint)tex);
     }
 
     private void OnUpdate(double dt)
@@ -282,23 +334,42 @@ public sealed class Engine
     private readonly uint[] _gpuQueries = new uint[4];
     private readonly bool[] _gpuPending = new bool[4];
     private int _gpuSlot;
+    private const int GpuDisjoint = 0x8FBB;
 
     // Amedo 2026-09-28
     private void BeginGpuTimer()
     {
         if (_gpuQueries[0] == 0) for (int i = 0; i < _gpuQueries.Length; i++) _gpuQueries[i] = _gl.GenQuery();
         int slot = _gpuSlot;
+        if (Gles)
+        {
+            _gl.GetInteger((GetPName)GpuDisjoint, out int disjoint);
+            if (disjoint != 0) Array.Clear(_gpuPending);
+        }
         if (_gpuPending[slot])
         {
-            _gl.GetQueryObject(_gpuQueries[slot], QueryObjectParameterName.ResultAvailable, out int ready);
+            _gl.GetQueryObject(_gpuQueries[slot], QueryObjectParameterName.ResultAvailable, out uint ready); // Amedo 2026-10-26
             if (ready != 0)
             {
-                _gl.GetQueryObject(_gpuQueries[slot], QueryObjectParameterName.Result, out ulong ns);
+                ulong ns = QueryNanoseconds(_gpuQueries[slot]); // Amedo 2026-10-26
                 PerfStats.ReportGpu(ns / 1_000_000f);
             }
             _gpuPending[slot] = false;
         }
         _gl.BeginQuery(QueryTarget.TimeElapsed, _gpuQueries[slot]);
+    }
+
+    // Amedo 2026-10-26
+    private unsafe ulong QueryNanoseconds(uint query)
+    {
+        if (!Gles)
+        {
+            _gl.GetQueryObject(query, QueryObjectParameterName.Result, out ulong ns);
+            return ns;
+        }
+        ulong value = 0;
+        GlesExtensions.GetQueryObjectui64(query, (uint)QueryObjectParameterName.Result, &value);
+        return value;
     }
 
     // Amedo 2026-09-28
@@ -311,7 +382,8 @@ public sealed class Engine
 
     private void OnRender(double dt)
     {
-        BeginGpuTimer(); // Amedo 2026-09-28
+        if (Desktop is null && !ScreenSizeKnown()) return; // Amedo 2026-10-27
+        if (GlCaps.GpuTimer) BeginGpuTimer(); // Amedo 2026-10-26
         if (TargetFramebuffer != 0) // Amedo 2026-09-30
         {
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, TargetFramebuffer);
@@ -321,7 +393,57 @@ public sealed class Engine
         _gl.ClearColor(0.10f, 0.10f, 0.12f, 1f);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        _imgui?.Update((float)dt);
+        if (_imgui is not null) BeginImGuiFrame((float)dt); // Amedo 2026-10-26
+
+        if ((ViewWidth, ViewHeight) != _viewSize) // Amedo
+        {
+            _viewSize = (ViewWidth, ViewHeight);
+            _activeScene?.Resize(_viewSize.W, _viewSize.H);
+        }
+        SceneFramebuffer = TargetFramebuffer; // Amedo
+        SceneWidth = ViewWidth;
+        SceneHeight = ViewHeight;
+        SceneSamples = 1;
+        if (SceneHeld?.Invoke() != true || ReuseScene?.Invoke(_gl) != true)
+        {
+            bool offscreen = BeginScene?.Invoke(_gl) == true;
+            if (!offscreen && SceneViewport is { } view) // Amedo
+                _gl.Viewport(view.X, Height - view.Y - view.H, (uint)view.W, (uint)view.H);
+            using (PerfStats.Measure(PerfSection.Render)) _activeScene?.Render(_gl); // Amedo 2026-09-28
+            if (offscreen) EndScene?.Invoke(_gl); // Amedo
+            else if (SceneViewport is not null) _gl.Viewport(0, 0, (uint)Width, (uint)Height); // Amedo
+        }
+
+        if (!Gles) _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill); // Amedo 2026-10-26
+
+        if (_imgui is not null) // Amedo 2026-10-26
+        using (PerfStats.Measure(PerfSection.Ui)) // Amedo 2026-09-28
+        {
+            _activeScene?.OnImGuiRender();
+            DrawFrameToast(dt); // Amedo 2026-09-29
+            RenderImGui(); // Amedo
+        }
+        if (GlCaps.GpuTimer) EndGpuTimer(); // Amedo 2026-10-26
+        PerfStats.VSync = _win.VSync;
+        PerfStats.FrameMode = FrameModeName; // Amedo 2026-09-29
+        PerfStats.FrameBudgetMs = FrameBudgetMs;
+        PerfStats.EndFrame();
+    }
+
+    // Amedo 2026-10-27
+    public static Action? ClearScreenSizeError { get; set; }
+
+    private bool ScreenSizeKnown()
+    {
+        ClearScreenSizeError?.Invoke();
+        try { return _win.FramebufferSize is { X: > 0, Y: > 0 }; }
+        catch (Exception) { return false; }
+    }
+
+    // Amedo 2026-10-26
+    private void BeginImGuiFrame(float dt)
+    {
+        _imgui!.Update(dt);
 
         // Amedo 2026-09-22
         unsafe
@@ -333,7 +455,6 @@ public sealed class Engine
         }
 
         var io = ImGui.GetIO();
-        Win32Clipboard.Hook(io);
 
         bool ctrlHeld  = Input.KeyHeld(Key.ControlLeft) || Input.KeyHeld(Key.ControlRight);
         bool shiftHeld = Input.KeyHeld(Key.ShiftLeft)   || Input.KeyHeld(Key.ShiftRight);
@@ -344,36 +465,6 @@ public sealed class Engine
         io.AddKeyEvent(ImGuiKey.ModCtrl,  ctrlHeld);
         io.AddKeyEvent(ImGuiKey.ModShift, shiftHeld);
         io.AddKeyEvent(ImGuiKey.ModAlt,   altHeld);
-
-        if ((ViewWidth, ViewHeight) != _viewSize) // Amedo
-        {
-            _viewSize = (ViewWidth, ViewHeight);
-            _activeScene?.Resize(_viewSize.W, _viewSize.H);
-        }
-        SceneFramebuffer = TargetFramebuffer; // Amedo
-        SceneWidth = ViewWidth;
-        SceneHeight = ViewHeight;
-        SceneSamples = 1;
-        bool offscreen = BeginScene?.Invoke(_gl) == true;
-        if (!offscreen && SceneViewport is { } view) // Amedo
-            _gl.Viewport(view.X, Height - view.Y - view.H, (uint)view.W, (uint)view.H);
-        using (PerfStats.Measure(PerfSection.Render)) _activeScene?.Render(_gl); // Amedo 2026-09-28
-        if (offscreen) EndScene?.Invoke(_gl); // Amedo
-        else if (SceneViewport is not null) _gl.Viewport(0, 0, (uint)Width, (uint)Height); // Amedo
-
-        _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill);
-
-        using (PerfStats.Measure(PerfSection.Ui)) // Amedo 2026-09-28
-        {
-            _activeScene?.OnImGuiRender();
-            DrawFrameToast(dt); // Amedo 2026-09-29
-            RenderImGui(); // Amedo
-        }
-        EndGpuTimer(); // Amedo 2026-09-28
-        PerfStats.VSync = _win.VSync;
-        PerfStats.FrameMode = FrameModeName; // Amedo 2026-09-29
-        PerfStats.FrameBudgetMs = FrameBudgetMs;
-        PerfStats.EndFrame();
     }
 
     [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_frameBegun")]

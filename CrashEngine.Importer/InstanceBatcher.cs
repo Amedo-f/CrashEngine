@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
 
@@ -10,9 +11,12 @@ public static class InstanceBatcher
     public const int Stride = 11;
     public const uint Binding = 3;
 
-    public static bool Enabled { get; set; } = true;
+    private static bool _enabled = true;
+    public static bool Enabled { get => _enabled && GlCaps.VertexStorageBlocks > 0; set => _enabled = value; }
     public static int Batches { get; private set; }
     public static int Instanced { get; private set; }
+
+    public static bool FrontToBack { get; set; }
 
     private sealed class Group
     {
@@ -24,6 +28,7 @@ public static class InstanceBatcher
         public int Count;
         public int Base;
         public int LastFrame;
+        public float Nearest;
     }
 
     private readonly record struct Key(GpuMesh Mesh, Material Material, bool Receiver);
@@ -34,6 +39,10 @@ public static class InstanceBatcher
     private static Vector4[] _upload = new Vector4[Stride * 256];
     private static ShaderStorage? _storage;
     private static int _frame;
+    private static float[] _keys = new float[64];
+    private static int[] _byKey = new int[64];
+    private static Vector4[] _sorted = new Vector4[Stride * 64];
+    private static readonly Comparison<Group> NearestFirst = static (a, b) => a.Nearest.CompareTo(b.Nearest);
 
     public static void Defer(MeshRenderer renderer, GpuMesh mesh, Material material, bool receiver, in Matrix4x4 world, ReadOnlySpan<Vector4> light)
     {
@@ -60,6 +69,7 @@ public static class InstanceBatcher
         _frame++;
         Batches = Instanced = 0;
         if (Order.Count == 0) { Prune(); return; }
+        if (FrontToBack) SortNearestFirst();
         int total = 0;
         foreach (var g in Order)
             if (g.Count > 1)
@@ -82,10 +92,10 @@ public static class InstanceBatcher
                 Material.SetSelectPulse(sh, 1f); // Amedo 2026-10-01
                 sh.Set(u.UseInstances, 1);
                 sh.Set(u.InstanceBase, g.Base);
-                if (g.Receiver) gl.StencilFunc(StencilFunction.Always, 0, 0xFF);
+                if (g.Receiver) GlState.StencilFunc(gl, StencilFunction.Always, 0, 0xFF);
                 g.Mesh.DrawInstanced(gl, g.Count);
-                if (g.Receiver) gl.StencilFunc(StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
-                sh.Set(u.UseInstances, 0); // Amedo 2026-10-01
+                if (g.Receiver) GlState.StencilFuncLater(gl, StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
+                sh.SetLater(u.UseInstances, 0); // Amedo 2026-10-01
                 g.Material.Restore(gl, sh);
                 MeshRenderer.DrawCallsThisFrame++;
                 Batches++;
@@ -112,6 +122,39 @@ public static class InstanceBatcher
     {
         public readonly TwinShaderProgram.Slot UseInstances = sh.Uniform("UseInstances");
         public readonly TwinShaderProgram.Slot InstanceBase = sh.Uniform("InstanceBase");
+    }
+
+    private static void SortNearestFirst()
+    {
+        if (RenderPipeline.Instance?.Camera is not { } camera || !Matrix4x4.Invert(camera.View, out var inverse)) return;
+        var eye = inverse.Translation;
+        for (int o = 0; o < Order.Count; o++)
+        {
+            var g = Order[o];
+            var center = g.Mesh.LocalBounds(out var min, out var max) ? (min + max) * 0.5f : Vector3.Zero;
+            if (_keys.Length < g.Count)
+            {
+                _keys = new float[g.Count * 2];
+                _byKey = new int[g.Count * 2];
+            }
+            for (int i = 0; i < g.Count; i++)
+            {
+                var d = g.Data.AsSpan(i * Stride, 4);
+                var at = new Vector3(d[3].X + center.X * d[0].X + center.Y * d[1].X + center.Z * d[2].X,
+                                     d[3].Y + center.X * d[0].Y + center.Y * d[1].Y + center.Z * d[2].Y,
+                                     d[3].Z + center.X * d[0].Z + center.Y * d[1].Z + center.Z * d[2].Z);
+                _keys[i] = GameMath.LengthSquared(at - eye);
+                _byKey[i] = i;
+            }
+            Array.Sort(_keys, _byKey, 0, g.Count);
+            g.Nearest = _keys[0];
+            if (g.Count < 2) continue;
+            int length = g.Count * Stride;
+            if (_sorted.Length < length) _sorted = new Vector4[length * 2];
+            for (int i = 0; i < g.Count; i++) g.Data.AsSpan(_byKey[i] * Stride, Stride).CopyTo(_sorted.AsSpan(i * Stride));
+            _sorted.AsSpan(0, length).CopyTo(g.Data);
+        }
+        Order.Sort(NearestFirst);
     }
 
     // Amedo 2026-10-01

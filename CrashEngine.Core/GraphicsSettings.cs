@@ -12,7 +12,9 @@ public enum ShadowMode { Original, Sun }
 // Amedo
 public sealed record GraphicsSettings
 {
-    public static readonly int[] FrameLimits = { 60, 144, 240, 360, 0 };
+    public static readonly int[] PcFrameLimits = { 60, 144, 240, 360, 0 };
+    public static readonly int[] PalFrameLimits = { 50, 60, 144, 240, 360, 0 };
+    public static int[] FrameLimits { get; set; } = PcFrameLimits; // Amedo 2026-10-26
     public static readonly int[] RenderHeights = { 0, 720, 900, 1080, 1440, 2160 };
     public static readonly int[] MsaaSamples = { 1, 2, 4, 8 };
     public const int BrightnessMin = 0, BrightnessMax = 10, BrightnessDefault = 5;
@@ -41,6 +43,11 @@ public sealed record GraphicsSettings
     public bool PointLights { get; init; } = true; // Amedo
     public int PointLightStrength { get; init; } = PointLightStrengthDefault; // Amedo
     public int ShapeSoftness { get; init; } = ShapeSoftnessDefault; // Amedo
+    public int Quality { get; init; } // Amedo 2026-10-27: index into QualityPresets
+
+    // Amedo 2026-10-27
+    public sealed record QualityPreset(string Name, int PixelLimit, int Msaa, TextureFiltering Filtering);
+    public static QualityPreset[]? QualityPresets { get; set; }
 
     [JsonIgnore] public float Gamma => 1f + (Brightness - BrightnessDefault) * 0.1f;
     [JsonIgnore] public float SharpenAmount => Sharpness / (float)SharpnessMax; // Amedo
@@ -48,7 +55,7 @@ public sealed record GraphicsSettings
     [JsonIgnore] public float SunShadowAmount => SunStrength / (float)SunStrengthMax; // Amedo
     [JsonIgnore] public float SunPenumbra => SunSoftness / (float)SunSoftnessMax * 0.08f; // Amedo
     [JsonIgnore] public float ShapeSoft => ShapeSoftness / (float)ShapeSoftnessMax; // Amedo
-    [JsonIgnore] public float PointLightAmount => PointLightStrength / (float)PointLightStrengthDefault * 0.06f; // Amedo: the game's object-light numbers (clamped there) scaled to a visible pool under a light
+    [JsonIgnore] public float PointLightAmount => PointLightStrength / (float)PointLightStrengthDefault * 0.06f; // Amedo
     [JsonIgnore] public int Anisotropy => Filtering switch
     {
         TextureFiltering.Anisotropic4 => 4,
@@ -62,8 +69,14 @@ public sealed record GraphicsSettings
     public static int Version { get; private set; }
     public static event Action<GraphicsSettings, GraphicsSettings>? Changed;
 
+    public static GraphicsSettings Defaults { get; set; } = new(); // Amedo 2026-10-26
     private static GraphicsSettings? _current;
-    public static GraphicsSettings Current => _current ??= Load();
+    public static GraphicsSettings Current => _current ??= Ruled(null, Applied(Load())); // Amedo 2026-10-27
+
+    public static Func<GraphicsSettings, GraphicsSettings, GraphicsSettings>? Rule { get; set; }
+
+    private static GraphicsSettings Ruled(GraphicsSettings? old, GraphicsSettings next) =>
+        Rule is { } rule ? Applied(rule(old ?? next, next).Sanitized()) : next;
 
     private static string? _file; // Amedo
     private static bool _fileless; // Amedo
@@ -75,7 +88,7 @@ public sealed record GraphicsSettings
         if (_current is not null && !_fileless && path is not null && string.Equals(_file, path, StringComparison.OrdinalIgnoreCase)) return;
         _file = path;
         _fileless = path is null;
-        var next = Load();
+        var next = Ruled(_current, Applied(Load())); // Amedo 2026-10-27
         var old = _current ?? next;
         _current = next;
         Version++;
@@ -87,8 +100,9 @@ public sealed record GraphicsSettings
 
     public static void Set(GraphicsSettings next, bool save = true)
     {
-        next = next.Sanitized();
+        next = Applied(next.Sanitized()); // Amedo 2026-10-27
         var old = Current;
+        next = Ruled(old, next);
         if (next == old) return;
         _current = next;
         Version++;
@@ -96,9 +110,23 @@ public sealed record GraphicsSettings
         if (save) next.Save();
     }
 
+    // Amedo 2026-10-27: a quality preset decides the options it replaces, the rest stay at their defaults
+    private static GraphicsSettings Applied(GraphicsSettings s)
+    {
+        if (QualityPresets is not { Length: > 0 } presets) return s;
+        int q = Math.Clamp(s.Quality, 0, presets.Length - 1);
+        var p = presets[q];
+        ScenePixelLimit = p.PixelLimit;
+        return s.Sanitized() with
+        {
+            Quality = q, Msaa = p.Msaa, Filtering = p.Filtering, RenderHeight = 0,
+            Shadows = Defaults.Shadows, Brightness = Defaults.Brightness, Sharpness = Defaults.Sharpness,
+        };
+    }
+
     public GraphicsSettings Sanitized() => this with
     {
-        FrameLimit = Allowed(FrameLimits, FrameLimit, 0),
+        FrameLimit = Allowed(FrameLimits, FrameLimit, Array.IndexOf(FrameLimits, 0) >= 0 ? 0 : Defaults.FrameLimit), // Amedo 2026-10-26
         RenderHeight = Allowed(RenderHeights, RenderHeight, 0),
         Msaa = Allowed(MsaaSamples, Msaa, 1),
         Filtering = Enum.IsDefined(Filtering) ? Filtering : TextureFiltering.Original,
@@ -120,7 +148,7 @@ public sealed record GraphicsSettings
     {
         try
         {
-            if (_fileless) return new GraphicsSettings(); // Amedo
+            if (_fileless) return Defaults; // Amedo
             if (Persist && File.Exists(FilePath))
                 return (JsonSerializer.Deserialize<GraphicsSettings>(File.ReadAllText(FilePath), Json) ?? new()).Sanitized();
             if (Persist && _file is null && File.Exists(OldFrameModeFile)) // Amedo
@@ -130,7 +158,7 @@ public sealed record GraphicsSettings
         {
             Console.WriteLine($"[GraphicsSettings] could not read {FilePath}: {ex.Message}");
         }
-        return new GraphicsSettings();
+        return Defaults; // Amedo 2026-10-26
     }
 
     private static GraphicsSettings FromFrameMode(string mode) => mode switch
@@ -180,9 +208,13 @@ public sealed record GraphicsSettings
         float aspect = GameAspect(), windowAspect = (float)windowWidth / windowHeight;
         float inner = windowAspect >= aspect ? windowHeight : windowWidth / aspect;
         float scale = target / inner;
+        if (ScenePixelLimit > 0 && windowWidth * scale * windowHeight * scale > ScenePixelLimit) // Amedo 2026-10-26
+            scale *= MathF.Sqrt(ScenePixelLimit / (windowWidth * scale * windowHeight * scale));
         int w = (int)MathF.Round(windowWidth * scale / 2f) * 2, sh = (int)MathF.Round(windowHeight * scale / 2f) * 2;
         return (Math.Max(2, w), Math.Max(2, sh));
     }
+
+    public static int ScenePixelLimit { get; set; } // Amedo 2026-10-26
 
     public static string ResolutionName(int height, int screenWidth, int screenHeight)
     {

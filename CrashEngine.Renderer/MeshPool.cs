@@ -88,12 +88,24 @@ public static class MeshPool
         }
         fixed (GpuMesh.Vertex* pv = verts)
             if (!StagingRing.Copy(gl, page.Vbo, (long)baseVertex * sizeof(GpuMesh.Vertex), pv, (long)verts.Length * sizeof(GpuMesh.Vertex))) // Amedo
-                gl.NamedBufferSubData(page.Vbo, (nint)((long)baseVertex * sizeof(GpuMesh.Vertex)), (nuint)(verts.Length * sizeof(GpuMesh.Vertex)), pv);
+                Write(gl, page.Vbo, (nint)((long)baseVertex * sizeof(GpuMesh.Vertex)), (nuint)(verts.Length * sizeof(GpuMesh.Vertex)), pv);
         fixed (uint* pi = indices)
             if (!StagingRing.Copy(gl, page.Ebo, (long)firstIndex * sizeof(uint), pi, (long)indices.Length * sizeof(uint))) // Amedo
-                gl.NamedBufferSubData(page.Ebo, (nint)((long)firstIndex * sizeof(uint)), (nuint)(indices.Length * sizeof(uint)), pi);
+                Write(gl, page.Ebo, (nint)((long)firstIndex * sizeof(uint)), (nuint)(indices.Length * sizeof(uint)), pi);
         page.Users++;
         return page;
+    }
+
+    private static unsafe void Write(GL gl, uint buffer, nint offset, nuint size, void* data)
+    {
+        if (GlCaps.Dsa)
+        {
+            gl.NamedBufferSubData(buffer, offset, size, data);
+            return;
+        }
+        gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, buffer);
+        gl.BufferSubData(BufferTargetARB.CopyWriteBuffer, offset, size, data);
+        gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, 0);
     }
 
     // Amedo

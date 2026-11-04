@@ -89,6 +89,8 @@ public static class PerfStats
 
     public static long FrameNumber { get; private set; } // Amedo
 
+    public static Action? FrameEnded { get; set; }
+
     public static void AddSinceFrameEnd(PerfSection section) => _frameTicks[(int)section] += Stopwatch.GetTimestamp() - _lastFrame; // Amedo
 
     public static void EndFrame()
@@ -110,6 +112,7 @@ public static class PerfStats
             _allocSecond[i] += _frameBytes[i] / 1024f; // Amedo 2026-09-29
             _frameBytes[i] = 0;
         }
+        FrameEnded?.Invoke();
         long alloc = GC.GetAllocatedBytesForCurrentThread();
         _allocRun += (alloc - _lastAlloc) / 1024f;
         _lastAlloc = alloc;

@@ -62,6 +62,11 @@ internal sealed class FrameLimiter : IDisposable
                     continue;
                 }
             }
+            if (_timer == IntPtr.Zero) // Amedo 2026-10-27
+            {
+                Thread.Sleep(Math.Max(1, (int)((left - SpinTicks) * 1000 / Stopwatch.Frequency)));
+                continue;
+            }
             Thread.Sleep(left > SpinTicks * 3 ? 1 : 0);
         }
     }

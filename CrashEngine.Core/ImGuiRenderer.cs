@@ -69,7 +69,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
     private uint Compile(ShaderType type, string source)
     {
         uint shader = _gl.CreateShader(type);
-        _gl.ShaderSource(shader, source);
+        _gl.ShaderSource(shader, GlslSource.ForContext(source));
         _gl.CompileShader(shader);
         _gl.GetShader(shader, ShaderParameterName.CompileStatus, out int ok);
         if (ok == 0) throw new InvalidOperationException($"ImGui {type}: {_gl.GetShaderInfoLog(shader)}");
@@ -102,8 +102,8 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         _gl.Disable(GLEnum.DepthTest);
         _gl.Disable(GLEnum.StencilTest);
         _gl.Enable(GLEnum.ScissorTest);
-        _gl.Disable(GLEnum.PrimitiveRestart);
-        _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill);
+        if (!GlCaps.Gles) _gl.Disable(GLEnum.PrimitiveRestart); // Amedo 2026-10-26
+        if (GlCaps.PolygonMode) _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill); // Amedo 2026-10-26
         float l = data.DisplayPos.X, r = data.DisplayPos.X + data.DisplaySize.X;
         float t = data.DisplayPos.Y, b = data.DisplayPos.Y + data.DisplaySize.Y;
         Span<float> ortho = stackalloc float[]
@@ -190,8 +190,8 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         _gl.Enable(GLEnum.DepthTest);
         _gl.Disable(GLEnum.StencilTest);
         _gl.Disable(GLEnum.ScissorTest);
-        _gl.Disable(GLEnum.PrimitiveRestart);
-        _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill);
+        if (!GlCaps.Gles) _gl.Disable(GLEnum.PrimitiveRestart); // Amedo 2026-10-26
+        if (GlCaps.PolygonMode) _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill); // Amedo 2026-10-26
         _gl.Scissor(0, 0, (uint)fbWidth, (uint)fbHeight);
         Engine.UiStateReset?.Invoke();
     }

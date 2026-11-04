@@ -6,7 +6,7 @@ namespace CrashEngine.Runtime.Screen.Oleg;
 // Amedo
 public sealed class PcGraphicsOptions
 {
-    public const int DisplayItem = 0x40, VSyncItem = 0x41, FrameLimitItem = 0x42, ResolutionItem = 0x43, MsaaItem = 0x44, FilteringItem = 0x45, BrightnessItem = 0x46, SharpnessItem = 0x47, ShadowsItem = 0x48; // Amedo
+    public const int DisplayItem = 0x40, VSyncItem = 0x41, FrameLimitItem = 0x42, ResolutionItem = 0x43, MsaaItem = 0x44, FilteringItem = 0x45, BrightnessItem = 0x46, SharpnessItem = 0x47, ShadowsItem = 0x48, QualityItem = 0x49; // Amedo
 
     private static readonly string[] DisplayNames = { "FULLSCREEN", "WINDOWED" };
     private static readonly string[] FilteringNames = { "ORIGINAL", "TRILINEAR", "ANISO 4X", "ANISO 8X", "ANISO 16X" };
@@ -16,6 +16,7 @@ public sealed class PcGraphicsOptions
     private readonly ToggleItem _vsync;
     private readonly ChoiceItem _frameLimit, _resolution, _msaa, _filtering;
     private readonly ChoiceItem _shadows; // Amedo
+    private readonly ChoiceItem? _quality; // Amedo 2026-10-27
     private readonly ValueItem _brightness;
     private readonly ValueItem _sharpness; // Amedo
     private int _version = -1;
@@ -25,6 +26,7 @@ public sealed class PcGraphicsOptions
     public PcGraphicsOptions()
     {
         if (GraphicsSettings.DisplayModeAvailable) _display = Choice("DISPLAY", DisplayItem, DisplayNames);
+        if (GraphicsSettings.QualityPresets is { Length: > 0 } presets) _quality = Choice("QUALITY", QualityItem, presets.Select(p => p.Name).ToArray()); // Amedo 2026-10-27
         _vsync = new ToggleItem(0, VSyncItem, 0, 1, true, 0, 1) { Name_00 = "VSYNC" };
         _frameLimit = Choice("FRAME LIMIT", FrameLimitItem, GraphicsSettings.FrameLimits.Select(f => f > 0 ? f.ToString() : "UNLIMITED").ToArray());
         _resolution = Choice("RESOLUTION", ResolutionItem, new[] { "" });
@@ -51,6 +53,12 @@ public sealed class PcGraphicsOptions
 
     public void AddTo(MenuPage page)
     {
+        if (_quality is not null) // Amedo 2026-10-27
+        {
+            page.Add_25B710(_quality);
+            page.Add_25B710(_frameLimit);
+            return;
+        }
         if (_display is not null) page.Add_25B710(_display);
         page.Add_25B710(_vsync);
         page.Add_25B710(_frameLimit);
@@ -92,6 +100,7 @@ public sealed class PcGraphicsOptions
         _brightness.SetInt(col, s.Brightness);
         _sharpness.SetInt(col, s.Sharpness); // Amedo
         _shadows.SetInt(col, (int)s.Shadows); // Amedo
+        _quality?.SetInt(col, s.Quality); // Amedo 2026-10-27
         _version = GraphicsSettings.Version;
     }
 
@@ -116,10 +125,11 @@ public sealed class PcGraphicsOptions
             Brightness = Value(_brightness, col),
             Sharpness = Value(_sharpness, col), // Amedo
             Shadows = (ShadowMode)Value(_shadows, col), // Amedo
+            Quality = _quality is null ? s.Quality : Value(_quality, col), // Amedo 2026-10-27
         };
         if (next == s) return;
         GraphicsSettings.Set(next);
-        _version = GraphicsSettings.Version;
+        Load(col);
     }
 
     private static int Value(MenuItem item, int col) => item.GetInt(col, out int v) ? v : 0;

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -91,7 +92,7 @@ public sealed partial class AgentLabWorld
     }
 
     // Amedo
-    private static bool SphereTouchesBox(Vector3 c, float r, Vector3 min, Vector3 max)
+    private static bool SphereTouchesBox(in Vector3 c, float r, in Vector3 min, in Vector3 max)
     {
         if (c.X + r < min.X || max.X < c.X - r) return false;
         if (c.Y + r < min.Y || max.Y < c.Y - r) return false;
@@ -123,7 +124,7 @@ public sealed partial class AgentLabWorld
             for (var c = grid[_volumeCells[i]]; c is not null && _sphere.Count < cap; c = c.Next_14C)
             {
                 if (Skipped(c, skip, parent) || !c.Filter_1EA1E8(mask, exclude, require, requireAll)) continue;
-                if (boxes ? !SphereTouchesBox(center, r, c.BoxMin_40, c.BoxMax_50) : !(Vector3.DistanceSquared(center, c.Position_30) < r2)) continue;
+                if (boxes ? !SphereTouchesBox(center, r, c.BoxMin_40, c.BoxMax_50) : !(GameMath.DistanceSq(center, c.Position_30) < r2)) continue;
                 _sphere.Add(Owner(c));
             }
         return _sphere.ToList();
@@ -225,16 +226,22 @@ public sealed partial class AgentLabWorld
     }
 
     // Amedo
-    public IReadOnlyList<object> QueryOverlap(Physics.ConvexHull hull, Matrix4x4 m, uint mask, uint exclude, AgentLabAgent? skip, int max = 0xB4)
+    public IReadOnlyList<object> QueryOverlap(Physics.ConvexHull hull, Matrix4x4 m, uint mask, uint exclude, AgentLabAgent? skip, int max = 0xB4, bool points = false)
     {
         _overlap.Clear();
         if (ChunkOf(skip).Cells_160 is not { } grid) return _overlap;
         var (qmin, qmax) = hull.Bounds(m);
+        var toHull = points ? GameMath.RigidInverse_18E808(m) : default; // Amedo
         int n = InstanceCell.CellsOfVolume_1E8D50(qmin, qmax, _volumeCells);
         for (int i = 0; i < n && _overlap.Count < max; i++)
             for (var c = grid[_volumeCells[i]]; c is not null && _overlap.Count < max; c = c.Next_14C)
             {
                 if (c is not AgentCell { Agent: var a } || ReferenceEquals(a, skip) || a.Destroyed || !a.Entity.Active || !c.Filter_1EA1E8(mask, exclude, 0, true)) continue;
+                if (points) // Amedo
+                {
+                    if (hull.IsPointInsideAt_200598(a.GameMatrix.Translation, toHull)) _overlap.Add(a);
+                    continue;
+                }
                 if (!Physics.CollisionWorld.Overlap(qmin, qmax, c.BoxMin_40, c.BoxMax_50) || a.Body() is not { } body) continue;
                 foreach (var (h, pm) in body.Parts)
                 {

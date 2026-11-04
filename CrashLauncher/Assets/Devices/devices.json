@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "devices": [
+    { "name": "Samsung Galaxy S26 Ultra", "width": 1440, "height": 3120, "corner": 90,  "cutout": { "type": "hole",   "x": 720, "y": 62,  "w": 54,  "h": 54 },  "safeTop": 130, "safeBottom": 0 },
+    { "name": "Samsung Galaxy S24+",      "width": 1440, "height": 3120, "corner": 126, "cutout": { "type": "hole",   "x": 720, "y": 56,  "w": 68,  "h": 68 },  "safeTop": 113, "safeBottom": 0 },
+    { "name": "Samsung Galaxy S23",       "width": 1080, "height": 2340, "corner": 80,  "cutout": { "type": "hole",   "x": 540, "y": 48,  "w": 42,  "h": 42 },  "safeTop": 100, "safeBottom": 0 },
+    { "name": "Samsung Galaxy A55",       "width": 1080, "height": 2340, "corner": 80,  "cutout": { "type": "hole",   "x": 540, "y": 50,  "w": 44,  "h": 44 },  "safeTop": 100, "safeBottom": 0 },
+    { "name": "Google Pixel 9 Pro",       "width": 1280, "height": 2856, "corner": 120, "cutout": { "type": "hole",   "x": 640, "y": 58,  "w": 50,  "h": 50 },  "safeTop": 120, "safeBottom": 0 },
+    { "name": "iPhone 16 Pro Max",        "width": 1320, "height": 2868, "corner": 165, "cutout": { "type": "island", "x": 660, "y": 64,  "w": 375, "h": 110 }, "safeTop": 186, "safeBottom": 102 },
+    { "name": "iPhone 16 Pro",            "width": 1206, "height": 2622, "corner": 165, "cutout": { "type": "island", "x": 603, "y": 64,  "w": 375, "h": 110 }, "safeTop": 186, "safeBottom": 102 },
+    { "name": "iPhone 15",                "width": 1179, "height": 2556, "corner": 165, "cutout": { "type": "island", "x": 590, "y": 56,  "w": 375, "h": 110 }, "safeTop": 177, "safeBottom": 102 },
+    { "name": "iPhone SE (3rd gen)",      "width": 750,  "height": 1334, "corner": 0,   "safeTop": 40,  "safeBottom": 0 }
+  ]
+}
