@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Amedo 2026-11-04: turns AgentLab behaviour scripts into C# (CrashEngine.Runtime.AgentLab.Compiled). Editor/tools only. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
+  </ItemGroup>
+</Project>

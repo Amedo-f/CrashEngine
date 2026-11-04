@@ -19,6 +19,16 @@ public sealed partial class AgentLabAgent
 
     private static bool HasSub(PS2BehaviourState? s) => s is not null && s.BehaviourIndexOrSlot != -1;
 
+    // Amedo 2026-11-04: the script's C# translation (CrashEngine.ScriptGen) runs a body's condition and commands when there is
+    // one for this graph; otherwise the interpreter (Evaluate / Execute) as before. Same objects, same order.
+    public float RunCondition(TwinBehaviourCondition cond, Level ctx) => Evaluate(cond, ctx);
+    public void RunCommand(PS2BehaviourCommand cmd, Level ctx) => Execute(cmd, ctx);
+
+    private float Condition(TwinBehaviourCondition cond, PS2BehaviourStateBody body, Level ctx) =>
+        Compiled.CompiledBehaviours.For(ctx.Graph) is { } cb && cb.Keys.TryGetValue(body, out int key)
+            ? cb.Code.Condition(this, key, ctx)
+            : Evaluate(cond, ctx);
+
     private int _lockDepth = 0xFF; // Amedo 2026-09-30
 
     private void RunStateStack(int depth, TwinBehaviourControlPacket? t0)
@@ -76,7 +86,7 @@ public sealed partial class AgentLabAgent
     private void OpenLevel(int depth, PS2BehaviourState state)
     {
         var parent = Levels[depth - 1];
-        var graph  = state.UsesObjectSlot ? RootController().Slot(state.BehaviourIndexOrSlot).Graph : World.Behaviour((ushort)state.BehaviourIndexOrSlot); // Amedo: GetGameObjectAddress_FromInstance_ 0x23C0E0
+        var graph  = state.UsesObjectSlot ? RootController().Slot(state.BehaviourIndexOrSlot).Graph : World.Behaviour((ushort)state.BehaviourIndexOrSlot); // Amedo
         var level  = new Level
         {
             Graph     = graph,
@@ -125,7 +135,7 @@ public sealed partial class AgentLabAgent
                 _body = body;
                 var cond = body.Condition;
                 if (cond is null) continue;
-                float v = Evaluate(cond, ctx);
+                float v = Condition(cond, body, ctx); // Amedo 2026-11-04
                 bool ok = cond.NotGate ? v < cond.ReturnCheck : cond.ReturnCheck < v;
                 if (!ok) continue;
                 float score = (cond.NotGate ? cond.ReturnCheck - v : v - cond.ReturnCheck) * cond.ConditionPowerMultiplier;
@@ -183,7 +193,7 @@ public sealed partial class AgentLabAgent
             _body = body;
             var cond = body.Condition;
             if (cond is null) continue;
-            float v = Evaluate(cond, ctx);
+            float v = Condition(cond, body, ctx); // Amedo 2026-11-04
             bool ok = cond.NotGate ? v < cond.ReturnCheck : cond.ReturnCheck < v;
             if (Tracing) Trace($"  cond {cond.ConditionIndex}:{AgentLabWorld.ConditionName(cond.ConditionIndex)}({cond.Parameter}) = {v} {(cond.NotGate ? "<" : ">")} {cond.ReturnCheck} {(ok ? "ok" : "no")} -> {NextOf(body)}"); // Amedo
             if (!ok) continue;
@@ -209,8 +219,10 @@ public sealed partial class AgentLabAgent
     {
         if (Tracing) Trace($"  body [{string.Join(",", body.Commands.OfType<PS2BehaviourCommand>().Select(c => $"{c.CommandIndex}:{AgentLabWorld.CommandName(c.CommandIndex)}"))}] -> {NextOf(body)}");
         ctx.Else = null;
-        foreach (var c in body.Commands)
-            if (c is PS2BehaviourCommand cmd) Execute(cmd, ctx);
+        if (Compiled.CompiledBehaviours.For(ctx.Graph) is { } cb && cb.Keys.TryGetValue(body, out int key)) cb.Code.Commands(this, key, ctx); // Amedo 2026-11-04
+        else
+            foreach (var c in body.Commands)
+                if (c is PS2BehaviourCommand cmd) Execute(cmd, ctx);
         if ((body.Bitfield & 0x100) != 0) ctx.Reenter = true;
         ctx.EnterTime = World.Now;
         return NextOf(body);
