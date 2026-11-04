@@ -74,7 +74,7 @@ public static class CharacterImporter
     {
         error = "";
         var raw = ModelImporter.ExtractRawSubmeshes(path);
-        if (raw is null || raw.Count == 0) { error = "no meshes could be read from the file"; return null; }
+        if (raw is null || raw.Count == 0) { error = $"no meshes could be read from the file {ModelImporter.LastReport}"; return null; } // Amedo
         using var ctx = new AssimpContext();
         var scene = ctx.ImportFile(path, Steps);
         float unit = 1f;

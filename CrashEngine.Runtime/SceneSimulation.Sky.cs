@@ -20,19 +20,21 @@ public sealed partial class SceneSimulation
     private PS2AnyScenery? SceneryOf(WorldChunk? chunk) =>
         (ReferenceEquals(chunk, _anchorChunk) ? _anchorSm2 : chunk?.Sm2)?.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
 
+    private static readonly Matrix4x4 SceneMirror = Matrix4x4.CreateScale(-1f, 1f, 1f); // Amedo
+
     private void UpdateLook_19B280()
     {
         var chunk = World.Player?.Chunk ?? World.RootChunk;
+        bool anchor = ReferenceEquals(chunk, _anchorChunk);
+        var rotation = anchor ? Matrix4x4.Identity : SceneMirror * chunk.ToAnchor * SceneMirror; // Amedo
+        rotation.Translation = Vector3.Zero;
+        RenderPipeline.SkydomeRotation = rotation;
         if (ReferenceEquals(chunk, _lookChunk)) return;
         var from = _lookChunk;
         _lookChunk = chunk;
-        bool anchor = ReferenceEquals(chunk, _anchorChunk);
         var scenery = SceneryOf(chunk);
         uint sky = scenery?.SkydomeID ?? 0;
         RenderPipeline.SkydomeOverride = anchor || sky == SceneryOf(_anchorChunk)?.SkydomeID ? null : SkydomeOf_1B9BC0(sky);
-        var rotation = anchor ? Matrix4x4.Identity : chunk.ToAnchor;
-        rotation.Translation = Vector3.Zero;
-        RenderPipeline.SkydomeRotation = rotation;
 
         GameLightingDraw.FadeSeconds = FogFadeSeconds; // Amedo 2026-09-30
         if (RenderPipeline.Instance is { } rp)

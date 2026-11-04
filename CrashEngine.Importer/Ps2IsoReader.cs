@@ -3,22 +3,18 @@ using System.Text;
 namespace CrashEngine.Importer;
 
 // Amedo 2026-09-21
-// Minimal, dependency-free ISO9660 reader for PS2 game discs. Handles both 2048-byte
-// (Mode 1, the common case) and raw 2352-byte sectors (Mode 1 + Mode 2/Form 1), streams
-// large files, and reproduces the disc's file tree on disk. Notes live in the docs.
 public static class Ps2IsoReader
 {
     private const int UserData = 2048;
 
     private sealed class Layout
     {
-        public int RawSectorSize;   // 2048 or 2352
-        public int UserDataOffset;  // 0, 16 or 24
+        public int RawSectorSize;
+        public int UserDataOffset;
     }
 
     private sealed record DirEntry(string Name, uint Lba, uint Size, bool IsDir);
 
-    /// <summary>True if the file looks like a readable ISO9660 disc image.</summary>
     public static bool IsIso(string isoPath)
     {
         try
@@ -29,22 +25,22 @@ public static class Ps2IsoReader
         catch { return false; }
     }
 
-    /// <summary>
-    /// Extracts every file/folder from the ISO into <paramref name="destDir"/>, preserving the
-    /// directory tree. progress(relativePath, 0..1) is called per file. Returns file count.
-    /// </summary>
     public static int Extract(string isoPath, string destDir, Action<string, float>? progress = null)
     {
         using var fs = File.OpenRead(isoPath);
+        return Extract(fs, destDir, progress);
+    }
+
+    // Amedo 2026-10-27
+    public static int Extract(FileStream fs, string destDir, Action<string, float>? progress = null)
+    {
         var layout = DetectLayout(fs)
             ?? throw new InvalidOperationException("Not a recognizable ISO9660 disc image (no CD001 volume descriptor).");
 
-        // Root directory record lives at byte 156 of the Primary Volume Descriptor (LBA 16).
         var pvd = ReadSector(fs, layout, 16);
         uint rootLba  = ReadU32Le(pvd, 156 + 2);
         uint rootSize = ReadU32Le(pvd, 156 + 10);
 
-        // First pass: enumerate all files (for progress), then extract.
         var files = new List<(string Rel, uint Lba, uint Size)>();
         var dirs  = new List<string>();
         Walk(fs, layout, rootLba, rootSize, "", files, dirs);
@@ -54,15 +50,43 @@ public static class Ps2IsoReader
         Directory.CreateDirectory(destDir);
 
         int done = 0;
+        long total = files.Sum(f => (long)f.Size), copied = 0;
         foreach (var (rel, lba, size) in files)
         {
             var outPath = Path.Combine(destDir, rel);
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            ExtractFile(fs, layout, lba, size, outPath);
+            long before = copied;
+            ExtractFile(fs, layout, lba, size, outPath, bytes => progress?.Invoke(rel, total == 0 ? 1f : (float)(before + bytes) / total));
+            copied += size;
             done++;
-            progress?.Invoke(rel, files.Count == 0 ? 1f : (float)done / files.Count);
+            progress?.Invoke(rel, total == 0 ? 1f : (float)copied / total);
         }
         return done;
+    }
+
+    // Amedo 2026-10-27: one file's bytes (path like "SYSTEM.CNF" or "CRASH6/CRASH.BH"), or null if it isn't on the disc
+    public static byte[]? ReadFile(string isoPath, string relPath)
+    {
+        using var fs = File.OpenRead(isoPath);
+        return ReadFile(fs, relPath);
+    }
+
+    public static byte[]? ReadFile(FileStream fs, string relPath)
+    {
+        var layout = DetectLayout(fs);
+        if (layout is null) return null;
+        var pvd = ReadSector(fs, layout, 16);
+        uint lba = ReadU32Le(pvd, 156 + 2), size = ReadU32Le(pvd, 156 + 10);
+        var parts = relPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            var entry = ReadDir(fs, layout, lba, size).FirstOrDefault(e => string.Equals(e.Name, parts[i], StringComparison.OrdinalIgnoreCase));
+            if (entry is null || entry.IsDir != (i < parts.Length - 1)) return null;
+            (lba, size) = (entry.Lba, entry.Size);
+        }
+        using var ms = new MemoryStream((int)size);
+        CopyFile(fs, layout, lba, size, ms, null);
+        return ms.ToArray();
     }
 
     private static void Walk(FileStream fs, Layout layout, uint dirLba, uint dirSize, string prefix,
@@ -94,14 +118,13 @@ public static class Ps2IsoReader
             while (pos < UserData)
             {
                 byte recLen = sector[pos];
-                if (recLen == 0) break; // rest of this sector is padding
+                if (recLen == 0) break;
 
                 uint extLba  = ReadU32Le(sector, pos + 2);
                 uint extSize = ReadU32Le(sector, pos + 10);
                 byte flags   = sector[pos + 25];
                 byte nameLen = sector[pos + 32];
 
-                // 0x00 = ".", 0x01 = ".." — skip both
                 bool special = nameLen == 1 && (sector[pos + 33] == 0x00 || sector[pos + 33] == 0x01);
                 if (!special)
                 {
@@ -115,21 +138,29 @@ public static class Ps2IsoReader
         return entries;
     }
 
-    private static void ExtractFile(FileStream fs, Layout layout, uint lba, uint size, string outPath)
+    private static void ExtractFile(FileStream fs, Layout layout, uint lba, uint size, string outPath, Action<long>? copied = null)
     {
         using var outFs = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16);
-        var buf = new byte[UserData];
+        CopyFile(fs, layout, lba, size, outFs, copied);
+    }
+
+    private static void CopyFile(FileStream fs, Layout layout, uint lba, uint size, Stream to, Action<long>? copied)
+    {
+        int chunk = layout.RawSectorSize == UserData ? 1 << 20 : UserData;
+        var buf = new byte[chunk];
         uint remaining = size;
         uint sector = lba;
+        long done = 0;
         while (remaining > 0)
         {
-            long pos = (long)sector * layout.RawSectorSize + layout.UserDataOffset;
-            fs.Position = pos;
-            int want = (int)Math.Min(remaining, (uint)UserData);
+            fs.Position = (long)sector * layout.RawSectorSize + layout.UserDataOffset;
+            int want = (int)Math.Min(remaining, (uint)chunk);
             fs.ReadExactly(buf, 0, want);
-            outFs.Write(buf, 0, want);
+            to.Write(buf, 0, want);
             remaining -= (uint)want;
-            sector++;
+            sector += (uint)(want + UserData - 1) / UserData;
+            done += want;
+            if (copied is not null && (done & ((1 << 24) - 1)) < want) copied(done);
         }
     }
 
@@ -143,13 +174,12 @@ public static class Ps2IsoReader
 
     private static Layout? DetectLayout(FileStream fs)
     {
-        // Volume descriptors start at LBA 16. A valid one begins with a type byte then "CD001".
         Span<byte> id = stackalloc byte[6];
         (int raw, int off)[] candidates =
         {
-            (2048, 0),   // Mode 1 / 2048-byte user sectors (most PS2 ISOs)
-            (2352, 16),  // raw Mode 1 (12 sync + 4 header)
-            (2352, 24),  // raw Mode 2 / Form 1 (+ 8-byte subheader)
+            (2048, 0),
+            (2352, 16),
+            (2352, 24),
         };
         foreach (var (raw, off) in candidates)
         {
@@ -165,7 +195,6 @@ public static class Ps2IsoReader
 
     private static string CleanName(string raw)
     {
-        // Strip the ISO9660 ";1" version and any trailing dot on extension-less names.
         int semi = raw.IndexOf(';');
         if (semi >= 0) raw = raw[..semi];
         if (raw.EndsWith('.')) raw = raw[..^1];

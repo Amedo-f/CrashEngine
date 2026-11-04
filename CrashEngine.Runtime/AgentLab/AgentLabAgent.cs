@@ -61,6 +61,7 @@ public sealed partial class AgentLabAgent : Component
 
     public AgentLabAgent(AgentLabWorld world, InstanceData instance, PS2AnyObject? gameObject, AnimatedObject? anim)
     {
+        LiveProbe.Track("agent", this);
         World      = world;
         Instance   = instance;
         GameObject = gameObject;
@@ -220,27 +221,29 @@ public sealed partial class AgentLabAgent : Component
     public bool TriggerEventSlot(int slot) => TriggerEventSlot(slot, null);
 
     // Amedo 2026-09-27
-    public bool TriggerEventSlot(int slot, AgentLabAgent? originator, bool force = false)
+    public bool TriggerEventSlot(int slot, AgentLabAgent? originator, bool force = false, int channel = 0)
     {
         if (EventsHeld_18) return false; // Amedo
         if (Pickup is not null) return RequestPickup(slot, originator); // Amedo 2026-09-27
         if (Projectile is not null) return RequestProjectile(slot, originator); // Amedo 2026-10-06
         if (Slot(slot) is not { Graph: not null }) return false;
-        World.PostSlotRequest_260E68(this, slot, originator, force); // Amedo
+        World.PostSlotRequest_260E68(this, slot, originator, force, channel); // Amedo
         return true;
     }
 
     // Amedo
-    internal void RequestSlot_20E5A8(int slot, AgentLabAgent? originator, bool force)
+    internal void RequestSlot_20E5A8(int slot, AgentLabAgent? originator, bool force, int channel = 0)
     {
         if (Slot(slot) is not { Graph: { } g } r) return;
+        var entered = EnterChannel(channel);
         if (!force && !CanRequest(g, r.Starter))
-        {
             Trace($"event slot 0x{slot:X} -> '{g.Name}' refused (priority {r.Starter?.Priority ?? g.Priority}, running {RunningPriority}, pending {_pendingBehaviour?.Graph.Name ?? "-"})"); // Amedo 2026-10-01
-            return;
+        else
+        {
+            Trace($"event slot 0x{slot:X} -> '{g.Name}'{(channel != 0 ? $" on channel {channel}" : "")}");
+            _pendingBehaviour = (g, r.Starter, originator ?? this, originator); // Amedo 2026-09-27
         }
-        Trace($"event slot 0x{slot:X} -> '{g.Name}'");
-        _pendingBehaviour = (g, r.Starter, originator ?? this, originator); // Amedo 2026-09-27
+        LeaveChannel(entered);
     }
 
     private (PS2BehaviourGraph? Graph, TwinBehaviourStarter? Starter) Slot(int slot) =>

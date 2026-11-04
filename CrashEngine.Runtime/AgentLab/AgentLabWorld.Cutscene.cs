@@ -54,6 +54,12 @@ public sealed partial class AgentLabWorld
         _videoModelCount_E0++;
     }
 
+    internal void ForgetVideoModel(AgentLabAgent agent)
+    {
+        for (int i = 0; i < _videoModelCount_E0; i++)
+            if (ReferenceEquals(_videoModels_A0[i], agent)) _videoModels_A0[i] = null;
+    }
+
     // Amedo
     public AgentLabAgent? VideoModelInstance(ushort id)
     {

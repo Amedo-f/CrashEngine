@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -113,8 +114,8 @@ public sealed partial class AgentLabAgent
         var from = (fromNeed | fromSkip) != 0 ? nav.Nearest_23BC80(start, fromNeed, fromSkip) : nav.Nearest_23BAF8(start);
         var to = (toNeed | toSkip) != 0 ? nav.Nearest_23BC80(dest, toNeed, toSkip) : nav.Nearest_23BAF8(dest);
         if (from is null || to is null) return;
-        if (F(15) > 0f && MathF.Sqrt(DistanceSq(from.Position, start)) - from.Radius > F(15)) return; // Amedo
-        if (F(16) > 0f && MathF.Sqrt(DistanceSq(to.Position, dest)) - to.Radius > F(16)) return;
+        if (F(15) > 0f && MathF.Sqrt(GameMath.DistanceSq(from.Position, start)) - from.Radius > F(15)) return; // Amedo
+        if (F(16) > 0f && MathF.Sqrt(GameMath.DistanceSq(to.Position, dest)) - to.Radius > F(16)) return;
 
         var req = new NavRequest // Amedo
         {
@@ -148,7 +149,7 @@ public sealed partial class AgentLabAgent
         pf.Start_1200 = start;
         pf.Dest_1210 = dest;
         pf.Mid_1220 = new Vector3((dest.X + start.X) * 0.5f, (dest.Y + start.Y) * 0.5f, (dest.Z + start.Z) * 0.5f);
-        pf.Radius2_1230 = DistanceSq(start, pf.Mid_1220);
+        pf.Radius2_1230 = GameMath.DistanceSq(start, pf.Mid_1220);
         if ((flags & 0x800000) != 0) pf.SetNearFocusWeight_251CA8(req.Value14);
         if (pf.Search_242868(req) is not { } route) return;
         SetRoute_20EB48(route);
@@ -158,7 +159,7 @@ public sealed partial class AgentLabAgent
     private bool InsideNode(NavNode? node)
     {
         if (node is null) return false;
-        var (min, max) = WorldBox(); // Amedo: IsWithinAiPosition 0x22BFD0 (centre of inst+0x40/+0x50)
+        var (min, max) = WorldBox(); // Amedo
         var p = new Vector3((max.X - min.X) * 0.5f + min.X, (max.Y - min.Y) * 0.5f + min.Y, (max.Z - min.Z) * 0.5f + min.Z);
         if (node.Position.Y + 3.7f < p.Y || p.Y < node.Position.Y - 0.8f) return false;
         float dx = p.X - node.Position.X, dz = p.Z - node.Position.Z;

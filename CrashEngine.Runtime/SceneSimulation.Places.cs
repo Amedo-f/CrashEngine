@@ -88,7 +88,7 @@ public sealed partial class SceneSimulation
         var from = agent.Chunk;
         if (!ReferenceEquals(e.Parent, home))
         {
-            if (!Moved(e) && e.Parent is { } parent) _moved.Add((e, parent));
+            RememberHome(e); // Amedo
             e.Parent?.RemoveChild(e);
             home.AddChild(e);
         }

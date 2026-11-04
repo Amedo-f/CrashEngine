@@ -3,6 +3,7 @@ using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -232,9 +233,9 @@ public sealed partial class AgentLabAgent
     {
         if (World.Player is not { } player || Key(_keyCurrent) is not { } current) return 0f;
         var p = player.GamePosition;
-        float best = Vector3.DistanceSquared(p, current);
+        float best = GameMath.DistanceSq(p, current);
         for (int i = 0; i < _keys.Count; i++)
-            if (i != _keyCurrent && Vector3.DistanceSquared(p, _keys[i]) < best) return 1f;
+            if (i != _keyCurrent && GameMath.DistanceSq(p, _keys[i]) < best) return 1f;
         return 0f;
     }
 }

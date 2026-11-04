@@ -9,7 +9,7 @@ public static class OgiHulls
 {
     private static readonly ConditionalWeakTable<PS2AnyOGI, IReadOnlyList<ConvexHull>> Local = new();
 
-    // Amedo: ReadOgi 0x296194 — no collision parts in the file -> one box of the OGI bounds, no joint
+    // Amedo
     public static bool IsDefaultBox(PS2AnyOGI ogi) => ogi.Collisions.Count == 0;
 
     public static int Count(PS2AnyOGI ogi) => IsDefaultBox(ogi) ? 1 : ogi.Collisions.Count;

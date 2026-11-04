@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Character.Vehicles;
+using CrashEngine.Runtime.Physics;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -7,6 +8,7 @@ namespace CrashEngine.Runtime.AgentLab;
 public sealed partial class AgentLabAgent
 {
     private (Vector3 Min, Vector3 Max, bool Has)? _ogiBox;
+    private ConvexHull? _setBoxHull;
 
     internal void SetCollidable(bool on) => AgentFlags = on ? AgentFlags | 0x10u : AgentFlags & ~0x10u;
 
@@ -27,6 +29,9 @@ public sealed partial class AgentLabAgent
     {
         if (box is { } b)
         {
+            if (_setBoxHull is null) _setBoxHull = ConvexHull.Box(b.Min, b.Max);
+            else _setBoxHull.SetBox(b.Min, b.Max);
+            _ownHull_4 = _setBoxHull;
             _ogiBox ??= (_boxMin, _boxMax, _hasBox);
             _boxMin = b.Min;
             _boxMax = b.Max;
@@ -34,6 +39,7 @@ public sealed partial class AgentLabAgent
             CellBox_1EB158(); // Amedo
             return;
         }
+        _ownHull_4 = null;
         if (_ogiBox is not { } saved) return;
         (_boxMin, _boxMax, _hasBox) = saved;
         _ogiBox = null;

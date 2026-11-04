@@ -100,6 +100,7 @@ public static partial class MeshDecoder
         {
             var raw = sm.Mesh;
             if (raw.Indices.Length < 3 || raw.Positions.Length == 0) continue;
+            bool ownTexture = raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0; // Amedo
             if (raw.DiffusePixelsRGBA is null || raw.TexWidth <= 0 || raw.TexHeight <= 0)
             {
                 const int whiteSize = 128;
@@ -119,7 +120,7 @@ public static partial class MeshDecoder
             for (int p = 0; p < tw * th; p++) colors.Add(new Color(pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2], pixels[p * 4 + 3]));
             tex.FromBitmap(colors, tw, ITwinTextureFunction(), ITwinTexturePsm());
             destTexSec.AddItem(tex);
-            if (tw < raw.TexWidth || th < raw.TexHeight) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight);
+            if (ownTexture) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo
             var t2d = ChunkImporter.DecodeTexture(gl, tex);
             if (t2d is not null) destTexCache[texId] = t2d;
             rec.TextureIds.Add(texId);
@@ -129,6 +130,9 @@ public static partial class MeshDecoder
             mat.SetID(matId);
             mat.Shaders[0].TextureId = texId;
             mat.Shaders[0].TxtMapping = TwinShader.TextureMapping.ON;
+            if (raw.CeAlphaBlend.HasValue) // Amedo
+                mat.Shaders[0].ABlending = raw.CeAlphaBlend.Value ? TwinShader.AlphaBlending.ON : TwinShader.AlphaBlending.OFF;
+            ApplyImportAlphaTest(mat.Shaders[0], raw.AlphaCutoff); // Amedo
             destMatSec.AddItem(mat);
             rec.MaterialIds.Add(matId);
             RegisterUpperLayers(mat, destTexCache);
@@ -163,7 +167,7 @@ public static partial class MeshDecoder
                 var p = raw.Positions[vi]; var n = raw.Normals[vi]; var uv = raw.UVs[vi];
                 sub.Vertexes.Add(new TwinVec4(p.X, p.Y, p.Z, n.X));
                 sub.UVW.Add(new TwinVec4(uv.X, uv.Y, n.Y, n.Z));
-                sub.Colors.Add(new TwinVec4(SkinVertexColor.X, SkinVertexColor.Y, SkinVertexColor.Z, SkinVertexColor.W));
+                sub.Colors.Add(ImportVertexColor(raw, vi, SkinVertexColor.X, SkinVertexColor.W)); // Amedo
                 sub.SkinJoints.Add(JointInfo(sm, (int)vi, draws));
                 minPos = SysVec3.Min(minPos, p); maxPos = SysVec3.Max(maxPos, p);
                 inGroup++;

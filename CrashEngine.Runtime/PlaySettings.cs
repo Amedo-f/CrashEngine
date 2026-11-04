@@ -86,6 +86,9 @@ public sealed class PlaySettings
         };
     }
 
+    public static bool IsPalDisc(string disc) =>
+        !File.Exists(Path.Combine(disc, NtscExe)) && File.Exists(Path.Combine(disc, PalExe));
+
     // Amedo
     private static bool BootStraightPatched(string disc, bool ntsc)
     {

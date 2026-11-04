@@ -23,6 +23,7 @@ public sealed partial class AgentLabAgent
     {
         if (GameObject is not { Type: ITwinObject.ObjectType.Projectile } go || go.UnkTypeValue != 0x12) return false;
         Projectile = new ProjectileAgent(this);
+        Projectile.ApplyState_141C28(); // Amedo
         Projectile.SetSettingsIndex(Var(0));
         Trace($"projectile custom agent (settings {Var(0)})");
         return true;

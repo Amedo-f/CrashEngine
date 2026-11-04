@@ -37,6 +37,14 @@ public sealed class GameRandom
 
     public float RandomAround_18C210(float a, float b) => a + RandomSigned_18C0F0() * b;
 
+    public Vector3 JitterVector_23C848(Vector3 v, float scale, float y, float x, float z)
+    {
+        float dx = RandomSigned_18C0F0() * (scale * x);
+        float dy = RandomSigned_18C0F0() * (scale * y);
+        float dz = RandomSigned_18C0F0() * (scale * z);
+        return new Vector3(v.X + dx, v.Y + dy, v.Z + dz);
+    }
+
     public static float CvtSW(int v)
     {
         uint m = v < 0 ? (uint)(-(long)v) : (uint)v;

@@ -11,6 +11,8 @@ public static class GameFog
 
     public const float ZBias = -1117f;
 
+    public const uint Chain_1AE698 = 4;
+
     private static readonly byte[] Alpha =
     {
         90, 77, 77, 78, 78, 79, 79, 79, 80, 80, 81, 81, 82, 82, 82, 83, 83, 84, 84, 84, 85, 85, 86, 86, 86, 87, 87, 87, 88, 88, 88, 89,

@@ -84,7 +84,7 @@ public sealed partial class AgentLabAgent
         if (field >= packet.Bytes.Count) return false;
         byte b = packet.Bytes[field];
         if (b == 0xFF) return false;
-        if ((b & 0x80) != 0) { value = RootController().FloatVar(b & 0x7F); return true; } // Amedo: GetPropsHolderFromInstanceNode 0x23C118
+        if ((b & 0x80) != 0) { value = RootController().FloatVar(b & 0x7F); return true; } // Amedo
         if (b >= packet.Floats.Count) return false;
         value = BitConverter.UInt32BitsToSingle(packet.Floats[b]);
         return true;

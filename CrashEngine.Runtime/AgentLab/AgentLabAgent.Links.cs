@@ -187,7 +187,7 @@ public sealed partial class AgentLabAgent
         }
 
         AgentLabAgent? to;
-        bool canUnlink = true; // Amedo: a participant (index < 0xDE) is never unlinked
+        bool canUnlink = true; // Amedo
         if ((arg1 & 0x10000) != 0)
         {
             if ((arg1 & 0x100000) != 0) index = _links.Count - 1;
@@ -199,7 +199,7 @@ public sealed partial class AgentLabAgent
             to = index < 0xDE ? Participant(index) : CodeObject(index);
         }
         if (to is null) return;
-        if (unlink && canUnlink) UnlinkInstance_196520(to, update: true); // Amedo: off the links and the attachments
+        if (unlink && canUnlink) UnlinkInstance_196520(to, update: true); // Amedo
         to.Deliver(id, this);
     }
 }

@@ -1,5 +1,6 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -72,7 +73,7 @@ public sealed partial class AgentLabAgent
         if (_sqrTolerance != 0f)
         {
             MoveInstance_23C280(p);
-            if (Vector3.DistanceSquared(p, _moveTarget) < _sqrTolerance) _translationDone = true;
+            if (GameMath.DistanceSq(p, _moveTarget) < _sqrTolerance) _translationDone = true;
             return;
         }
         if (_projectileDuration <= (float)(World.Now - _packetStart))

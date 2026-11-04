@@ -49,7 +49,7 @@ public sealed partial class AgentLabWorld
             for (int i = 0; i < triggers.GetItemsAmount(); i++)
                 if (triggers.GetItem(i) is PS2AnyTrigger t)
                 {
-                    if ((t.Trigger.Header & 0xFF) == 0) // Amedo: RegisterTrigger 0x266100
+                    if ((t.Trigger.Header & 0xFF) == 0) // Amedo
                     {
                         chunk.AddSoundBox_1F1E30(new SoundBox(t));
                         continue;

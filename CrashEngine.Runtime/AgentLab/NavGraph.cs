@@ -3,6 +3,7 @@ using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -103,7 +104,7 @@ public sealed class NavGraph
         {
             if (require != 0 && (n.Flags & require) == 0) continue;
             if ((n.Flags & exclude) != 0) continue;
-            float dSq = Vector3.DistanceSquared(point, n.Position);
+            float dSq = GameMath.DistanceSq(point, n.Position);
             if (dSq < bestSq) { bestSq = dSq; best = n; }
         }
         return best;
