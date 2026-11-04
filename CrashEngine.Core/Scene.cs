@@ -67,9 +67,32 @@ public class Scene
         foreach (var e in _roots) e.Update();
     }
 
+    // Amedo 2026-10-27: the same rule as walking the tree (the component and every entity up to a root of this scene active), only for the components that use it
+    private WeakReference<Component>[] _fixedUpdaters = [];
+    private int _fixedUpdatersVersion = -1;
+
     internal void FixedUpdate()
     {
-        foreach (var e in _roots) e.FixedUpdate();
+        if (_fixedUpdatersVersion != Entity.FixedUpdatersVersion)
+            lock (Entity.FixedUpdaters)
+            {
+                Entity.FixedUpdaters.RemoveAll(static w => !w.TryGetTarget(out _));
+                _fixedUpdaters = Entity.FixedUpdaters.ToArray();
+                _fixedUpdatersVersion = Entity.FixedUpdatersVersion;
+            }
+        foreach (var w in _fixedUpdaters)
+            if (w.TryGetTarget(out var c) && c.Enabled && InThisSceneAndActive(c.Entity)) c.OnFixedUpdate();
+    }
+
+    private bool InThisSceneAndActive(Entity? e)
+    {
+        Entity? top = null;
+        for (; e is not null; e = e.Parent)
+        {
+            if (!e.Active) return false;
+            top = e;
+        }
+        return top is not null && _roots.Contains(top);
     }
 
     private readonly List<Component> _translucent = new(); // Amedo 2026-09-26
@@ -77,6 +100,8 @@ public class Scene
     // Amedo 2026-10-01
     public static bool InOpaquePass { get; private set; }
     public static event Action<GL>? AfterOpaque;
+
+    public static Func<Component, bool>? RenderFilter { get; set; }
 
     internal void Render(GL gl)
     {

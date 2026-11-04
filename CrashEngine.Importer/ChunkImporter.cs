@@ -158,6 +158,7 @@ public static class ChunkImporter
             MeshTables    = meshTables,
             SceneryTables = sceneryTables,
         });
+        LiveProbe.Track("chunk", root.Get<ChunkSource>()!, Path.GetFileNameWithoutExtension(rm2Path));
 
         return root;
     }

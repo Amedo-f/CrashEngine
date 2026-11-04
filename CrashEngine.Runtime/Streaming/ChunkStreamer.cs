@@ -77,6 +77,30 @@ public sealed class StreamResource
     public int DepthB => (int)(Flags4 & 0xF);
     public bool WantsScenery => DepthB < 2;
     public bool WantsObjects => DepthA < 2;
+
+    public const int WaitNone = 0, WaitLoad = 1, WaitUnload = 2;
+    private const long LoadDelay = 9000, UnloadDelay = LoadDelay * 4, UnreachedDelay = LoadDelay / 10;
+
+    private int _waitKind;
+    private long _waitStart, _waitTicks;
+
+    public bool Waited_2AA020(int kind, long now)
+    {
+        if (kind == WaitNone)
+        {
+            _waitKind = WaitNone;
+            return true;
+        }
+        if (kind != _waitKind)
+        {
+            _waitKind = kind;
+            _waitStart = now;
+            _waitTicks = kind == WaitLoad ? LoadDelay : (Flags4 & 0xFF) == 0xFF ? UnreachedDelay : UnloadDelay;
+            return false;
+        }
+        return now - _waitStart > _waitTicks;
+    }
+
     public override string ToString() => $"{Name} A{DepthA} B{DepthB}";
 }
 

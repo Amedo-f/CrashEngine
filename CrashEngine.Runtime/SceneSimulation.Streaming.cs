@@ -22,11 +22,88 @@ public sealed partial class SceneSimulation
     }
 
     private readonly Dictionary<string, (Entity Root, Renderer.GpuUploadQueue? Uploads)> _built = new(); // Amedo 2026-09-29
+    private readonly List<string> _builtOrder = new();
+    private readonly Renderer.GpuUploadQueue _stillUsed = new();
+
+    public static int KeepBuiltScenes { get; set; } = 0;
+
+    public string StreamCounts => $"built {_built.Count}, streamed {_streamed.Count}, scenery-only {_sceneryOnly.Count}, parsing {_parsing.Count}, dropped {_dropped.Count}";
+
+    private HashSet<object> UsedGpuResources()
+    {
+        var used = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var stack = new Stack<Entity>();
+        if (_chunkRoot?.Scene is { } scene) foreach (var e in scene.Roots) stack.Push(e);
+        foreach (var (_, kept) in _built) stack.Push(kept.Root);
+        foreach (var (mesh, material) in Renderer.RenderPipeline.SkydomeDraws) AddUsed(used, mesh, material);
+        if (Renderer.RenderPipeline.SkydomeOverride is { } sky) foreach (var (mesh, material) in sky) AddUsed(used, mesh, material);
+        while (stack.Count > 0)
+        {
+            var e = stack.Pop();
+            foreach (var c in e.Components)
+                switch (c)
+                {
+                    case MeshRenderer m: AddUsed(used, m.Mesh, m.Material); break;
+                    case Renderer.MeshRenderer m: AddUsed(used, m.Mesh, m.Material); break;
+                }
+            foreach (var child in e.Children) stack.Push(child);
+        }
+        return used;
+    }
+
+    private static void AddUsed(HashSet<object> used, object? mesh, Renderer.Material? material)
+    {
+        if (mesh is not null) used.Add(mesh);
+        if (material is null) return;
+        if (material.Albedo is { } texture) used.Add(texture);
+        if (material.Layers is { } layers) foreach (var layer in layers) AddUsed(used, null, layer);
+    }
+
+    private void KeepBuilt(string name, (Entity Root, Renderer.GpuUploadQueue? Uploads) built)
+    {
+        _built.TryGetValue(name, out var replaced);
+        _built[name] = built;
+        _builtOrder.Remove(name);
+        _builtOrder.Add(name);
+        if (replaced.Root is not null && !ReferenceEquals(replaced.Root, built.Root)) FreeBuilt(name, replaced);
+        while (_built.Count > KeepBuiltScenes && _builtOrder.Count > 0)
+        {
+            string oldest = _builtOrder[0];
+            _builtOrder.RemoveAt(0);
+            if (_built.Remove(oldest, out var freed)) FreeBuilt(oldest, freed);
+        }
+    }
+
+    private void FreeBuilt(string name, (Entity Root, Renderer.GpuUploadQueue? Uploads) freed)
+    {
+        if (freed.Uploads is { } uploads)
+        {
+            int count = uploads.Count, done = uploads.DisposeUnused(UsedGpuResources(), _stillUsed);
+            _log?.Invoke($"[stream] freed the built {name} ({done} of {count} GPU resources, the rest still used) to keep {KeepBuiltScenes} left scene(s)");
+        }
+        CutTree(freed.Root);
+    }
+
+    private static void CutTree(Entity root)
+    {
+        GameLightingDraw.ForgetChunk(root);
+        root.RemoveComponent<ChunkSource>();
+        var stack = new Stack<Entity>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var e = stack.Pop();
+            if (e.Has<AgentLabAgent>()) continue;
+            foreach (var child in e.Children) stack.Push(child);
+            e.ForgetChildren();
+        }
+    }
 
     // Amedo 2026-10-06
     private sealed class SceneryOnlyChunk
     {
         public required Entity Entity;
+        public WorldChunk? Chunk;
         public Renderer.GpuUploadQueue? Uploads;
         public readonly List<(Entity Entity, bool Active)> Hidden = new();
     }
@@ -50,7 +127,7 @@ public sealed partial class SceneSimulation
     private Entity? _chunkRoot;
     private WorldChunk? _anchorChunk;
     private StreamResource? _anchorResource;
-    private readonly List<(Entity Entity, Entity Home)> _moved = new();
+    private readonly List<(Entity Entity, Entity Home, int Index)> _moved = new(); // Amedo
 
     // Amedo
     private bool Moved(Entity e)
@@ -58,6 +135,15 @@ public sealed partial class SceneSimulation
         foreach (var x in _moved)
             if (ReferenceEquals(x.Entity, e)) return true;
         return false;
+    }
+
+    // Amedo
+    private void RememberHome(Entity e)
+    {
+        if (Moved(e) || e.Parent is not { } parent) return;
+        int index = 0;
+        while (index < parent.Children.Count && !ReferenceEquals(parent.Children[index], e)) index++;
+        _moved.Add((e, parent, index));
     }
 
     private readonly Dictionary<string, uint> _lastDepths = new();
@@ -164,7 +250,7 @@ public sealed partial class SceneSimulation
         for (int i = 0; i < agents.Count; i++)
         {
             var agent = agents[i];
-            if (agent.OwnCharacter is null || agent.Destroyed || ReferenceEquals(agent, World.Player)) continue;
+            if (agent.Destroyed || ReferenceEquals(agent, World.Player)) continue; // Amedo
             if ((agent.AgentFlags & 0x20000) != 0x20000) continue; // Amedo 2026-10-05
             if (ResourceOf(agent.Chunk)?.Links is not { } links) continue;
             var best = Select_1ED690(links, agent.Chunk, agent.GamePosition);
@@ -231,13 +317,15 @@ public sealed partial class SceneSimulation
         var from = agent.Chunk; // Amedo 2026-09-29
         var m = agent.GameMatrix * obj;
         var e = agent.Entity;
-        if (!Moved(e) && e.Parent is { } parent) _moved.Add((e, parent));
+        RememberHome(e); // Amedo
         e.Parent?.RemoveChild(e);
         home.AddChild(e);
         agent.GameMatrix = m;
         SnapDisplay(e); // Amedo 2026-09-30
         agent.CanChangeChunk_23D060(target); // Amedo
+        agent.Projectile?.CanChangeChunk_11EFB8(obj); // Amedo
         agent.Chunk = target;
+        if (agent.Component5 is { } body && !ReferenceEquals(body, agent.OwnCharacter?.Body5)) body.Transfer_28D698(obj); // Amedo 2026-11-03
         if (agent.OwnCharacter is not { } c) return; // Amedo 2026-09-29
         c.Body5?.Transfer_28D698(obj);
         c.Transfer_13BEA0(obj);
@@ -264,11 +352,10 @@ public sealed partial class SceneSimulation
         foreach (var l in links)
         {
             if (l.Target is not { } t || links.First(x => ReferenceEquals(x.Target, t)) != l) continue;
-            if (ReferenceEquals(t, _anchorResource))
+            if (ReferenceEquals(t, _anchorResource) || t.Name == _anchorResource?.Name) // Amedo
             {
                 var wants = MeshDecoder.TwinMatToSys(l.Source.ChunkMatrix) * root.ToAnchor;
-                if (_anchorChunk is { } a && !Near(a.ToAnchor, wants))
-                    _log?.Invoke($"[stream] the editor's scene {t.Name} is at {a.ToAnchor.Translation}, the link of {root.Name} puts it at {wants.Translation}");
+                if (_anchorChunk is { } a && !ReferenceEquals(a, root) && !Near(a.ToAnchor, wants)) MoveAroundAnchor(MeshDecoder.TwinMatToSys(l.Source.ChunkMatrix), root, wants); // Amedo
                 continue;
             }
             Entity? e;
@@ -293,6 +380,25 @@ public sealed partial class SceneSimulation
         World.SetRoot(root);
     }
 
+    // Amedo
+    private void MoveAroundAnchor(Matrix4x4 link, WorldChunk root, Matrix4x4 wants)
+    {
+        if (!Matrix4x4.Invert(link, out var rootAt) || !Matrix4x4.Invert(root.ToAnchor, out var fromRoot)) return;
+        var move = fromRoot * rootAt;
+        foreach (var s in _streamed.Values)
+        {
+            var was = s.Chunk.ToAnchor;
+            s.Chunk.ToAnchor = was * move;
+            s.Entity.Transform.LocalMatrix = s.Chunk.ToAnchor;
+            if (s.ParticleBank >= 0) World.Particles?.MoveBank(s.ParticleBank, was, s.Chunk.ToAnchor);
+        }
+        foreach (var held in _sceneryOnly.Values)
+            if (held.Entity.Transform.LocalMatrix is { } m) held.Entity.Transform.LocalMatrix = m * move;
+        World.MoveRespawn(move, _anchorChunk?.Name);
+        SnapDisplay();
+        _log?.Invoke($"[stream] the link of {root.Name} puts the editor's scene at {wants.Translation}: moved the {_streamed.Count + _sceneryOnly.Count} other scene(s) by {move.Translation} so it stays where it is");
+    }
+
     private static bool Near(Matrix4x4 a, Matrix4x4 b)
     {
         for (int i = 0; i < 4; i++)
@@ -305,19 +411,20 @@ public sealed partial class SceneSimulation
     {
         if (_anchorChunk is null) return;
         ShowAnchor(); // Amedo 2026-09-29
-        foreach (var (e, homeParent) in _moved)
+        for (int i = _moved.Count - 1; i >= 0; i--) // Amedo
         {
+            var (e, homeParent, index) = _moved[i];
             if (e.Parent is null && e.Get<AgentLabAgent>() is { SpawnedBy: not null } gone && !World.Spawned.Contains(gone)) continue; // Amedo
             e.Parent?.RemoveChild(e);
-            homeParent.AddChild(e);
+            homeParent.InsertChild(index, e); // Amedo
         }
         _moved.Clear();
         SnapDisplay(); // Amedo 2026-09-30
         World.SetRoot(_anchorChunk);
+        if (Streamer is not null && _anchorResource is not null) Streamer.Root = _anchorResource; // Amedo
         PlaceLinked_1E9C18(); // Amedo
         foreach (var a in World.Agents)
             if (a.Entity.Parent is { } p && ReferenceEquals(p, _gameSpace)) { a.CanChangeChunk_23D060(_anchorChunk); a.Chunk = _anchorChunk; } // Amedo
-        if (Streamer is not null && _anchorResource is not null) Streamer.Root = _anchorResource;
     }
 
     private void StepStreaming(bool block = false)
@@ -338,17 +445,31 @@ public sealed partial class SceneSimulation
             if (!_lastDepths.TryGetValue(r.Name, out uint was) || was != (r.Flags4 & 0xFF))
             {
                 _lastDepths[r.Name] = r.Flags4 & 0xFF;
-                _log?.Invoke($"[stream] {r.Name} A{r.DepthA} B{r.DepthB} (viewer {player.GamePosition}, root {root.Name})");
+                _log?.Invoke($"[stream] {r.Name} A{r.DepthA} B{r.DepthB} at {World.Now:0.00}s (viewer {player.GamePosition}, root {root.Name})");
             }
-            if (ReferenceEquals(r, root)) continue;
+            if (ReferenceEquals(r, root))
+            {
+                r.Waited_2AA020(StreamResource.WaitNone, World.ClockTicks);
+                continue;
+            }
             if (r.Name == _anchorResource?.Name) // Amedo 2026-09-29
             {
                 if (_anchorUnloaded) _anchorResource = r; // Amedo
-                if (!r.WantsObjects && !_anchorUnloaded) UnloadAnchor(r);
-                else if (r.WantsObjects && _anchorUnloaded) RestoreAnchor(r);
+                int anchorWait = !r.WantsObjects && !_anchorUnloaded ? StreamResource.WaitUnload
+                               : r.WantsObjects && _anchorUnloaded ? StreamResource.WaitLoad : StreamResource.WaitNone;
+                if (r.Waited_2AA020(anchorWait, World.ClockTicks) || block)
+                {
+                    if (!r.WantsObjects && !_anchorUnloaded) UnloadAnchor(r);
+                    else if (r.WantsObjects && _anchorUnloaded) RestoreAnchor(r);
+                }
                 if (_anchorUnloaded) r.SceneryLoaded = r.WantsScenery; // Amedo 2026-10-06
                 continue;
             }
+            int wait = r.WantsObjects && !r.ObjectsLoaded ? StreamResource.WaitLoad
+                     : !r.WantsObjects && r.ObjectsLoaded ? StreamResource.WaitUnload
+                     : r.WantsScenery && !r.SceneryLoaded ? StreamResource.WaitLoad
+                     : !r.WantsScenery && _sceneryOnly.ContainsKey(r) ? StreamResource.WaitUnload : StreamResource.WaitNone;
+            if (!r.Waited_2AA020(wait, World.ClockTicks) && !block) continue;
             if (r.WantsObjects && !r.ObjectsLoaded) // Amedo 2026-10-06
             {
                 if (_sceneryOnly.Remove(r, out var held)) UpgradeScenery(r, root, held);
@@ -395,7 +516,7 @@ public sealed partial class SceneSimulation
         if (!r.WantsObjects && !(r.WantsScenery && !r.SceneryLoaded)) // Amedo 2026-10-06
         {
             _parsing.Remove(r.Name);
-            if (result is PreparedChunk { Root: { } unwanted } kept) _built[r.Name] = (unwanted, kept.Uploads); // Amedo 2026-09-29
+            if (result is PreparedChunk { Root: { } unwanted } kept) KeepBuilt(r.Name, (unwanted, kept.Uploads)); // Amedo 2026-09-29
             return false;
         }
         if (!r.WantsObjects) // Amedo 2026-10-06
@@ -455,7 +576,7 @@ public sealed partial class SceneSimulation
         foreach (var name in _droppedDone)
         {
             _dropped.Remove(name, out var task);
-            if (task!.IsCompletedSuccessfully && task.Result is PreparedChunk { Root: { } kept } p && !_built.ContainsKey(name)) _built[name] = (kept, p.Uploads);
+            if (task!.IsCompletedSuccessfully && task.Result is PreparedChunk { Root: { } kept } p && !_built.ContainsKey(name)) KeepBuilt(name, (kept, p.Uploads));
         }
     }
 
@@ -465,6 +586,7 @@ public sealed partial class SceneSimulation
     {
         if (_chunkHost is not { } host || _parsing.ContainsKey(r.Name)) return;
         string name = r.Name;
+        _log?.Invoke($"[stream] {name}: load started at {World.Now:0.00}s");
         if (_dropped.Remove(name, out var resumed)) // Amedo
         {
             _parsing[name] = resumed;
@@ -663,7 +785,7 @@ public sealed partial class SceneSimulation
     {
         if (_chunkRoot is null || e?.Get<ChunkSource>() is not { } src || root.Links?.FirstOrDefault(l => ReferenceEquals(l.Target, r)) is not { } link)
         {
-            if (e is not null) _built[r.Name] = (e, uploads);
+            if (e is not null) KeepBuilt(r.Name, (e, uploads));
             return;
         }
         var toAnchor = MeshDecoder.TwinMatToSys(link.Source.ChunkMatrix) * World.RootChunk.ToAnchor;
@@ -703,10 +825,18 @@ public sealed partial class SceneSimulation
         held.Entity.Active = true;
         held.Entity.Parent?.RemoveChild(held.Entity);
         ReleaseSceneryShaders(held.Entity.Get<ChunkSource>()?.Sm2); // Amedo
-        _built[r.Name] = (held.Entity, held.Uploads);
+        KeepBuilt(r.Name, (held.Entity, held.Uploads));
+        if (held.Chunk is { } chunk) ReleaseChunkData(chunk);
         r.SceneryLoaded = false;
         r.Links = null;
         _log?.Invoke($"[stream] unloaded the scenery of {r.Name} at {World.Now:0.00}s (kept built for the rest of this Play)");
+    }
+
+    private void ReleaseChunkData(WorldChunk chunk)
+    {
+        foreach (var agent in World.Agents)
+            if (ReferenceEquals(agent.Chunk, chunk)) return;
+        chunk.ReleaseData();
     }
 
     private void UnloadObjects(StreamResource r) => UnloadObjects(r, false); // Amedo 2026-10-06
@@ -722,6 +852,7 @@ public sealed partial class SceneSimulation
             if (!ReleaseOnUnload_197570(agent, s.Chunk)) ReleaseAgent(agent); // Amedo
         World.ReleaseSpawnedUnder(s.Entity); // Amedo 2026-09-29
         World.UndoForeignGroupsUnder(s.Entity);
+        foreach (var agent in World.Agents) agent.ForgetReleased();
         foreach (var snap in _snapshot.Where(x => ReferenceEquals(x.Chunk, s.Chunk)))
             if (snap.Entity.Get<AgentLabAgent>() is not { } alive || ReferenceEquals(alive.Chunk, s.Chunk)) Restore(snap); // Amedo 2026-09-29
         _snapshot.RemoveAll(x => ReferenceEquals(x.Chunk, s.Chunk));
@@ -733,7 +864,7 @@ public sealed partial class SceneSimulation
         r.Tag = null;
         if (keepScenery) // Amedo 2026-10-06
         {
-            var held = new SceneryOnlyChunk { Entity = s.Entity, Uploads = s.Uploads };
+            var held = new SceneryOnlyChunk { Entity = s.Entity, Chunk = s.Chunk, Uploads = s.Uploads };
             foreach (var c in s.Entity.Children)
             {
                 if (c.Name == "Scenery") continue;
@@ -746,7 +877,8 @@ public sealed partial class SceneSimulation
         }
         s.Entity.Parent?.RemoveChild(s.Entity);
         ReleaseSceneryShaders(s.Chunk.Sm2); // Amedo
-        _built[r.Name] = (s.Entity, s.Uploads); // Amedo 2026-09-29
+        KeepBuilt(r.Name, (s.Entity, s.Uploads)); // Amedo 2026-09-29
+        ReleaseChunkData(s.Chunk);
         r.SceneryLoaded = false;
         r.Links = null;
         _log?.Invoke($"[stream] unloaded {r.Name} (kept built for the rest of this Play)");
@@ -797,7 +929,7 @@ public sealed partial class SceneSimulation
         if (!ReferenceEquals(player.Chunk, target))
         {
             var e = player.Entity;
-            if (!Moved(e) && e.Parent is { } parent) _moved.Add((e, parent));
+            RememberHome(e); // Amedo
             e.Parent?.RemoveChild(e);
             home.AddChild(e);
             player.CanChangeChunk_23D060(target); // Amedo
@@ -828,7 +960,7 @@ public sealed partial class SceneSimulation
         if (InstancesOf(target) is { } home && (!ReferenceEquals(agent.Chunk, target) || !Under(agent.Entity, home)))
         {
             var e = agent.Entity;
-            if (!Moved(e) && e.Parent is { } parent) _moved.Add((e, parent));
+            RememberHome(e); // Amedo
             e.Parent?.RemoveChild(e);
             home.AddChild(e);
             agent.CanChangeChunk_23D060(target); // Amedo
@@ -878,6 +1010,7 @@ public sealed partial class SceneSimulation
         agent.LeaveTree(); // Amedo
         agent.InChunk_A0 = false;
         World.Agents.Remove(agent);
+        World.Unregister(agent);
     }
 
     // Amedo 2026-09-29
@@ -901,6 +1034,7 @@ public sealed partial class SceneSimulation
             World.ReleaseSpawnedUnder(_gameSpace);
             World.UndoForeignGroupsUnder(_gameSpace);
         }
+        foreach (var agent in World.Agents) agent.ForgetReleased();
         foreach (var snap in _snapshot.Where(x => x.Chunk is null && Under(x.Entity, _gameSpace))) Restore(snap);
         World.RemoveChunk(chunk);
         World.Sounds?.RemoveLevel(chunk.Rm2);
@@ -967,7 +1101,7 @@ public sealed partial class SceneSimulation
         ReturnToAnchor();
         foreach (var (name, task) in _parsing.Concat(_dropped)) // Amedo 2026-09-29
             if (task.IsCompletedSuccessfully && task.Result is PreparedChunk { Root: { } pending } p && !_built.ContainsKey(name))
-                _built[name] = (pending, p.Uploads);
+                KeepBuilt(name, (pending, p.Uploads));
         _parsing.Clear();
         _dropped.Clear(); // Amedo
         foreach (var r in _streamed.Keys.ToList()) UnloadObjects(r);
@@ -981,6 +1115,8 @@ public sealed partial class SceneSimulation
         }
         if (_built.Count > 0) _log?.Invoke($"[stream] freed {freed} GPU resources of {_built.Count} streamed scene(s)");
         _built.Clear();
+        _builtOrder.Clear();
+        _stillUsed.DisposeAll();
         Streamer = null;
     }
 }

@@ -186,13 +186,6 @@ public sealed partial class AgentLabWorld
             if (ReferenceEquals(agent.Chunk, chunk) && !agent.Destroyed) agent.AttachmentsUpdate_196DB8();
     }
 
-    // Amedo 2026-09-28
-    internal void UnlinkEverywhere(AgentLabAgent dead)
-    {
-        foreach (var a in Agents) a.DropLinksTo(dead);
-        foreach (var a in _pendingAgents) a.DropLinksTo(dead);
-    }
-
     // Amedo 2026-09-29
     public void ReleaseSpawnedUnder(Entity root)
     {
@@ -275,6 +268,7 @@ public sealed partial class AgentLabWorld
         GlobalRm2 = globalRm2;
         RootChunk = new WorldChunk(name, rm2, null);
         Chunks.Add(RootChunk);
+        RememberStateChunk(RootChunk); // Amedo
         PathFinder.Link_22BB58(RootChunk.Nav); // Amedo
         Oleg = NewOleg(null); // Amedo
     }
@@ -301,6 +295,8 @@ public sealed partial class AgentLabWorld
     public void RemoveChunk(WorldChunk chunk)
     {
         if (ReferenceEquals(chunk, RootChunk) || !Chunks.Remove(chunk)) return;
+        if (!_heldRm2.Contains(chunk.Rm2)) _heldRm2.Add(chunk.Rm2);
+        ReleaseUnheldRm2_25F0E0();
         PathFinder.Unlink(chunk.Nav); // Amedo
         DropTriggersOf(chunk); // Amedo 2026-10-01
         RemoveDynamicScenery(chunk); // Amedo 2026-10-06
@@ -309,9 +305,11 @@ public sealed partial class AgentLabWorld
     // Amedo 2026-09-28
     public void AddChunk(WorldChunk chunk)
     {
+        RememberStateChunk(chunk); // Amedo
         if (!Chunks.Contains(chunk))
         {
             Chunks.Add(chunk);
+            _heldRm2.Remove(chunk.Rm2);
             PathFinder.Link_22BB58(chunk.Nav); // Amedo
         }
     }
@@ -326,6 +324,21 @@ public sealed partial class AgentLabWorld
         if (Player is null && agent.Instance.ObjectId == 0) Player = agent;
         if (Crash is null && agent.Instance.ObjectId == 0) Crash = agent; // Amedo
         RegisterGlobalAgent_25D748(agent); // Amedo
+    }
+
+    public void Unregister(AgentLabAgent agent)
+    {
+        var key = (agent.Instance.Section, agent.Instance.Source.GetID());
+        if (_byInstance.TryGetValue(key, out var listed) && ReferenceEquals(listed, agent)) _byInstance.Remove(key);
+        Places_13C.Remove(agent.Instance);
+        Information_40.Remove(agent.Instance);
+        ForgetVideoModel(agent);
+        ForgetCheckpointAgent(agent);
+        _pendingAgents.Remove(agent);
+        if (_attachmentsGroup.Contains(agent)) RemoveAttachments_197480(agent);
+        if (agent.InstanceId_154 != -1) InstanceIdsRemove_199548(agent);
+        int slot = (ushort)agent.Instance.Source.RefListIndex & 0xFF;
+        if (ReferenceEquals(_globalAgents[slot], agent)) _globalAgents[slot] = null;
     }
 
     private readonly AgentLabAgent?[] _globalAgents = new AgentLabAgent?[256]; // Amedo
@@ -364,6 +377,7 @@ public sealed partial class AgentLabWorld
     }
 
     private long _clockTicks; // Amedo
+    public long ClockTicks => _clockTicks;
     public bool MoviePlaying { get; private set; } // Amedo
     private Action? _pauseSounds; // Amedo
 
@@ -523,7 +537,7 @@ public sealed partial class AgentLabWorld
         _chunkOrder.Clear();
         var main = Player is { Destroyed: false } p ? p.Chunk : RootChunk;
         if (Chunks.Contains(main)) _chunkOrder.Add(main);
-        for (int i = Chunks.Count - 1; i >= 0; i--) // Amedo: ChunkListPushFront 0x1F3A08 = newest first
+        for (int i = Chunks.Count - 1; i >= 0; i--) // Amedo
             if (!ReferenceEquals(Chunks[i], main)) _chunkOrder.Add(Chunks[i]);
         foreach (var agent in order)
             if (!_chunkOrder.Contains(agent.Chunk)) _chunkOrder.Add(agent.Chunk);
@@ -583,7 +597,7 @@ public sealed partial class AgentLabWorld
         StepQueuedObjects_1985C0(); // Amedo
         foreach (var agent in UpdateOrder_1999F0())
         {
-            if (!ReferenceEquals(agent.Chunk, chunk) || !agent.SteppedNow || !ChunkClocksRunning) continue; // Amedo
+            if (!ReferenceEquals(agent.Chunk, chunk) || !ChunkClocksRunning) continue; // Amedo
             Current = agent;
             agent.CrateGroup_17A9A0();
         }
@@ -750,8 +764,8 @@ public sealed partial class AgentLabWorld
     private bool _handingOut; // Amedo
 
     // Amedo
-    internal void PostSlotRequest_260E68(AgentLabAgent to, int slot, AgentLabAgent? from, bool force) =>
-        Enqueue_197A30((to, (ushort)slot, from, SlotRequest, force ? 1f : 0f));
+    internal void PostSlotRequest_260E68(AgentLabAgent to, int slot, AgentLabAgent? from, bool force, int channel = 0) =>
+        Enqueue_197A30((to, (ushort)slot, from, SlotRequest, (force ? 1 : 0) + ((channel & 1) << 1)));
 
     // Amedo 2026-10-01
     internal void PostTouch_13E0A0(AgentLabAgent to, int type, AgentLabAgent? from) => Enqueue_197A30((to, 0, from, type, 0f));
@@ -778,7 +792,7 @@ public sealed partial class AgentLabWorld
                     if (touch == Dropped) continue; // Amedo
                     if (touch >= 0) to.HandleMessage(touch, from); // Amedo 2026-10-01
                     else if (touch == NoiseTouch) to.NoiseEvent_209A30(loudness, from); // Amedo
-                    else if (touch == SlotRequest) to.RequestSlot_20E5A8(message, from, loudness != 0f); // Amedo
+                    else if (touch == SlotRequest) to.RequestSlot_20E5A8(message, from, ((int)loudness & 1) != 0, (int)loudness >> 1); // Amedo
                     else to.Receive_22E770(message, from);
                 }
             }
@@ -820,12 +834,98 @@ public sealed partial class AgentLabWorld
     private BaseTwinItem? CodeItem(uint id)
     {
         foreach (var rm in AllRm2()) // Amedo 2026-09-28
-        {
-            var sec = rm?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-                        ?.GetItem<BaseTwinSection>((uint)Constants.CODE_BEHAVIOURS_SECTION);
-            if (sec is not null && sec.ContainsItem(id)) return sec.GetItem<BaseTwinItem>(id);
-        }
+            if (BehaviourIn(rm, id) is { } item) return item;
+        return id <= 0x7FFF ? HeldItem(HeldKind.Behaviour, id, Constants.CODE_BEHAVIOURS_SECTION) : null;
+    }
+
+    private static BaseTwinItem? BehaviourIn(PS2AnyTwinsanityRM2? rm, uint id) => CodeItemIn(rm, Constants.CODE_BEHAVIOURS_SECTION, id);
+
+    private static BaseTwinItem? CodeItemIn(PS2AnyTwinsanityRM2? rm, int section, uint id)
+    {
+        var sec = rm?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
+                    ?.GetItem<BaseTwinSection>((uint)section);
+        return sec is not null && sec.ContainsItem(id) ? sec.GetItem<BaseTwinItem>(id) : null;
+    }
+
+    private enum HeldKind { Behaviour, Object, Sound }
+
+    private readonly List<PS2AnyTwinsanityRM2> _heldRm2 = new();
+    private readonly Dictionary<PS2AnyObject, HashSet<uint>>[] _objectResources =
+        [new(ReferenceEqualityComparer.Instance), new(ReferenceEqualityComparer.Instance), new(ReferenceEqualityComparer.Instance)];
+
+    private BaseTwinItem? HeldItem(HeldKind kind, uint id, int section)
+    {
+        if (_heldRm2.Count == 0 || !ObjectResourcesHold_25F0E0(kind, id)) return null;
+        foreach (var rm in _heldRm2)
+            if (CodeItemIn(rm, section, id) is { } item) return item;
         return null;
+    }
+
+    internal PS2AnySound? HeldSound(ushort id, int section) => HeldItem(HeldKind.Sound, id, section) as PS2AnySound;
+
+    private bool ObjectResourcesHold_25F0E0(HeldKind kind, uint id)
+    {
+        foreach (var list in (ReadOnlySpan<List<AgentLabAgent>>)[Agents, _pendingAgents])
+            foreach (var agent in list)
+                if (ResourcesOf(kind, agent) is { } held && held.Contains(id)) return true;
+        return false;
+    }
+
+    private HashSet<uint>? ResourcesOf(HeldKind kind, AgentLabAgent agent)
+    {
+        if (agent.Destroyed || agent.Released || agent.GameObject is not { } go) return null;
+        var cache = _objectResources[(int)kind];
+        if (!cache.TryGetValue(go, out var held))
+        {
+            var (refs, slots) = kind switch
+            {
+                HeldKind.Behaviour => (go.RefBehaviours, go.BehaviourSlots),
+                HeldKind.Object => (go.RefObjects, go.ObjectSlots),
+                _ => (go.RefSounds, go.SoundSlots),
+            };
+            held = new HashSet<uint>();
+            foreach (var r in refs) held.Add(r);
+            foreach (var s in slots) if (s != 0xFFFF) held.Add(s);
+            cache[go] = held;
+        }
+        return held;
+    }
+
+    private void ReleaseUnheldRm2_25F0E0()
+    {
+        foreach (var cache in _objectResources) cache.Clear();
+        if (_heldRm2.Count == 0) return;
+        var wanted = new Dictionary<int, HashSet<uint>>();
+        for (int section = Constants.CODE_SOUND_EFFECTS_SECTION; section <= Constants.CODE_LANG_JPN_SECTION; section++)
+            wanted[section] = new HashSet<uint>();
+        wanted[Constants.CODE_BEHAVIOURS_SECTION] = new HashSet<uint>();
+        wanted[Constants.CODE_GAME_OBJECTS_SECTION] = new HashSet<uint>();
+        foreach (var list in (ReadOnlySpan<List<AgentLabAgent>>)[Agents, _pendingAgents])
+            foreach (var agent in list)
+            {
+                if (ResourcesOf(HeldKind.Behaviour, agent) is { } behaviours) wanted[Constants.CODE_BEHAVIOURS_SECTION].UnionWith(behaviours);
+                if (ResourcesOf(HeldKind.Object, agent) is { } objects) wanted[Constants.CODE_GAME_OBJECTS_SECTION].UnionWith(objects);
+                if (ResourcesOf(HeldKind.Sound, agent) is { } sounds)
+                    for (int section = Constants.CODE_SOUND_EFFECTS_SECTION; section <= Constants.CODE_LANG_JPN_SECTION; section++)
+                        wanted[section].UnionWith(sounds);
+            }
+        foreach (var rm in AllRm2()) Supplies(rm, wanted);
+        _heldRm2.RemoveAll(rm => !Supplies(rm, wanted));
+        foreach (var cache in _objectResources) cache.Clear();
+    }
+
+    private static bool Supplies(PS2AnyTwinsanityRM2? rm, Dictionary<int, HashSet<uint>> wanted)
+    {
+        var code = rm?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
+        if (code is null) return false;
+        bool any = false;
+        foreach (var (section, ids) in wanted)
+        {
+            var sec = code.GetItem<BaseTwinSection>((uint)section);
+            if (sec is null) continue;
+            for (int i = 0, n = sec.GetItemsAmount(); i < n; i++) any |= ids.Remove(sec.GetItem(i).GetID());
+        }
+        return any;
     }
 
     public BaseTwinSection? LayoutItems(BaseTwinSection instances, int kind)
@@ -849,7 +949,7 @@ public sealed partial class AgentLabWorld
             if (objs is not null && objs.ContainsItem(objectId) && objs.GetItem<BaseTwinItem>(objectId) is PS2AnyObject o)
                 return o;
         }
-        return null;
+        return HeldItem(HeldKind.Object, objectId, Constants.CODE_GAME_OBJECTS_SECTION) as PS2AnyObject;
     }
 
     private readonly Dictionary<uint, PS2AnyOGI?> _defaultOgi = new(); // Amedo 2026-09-27

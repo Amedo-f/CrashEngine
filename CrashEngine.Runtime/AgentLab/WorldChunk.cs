@@ -8,9 +8,9 @@ namespace CrashEngine.Runtime.AgentLab;
 public sealed class WorldChunk
 {
     public string Name { get; }
-    public PS2AnyTwinsanityRM2 Rm2 { get; }
-    public PS2AnyTwinsanitySM2? Sm2 { get; }
-    public NavGraph Nav { get; }
+    public PS2AnyTwinsanityRM2 Rm2 { get; private set; }
+    public PS2AnyTwinsanitySM2? Sm2 { get; private set; }
+    public NavGraph Nav { get; private set; }
     public SceneryTree? Tree { get; set; }
     public Physics.CollisionWorld? Collision { get; set; }
     public Matrix4x4 ToRoot { get; set; } = Matrix4x4.Identity;
@@ -22,6 +22,19 @@ public sealed class WorldChunk
     public Physics.ChunkRigidBodies? RigidBodies_164; // Amedo
     public InstanceCell?[]? Cells_160; // Amedo
     public readonly List<SoundBox> SoundBoxes_198 = new(); // Amedo
+
+    public void ReleaseData()
+    {
+        Rm2 = new PS2AnyTwinsanityRM2();
+        Sm2 = null;
+        Nav = new NavGraph(Rm2);
+        Tree = null;
+        Collision = null;
+        Host = null;
+        MeshTables = null;
+        RigidBodies_164 = null;
+        Cells_160 = null;
+    }
 
     // Amedo
     public bool AddSoundBox_1F1E30(SoundBox box)
@@ -44,6 +57,7 @@ public sealed class WorldChunk
 
     public WorldChunk(string name, PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanitySM2? sm2)
     {
+        LiveProbe.Track("worldchunk", this, Path.GetFileName(name));
         Name = name;
         Rm2  = rm2;
         Sm2  = sm2;

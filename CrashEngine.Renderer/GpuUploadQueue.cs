@@ -20,6 +20,7 @@ public sealed class GpuUploadQueue
     [ThreadStatic] private static GpuUploadQueue? _current;
 
     internal static GpuUploadQueue? Current => _current;
+    public static bool Recording => _current is not null;
 
     private readonly List<IGpuResource> _resources = new();
     private int _next;
@@ -101,6 +102,23 @@ public sealed class GpuUploadQueue
         foreach (var r in _resources) r.Dispose();
         _resources.Clear();
         _next = 0;
+    }
+
+    public int DisposeUnused(HashSet<object> used, GpuUploadQueue keep)
+    {
+        int freed = 0;
+        foreach (var r in _resources)
+        {
+            if (used.Contains(r)) keep._resources.Add(r);
+            else
+            {
+                r.Dispose();
+                freed++;
+            }
+        }
+        _resources.Clear();
+        _next = 0;
+        return freed;
     }
 
     internal static void RequireMainThread(string what)
