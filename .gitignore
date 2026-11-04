@@ -10,6 +10,7 @@ obj/
 # ISO build pipeline output — contains real PS2 disc archive data (Crash.BD/BH,
 # staged .rm2/.sm2, built .iso) — copyrighted game content, never commit.
 Build/
+!CrashLauncher/Build/
 
 # Per-level script/asset dump output — also derived from the real game archive.
 Scripts/
