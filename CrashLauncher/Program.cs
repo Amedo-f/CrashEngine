@@ -27,6 +27,22 @@ Engine.CustomFontSetup = atlas =>
                 var rangesPtr = (ushort*)Marshal.AllocHGlobal(rangesManaged.Length * sizeof(ushort));
                 for (int i = 0; i < rangesManaged.Length; i++) rangesPtr[i] = rangesManaged[i];
                 atlas.AddFontFromFileTTF(sysFont, 16f, default, (IntPtr)rangesPtr);
+                // Amedo 2026-11-04: fixed-width font for the code editor (Consolas), with the Arabic letters taken from the UI font
+                var mono = Path.Combine(sysFontsDir, "consola.ttf");
+                if (File.Exists(mono))
+                {
+                    ushort[] latin = { 0x0020, 0x00FF, 0x2010, 0x2027, 0 };
+                    var latinPtr = (ushort*)Marshal.AllocHGlobal(latin.Length * sizeof(ushort));
+                    for (int i = 0; i < latin.Length; i++) latinPtr[i] = latin[i];
+                    var monoFont = atlas.AddFontFromFileTTF(mono, 15f, default, (IntPtr)latinPtr);
+                    ushort[] arabic = { 0x0600, 0x06FF, 0x0750, 0x077F, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0 };
+                    var arabicPtr = (ushort*)Marshal.AllocHGlobal(arabic.Length * sizeof(ushort));
+                    for (int i = 0; i < arabic.Length; i++) arabicPtr[i] = arabic[i];
+                    var merge = ImGuiNET.ImGuiNative.ImFontConfig_ImFontConfig();
+                    merge->MergeMode = 1;
+                    atlas.AddFontFromFileTTF(sysFont, 15f, merge, (IntPtr)arabicPtr);
+                    CrashLauncher.CodeEditor.CodeEditor.MonoFont = monoFont;
+                }
             }
             Console.WriteLine($"Font setup: loaded {Path.GetFileName(sysFont)} with extended glyph range (em-dash etc. now render correctly).");
         }
@@ -99,6 +115,7 @@ Engine.CustomFontSetup = atlas =>
 };
 
 GraphicsSettings.UseFile(null); // Amedo
+CrashEngine.Renderer.SceneTarget.ReuseHeldFrames = true;
 var engine = new Engine("CrashEngine", 1280, 720);
 
 // Amedo 2026-09-22
