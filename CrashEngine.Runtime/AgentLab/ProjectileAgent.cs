@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -58,8 +59,14 @@ public sealed class ProjectileAgent
     {
         _velocity = v;
         _c0 |= KeepVelocity;
-        _speed = v.Length();
+        _speed = GameMath.Length(v);
     }
+
+    // Amedo
+    public void ApplyState_141C28() => _owner.SetAgentFlags(0x20000);
+
+    // Amedo
+    public void CanChangeChunk_11EFB8(Matrix4x4 obj) => _velocity = Vector3.TransformNormal(_velocity, obj);
 
     public bool Request_10C120(ushort id, AgentLabAgent? sender, int now)
     {
@@ -241,9 +248,9 @@ public sealed class ProjectileAgent
         d.X *= Random(0.75f) + 0.25f;
         d.Y *= Random(0.75f) + 0.25f;
         d.Z *= Random(0.75f) + 0.25f;
-        d *= Character.CharacterController.InverseLength(d);
+        d *= GameMath.InverseLength(d);
         _velocity = Reflect_18D920(_velocity, d);
-        var dir = _velocity * Character.CharacterController.InverseLength(_velocity);
+        var dir = _velocity * GameMath.InverseLength(_velocity);
         Orient(dir);
         MoveBy(dir * (_speed * frameTicks * TickTime));
         _c0 &= ~HasTarget;
@@ -272,11 +279,11 @@ public sealed class ProjectileAgent
         bool found = gun is not null ? gun.AimPoint_14A860(out aim) : Slot118Center(holder, out aim);
         if (!found)
         {
-            var q = CamMath.MatrixToQuat_186900(holder.GameMatrix); // Amedo
+            var q = GameMath.MatrixToQuat_186900(holder.GameMatrix); // Amedo
             if (c.HasJump && c.Jump.Phase is >= 12 and <= 14)
             {
-                int pitch = CamMath.FromValue_11BFA0(90f, 1);
-                if (pitch != 0) q = CamMath.Mul_18D558(q, CamMath.RotationX_18D590(pitch));
+                int pitch = GameMath.FromValue_11BFA0(90f, 1);
+                if (pitch != 0) q = GameMath.Mul_18D558(q, GameMath.RotationX_18D590(pitch));
             }
             SetRotation(q);
             return;
@@ -285,8 +292,8 @@ public sealed class ProjectileAgent
         var d = new Vector4(aim.X - pos.X, aim.Y - pos.Y, aim.Z - pos.Z, 1f);
         if (1e-4f < d.X * d.X + d.Y * d.Y + d.Z * d.Z)
         {
-            float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, d); // Amedo
-            SetRotation(CamMath.MatrixToQuat_186900(AgentLabAgent.Along_185A40(new Vector3(d.X * k, d.Y * k, d.Z * k))));
+            float k = GameMath.InvLength_11C030(2.4999998e-09f, d); // Amedo
+            SetRotation(GameMath.MatrixToQuat_186900(AgentLabAgent.Along_185A40(new Vector3(d.X * k, d.Y * k, d.Z * k))));
         }
         _target = gun?.Target_14A7C0() ?? holder.AimSlot118_14A910(); // Amedo
         _c0 = _target is not null ? _c0 | HasTarget : _c0 & ~HasTarget;
@@ -305,7 +312,7 @@ public sealed class ProjectileAgent
     // Amedo
     private void SetRotation(Quaternion q)
     {
-        var r = CamMath.QuatToMatrix_18E620(q);
+        var r = GameMath.QuatToMatrix_18E620(q);
         r.Translation = _owner.GamePosition;
         if (r != _owner.GameMatrix) _owner.GameMatrix = r;
     }
@@ -317,35 +324,35 @@ public sealed class ProjectileAgent
         var m = _owner.GameMatrix;
         var pos = m.Translation;
         var to = target - pos;
-        to *= Character.CharacterController.InverseLength(to);
+        to *= GameMath.InverseLength(to);
         var f = new Vector3(m.M31, m.M32, m.M33);
         var up = new Vector3(m.M21, m.M22, m.M23);
         var n = new Vector3(f.X + (to.X - f.X) * horizontal, f.Y + (to.Y - f.Y) * vertical, f.Z + (to.Z - f.Z) * horizontal);
         if (n.X == 0f && n.Z == 0f) return;
-        n *= Character.CharacterController.InverseLength(n);
+        n *= GameMath.InverseLength(n);
         var right = Vector3.Cross(up, n);
         var up2 = Vector3.Cross(n, right);
         var rows = new Matrix4x4(right.X, right.Y, right.Z, 0f, up2.X, up2.Y, up2.Z, 0f, n.X, n.Y, n.Z, 0f, 0f, 0f, 0f, 1f);
-        var r = CamMath.QuatToMatrix_18E620(CamMath.MatrixToQuat_186900(rows));
+        var r = GameMath.QuatToMatrix_18E620(GameMath.MatrixToQuat_186900(rows));
         r.Translation = pos;
         if (r != m) _owner.GameMatrix = r;
     }
 
     private void Orient(Vector3 dir)
     {
-        CamMath.Frame_1879D0(dir, out var right, out var up);
+        GameMath.Frame_1879D0(dir, out var right, out var up);
         var rows = new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, dir.X, dir.Y, dir.Z, 0f, 0f, 0f, 0f, 1f);
-        var r = CamMath.QuatToMatrix_18E620(CamMath.MatrixToQuat_186900(rows));
+        var r = GameMath.QuatToMatrix_18E620(GameMath.MatrixToQuat_186900(rows));
         r.Translation = _owner.GamePosition;
         _owner.GameMatrix = r;
     }
 
     private static Vector3 Reflect_18D920(Vector3 v, Vector3 n)
     {
-        float d = Vector3.Dot(v, n);
+        float d = GameMath.Dot(v, n);
         if (d == 0f) return v;
         d += d;
-        float nn = n.LengthSquared();
+        float nn = GameMath.LengthSquared(n);
         d *= 2.4999998e-09f < nn ? 1f / nn : 0f;
         return v - n * d;
     }

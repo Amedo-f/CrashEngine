@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -47,21 +48,21 @@ public sealed class HullBuilder
         return (byte)(_pointCount - 1);
     }
 
-    public void AddQuad_1FB450(Vector4 a, Vector4 b, Vector4 c, Vector4 d)
+    public void AddQuad_1FB450(in Vector4 a, in Vector4 b, in Vector4 c, in Vector4 d)
     {
         byte ia = AddPoint_1FFF80(a), ib = AddPoint_1FFF80(b), ic = AddPoint_1FFF80(c), id = AddPoint_1FFF80(d);
         AddFace_2000B8([ia, ib, ic, id]);
     }
 
     // Amedo
-    public void AddTriangle_1FB1F8(Vector4 a, Vector4 b, Vector4 c)
+    public void AddTriangle_1FB1F8(in Vector4 a, in Vector4 b, in Vector4 c)
     {
         byte ia = AddPoint_1FFF80(a), ib = AddPoint_1FFF80(b), ic = AddPoint_1FFF80(c);
         AddFace_2000B8([ia, ib, ic]);
     }
 
     // Amedo
-    public bool BuildTriangle_1FBB20(Vector4 a, Vector4 b, Vector4 c, ConvexHull hull)
+    public bool BuildTriangle_1FBB20(in Vector4 a, in Vector4 b, in Vector4 c, ConvexHull hull)
     {
         Begin_1FFF00();
         AddPoint_1FFF80(a);
@@ -126,7 +127,7 @@ public sealed class HullBuilder
                 var pa = _points[_faceVerts[f, k]];
                 var pb = _points[_faceVerts[f, (k + 1) % n]];
                 var d = new Vector4(pa.X - pb.X, pa.Y - pb.Y, pa.Z - pb.Z, 1f);
-                float inv = CamMath.InvLengthGuarded_11C030(Eps, d);
+                float inv = GameMath.InvLength_11C030(Eps, d);
                 AddUnique(_dirs, ref _dirCount, new Vector4(d.X * inv, d.Y * inv, d.Z * inv, 1f));
             }
         }
@@ -138,7 +139,7 @@ public sealed class HullBuilder
         _normalCount = 0;
         for (int f = 0; f < _faceCount; f++)
         {
-            var plane = PlaneFromTriangle_185DC0(_points[_faceVerts[f, 0]], _points[_faceVerts[f, 1]], _points[_faceVerts[f, 2]]);
+            var plane = GameMath.PlaneFromTriangle_185DC0(_points[_faceVerts[f, 0]], _points[_faceVerts[f, 1]], _points[_faceVerts[f, 2]]);
             bool above = false, below = false;
             for (int i = 0; i < _pointCount; i++)
             {
@@ -157,7 +158,7 @@ public sealed class HullBuilder
             }
             _planes[f] = plane;
             var nrm = new Vector4(plane.X, plane.Y, plane.Z, 1f);
-            float inv = CamMath.InvLengthGuarded_11C030(Eps, nrm);
+            float inv = GameMath.InvLength_11C030(Eps, nrm);
             AddUnique(_normals, ref _normalCount, new Vector4(nrm.X * inv, nrm.Y * inv, nrm.Z * inv, 1f));
         }
         return true;
@@ -208,31 +209,5 @@ public sealed class HullBuilder
             for (int k = 0; k < n; k++) hull.FaceVerts[o++] = _faceVerts[f, k];
         }
         for (int i = 0; i < _edgeCount; i++) hull.Edges[i] = _edges[i];
-    }
-
-    public static Vector4 PlaneFromTriangle_185DC0(Vector4 a, Vector4 b, Vector4 c)
-    {
-        var u = new Vector4(b.X - a.X, b.Y - a.Y, b.Z - a.Z, b.W);
-        var v = new Vector4(c.X - a.X, c.Y - a.Y, c.Z - a.Z, c.W);
-        var n = new Vector4(u.Y * v.Z - u.Z * v.Y, u.Z * v.X - u.X * v.Z, u.X * v.Y - u.Y * v.X, 1f);
-        if (Small(n))
-        {
-            if (!Small(u)) n = PerpendicularOf_18DA40(u);
-            else if (!Small(v)) n = PerpendicularOf_18DA40(v);
-            else n = new Vector4(0f, 1f, 0f, 1f);
-        }
-        float k = CamMath.InvLengthGuarded_11C030(Eps, n);
-        float x = n.X * k, y = n.Y * k, z = n.Z * k;
-        return new Vector4(x, y, z, -(x * a.X + y * a.Y + z * a.Z));
-    }
-
-    private static bool Small(Vector4 v) => MathF.Abs(v.X) <= 5e-05f && MathF.Abs(v.Y) <= 5e-05f && MathF.Abs(v.Z) <= 5e-05f;
-
-    public static Vector4 PerpendicularOf_18DA40(Vector4 v)
-    {
-        float xx = v.X * v.X, zz = v.Z * v.Z;
-        if (!(1e-20f < xx + v.Y * v.Y + zz)) return v;
-        if (zz <= xx) return new Vector4(-v.Y * 3f, v.X * 3f, 0f, 1f);
-        return new Vector4(0f, v.Z * 3f, -v.Y * 3f, 1f);
     }
 }

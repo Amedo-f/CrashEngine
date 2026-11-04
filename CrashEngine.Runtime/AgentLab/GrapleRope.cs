@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -93,7 +94,7 @@ public sealed class GrapleRope : MeshDecoder.IJointControllers, MeshDecoder.IJoi
         }
         if (_mode == Off || _hand.Destroyed) return;
         _node = _hand.GameMatrix;
-        _toNode = CamMath.RigidInverse_18E808(_node);
+        _toNode = GameMath.RigidInverse_18E808(_node);
     }
 
     private bool Fade(int now, out float t)
@@ -104,7 +105,7 @@ public sealed class GrapleRope : MeshDecoder.IJointControllers, MeshDecoder.IJoi
             t = 1f;
             return true;
         }
-        t = elapsed * CamMath.TickToSec / (_duration * CamMath.TickToSec);
+        t = elapsed * GameMath.TickToSec / (_duration * GameMath.TickToSec);
         return false;
     }
 
@@ -128,8 +129,8 @@ public sealed class GrapleRope : MeshDecoder.IJointControllers, MeshDecoder.IJoi
     private bool Place_191170(int a, int joint, ref Vector3 translate, ref int flags, in Matrix4x4 parent, bool hasParent)
     {
         if (_mode == Off) return false;
-        var p = CamMath.Transform_18E4F0(_toNode, Point(a));
-        if (hasParent) p = CamMath.Transform_18E4F0(CamMath.RigidInverse_18E808(parent), p);
+        var p = GameMath.Transform_18E4F0(_toNode, Point(a));
+        if (hasParent) p = GameMath.Transform_18E4F0(GameMath.RigidInverse_18E808(parent), p);
         Translate_297E68(joint, ref translate, ref flags, p);
         return true;
     }
@@ -137,25 +138,25 @@ public sealed class GrapleRope : MeshDecoder.IJointControllers, MeshDecoder.IJoi
     private bool Aim_18FC50(int a, int b, int joint, ref Vector3 translate, ref Quaternion rot, ref int flags, in Matrix4x4 current, in Matrix4x4 parent, bool hasParent)
     {
         if (_mode == Off || Ogi is not { } ogi || ChildByReact_297FA0(ogi, joint, b) is not { } child) return false;
-        var pa = CamMath.Transform_18E4F0(_toNode, Point(a));
-        var pb = CamMath.Transform_18E4F0(_toNode, Point(b));
+        var pa = GameMath.Transform_18E4F0(_toNode, Point(a));
+        var pb = GameMath.Transform_18E4F0(_toNode, Point(b));
         var ct = child.LocalTranslation;
-        var tip = CamMath.Transform_18E4F0(current, new Vector4(ct.X, ct.Y, ct.Z, ct.W));
+        var tip = GameMath.Transform_18E4F0(current, new Vector4(ct.X, ct.Y, ct.Z, ct.W));
         var d1 = new Vector4(tip.X - current.M41, tip.Y - current.M42, tip.Z - current.M43, tip.W);
         var d2 = new Vector4(pb.X - pa.X, pb.Y - pa.Y, pb.Z - pa.Z, pb.W);
-        float k1 = CamMath.InvLengthGuarded_11C030(Eps, d1);
+        float k1 = GameMath.InvLength_11C030(Eps, d1);
         var u1 = new Vector3(d1.X * k1, d1.Y * k1, d1.Z * k1);
-        float k2 = CamMath.InvLengthGuarded_11C030(Eps, d2);
+        float k2 = GameMath.InvLength_11C030(Eps, d2);
         var u2 = new Vector3(d2.X * k2, d2.Y * k2, d2.Z * k2);
-        int angle = CamMath.Trunc(CamMath.VectorAngle_187BC8(u1, u2) * Weight);
+        int angle = GameMath.Trunc(GameMath.VectorAngle_187BC8(u1, u2) * Weight);
         var q = Quaternion.Identity;
         if (angle != 0)
         {
             var axis = new Vector3(u1.Y * u2.Z - u1.Z * u2.Y, u1.Z * u2.X - u1.X * u2.Z, u1.X * u2.Y - u1.Y * u2.X);
-            q = CamMath.AxisAngle_18D798(axis, angle);
+            q = GameMath.AxisAngle_18D798(axis, angle);
         }
-        if (hasParent) pa = CamMath.Transform_18E4F0(CamMath.RigidInverse_18E808(parent), pa);
-        if ((flags & 1) != 0) rot = CamMath.Mul_18D558(q, rot);
+        if (hasParent) pa = GameMath.Transform_18E4F0(GameMath.RigidInverse_18E808(parent), pa);
+        if ((flags & 1) != 0) rot = GameMath.Mul_18D558(q, rot);
         else
         {
             rot = q;

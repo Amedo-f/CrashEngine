@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -76,7 +77,7 @@ public sealed partial class AgentLabAgent
                 var (bmin, bmax) = other.Bounds(m);
                 if (!CollisionWorld.Overlap(amin, amax, bmin, bmax)) continue;
                 if (!ConvexHull.HullsContact_282778(hull, body.World, other, m, out var push, out var contact)) continue;
-                var normal = push * RigidBody.InverseLength(push);
+                var normal = push * GameMath.InverseLength(push);
                 if (!ReferenceEquals(target, body.IgnoredContact))
                 {
                     body.Decelerate(body.Decel, 1f);
@@ -125,7 +126,7 @@ public sealed partial class AgentLabAgent
                 var (bmin, bmax) = hb[j].Bounds(b.World);
                 if (!CollisionWorld.Overlap(amin, amax, bmin, bmax)) continue;
                 if (!ConvexHull.HullsContact_282778(ha[i], a.World, hb[j], b.World, out var push, out var contact)) continue;
-                var n = push * RigidBody.InverseLength(push);
+                var n = push * GameMath.InverseLength(push);
                 a.Decelerate(a.Decel, 1f);
                 b.Decelerate(b.Decel, 1f);
                 a.CorrectCapped_28D450(-push);
@@ -271,7 +272,7 @@ public sealed partial class AgentLabAgent
         a.CorrectCapped_28D450(push);
         b.CorrectCapped_28D450(back);
         var point = (a.Position + b.Position) * 0.5f;
-        var n = push * RigidBody.InverseLength(push);
+        var n = push * GameMath.InverseLength(push);
         a.Decelerate(a.Decel, 1f);
         b.Decelerate(b.Decel, 1f);
         BodyResponse_28BE10(a, this, point, -n, b, other);
@@ -288,10 +289,10 @@ public sealed partial class AgentLabAgent
         var pa = a.Position;
         var pb = b.Position;
         var d = pa - pb;
-        float depth = a.Radius + b.Radius - d.Length();
+        float depth = a.Radius + b.Radius - GameMath.Length(d);
         if (!(0f < depth)) return false;
         var point = pa + (pb - pa) * a.Radius;
-        var n = d * RigidBody.InverseLength(d);
+        var n = d * GameMath.InverseLength(d);
         var push = n * depth;
         a.CorrectCapped_28D450(push);
         b.CorrectCapped_28D450(-(push * 0.50005f));
@@ -342,21 +343,21 @@ public sealed partial class AgentLabAgent
         float limit = j * grip;
         b.ApplyImpulse_289CC0(-impulse, lb);
         var slide = a.PointVelocity(la) - b.PointVelocity(lb);
-        slide -= n * Vector3.Dot(slide, n);
-        var dir = slide * RigidBody.InverseLength(slide);
+        slide -= n * GameMath.Dot(slide, n);
+        var dir = slide * GameMath.InverseLength(slide);
         var friction = dir * -PairImpulse_28AB68(0f, 0f, a, la, b, lb, dir);
-        if (limit < friction.Length()) friction = friction * RigidBody.InverseLength(friction) * limit;
+        if (limit < GameMath.Length(friction)) friction = friction * GameMath.InverseLength(friction) * limit;
         a.ApplyImpulse_289CC0(friction, la);
         b.ApplyImpulse_289CC0(-friction, lb);
     }
 
     // Amedo 2026-10-01
-    private static float PairImpulse_28AB68(float e, float k, RigidBody a, Vector3 la, RigidBody b, Vector3 lb, Vector3 n)
+    private static float PairImpulse_28AB68(float e, float k, RigidBody a, in Vector3 la, RigidBody b, in Vector3 lb, in Vector3 n)
     {
         a.UpdateDerived();
         var va = a.PointVelocity(la);
         var vb = b.PointVelocity(lb);
-        float vn = Vector3.Dot(vb - va, n);
+        float vn = GameMath.Dot(vb - va, n);
         if (0f < vn) return 0f;
         if (k != 0f) e *= vn * vn / (vn * vn + k);
         return -(e + 1f) * vn / (a.EffectiveMass(la, n) + b.EffectiveMass(lb, n));
@@ -385,39 +386,17 @@ public sealed partial class AgentLabAgent
     // Amedo 2026-10-01
     private static (Vector3 Velocity, Vector3 Spin) SurfaceMotion_28B020(float dt, Matrix4x4 prev, Matrix4x4 cur, Vector3 point)
     {
-        var onSurface = Vector3.Transform(point, CamMath.RigidInverse_18E808(cur));
+        var onSurface = Vector3.Transform(point, GameMath.RigidInverse_18E808(cur));
         var velocity = (point - Vector3.Transform(onSurface, prev)) * (1f / dt);
-        var q = CamMath.MatrixToQuat_186900(cur * CamMath.RigidInverse_18E808(prev));
-        var axis = AxisAngle_186B50(q, out int angle);
+        var q = GameMath.MatrixToQuat_186900(cur * GameMath.RigidInverse_18E808(prev));
+        int angle = GameMath.AxisAngle_186B50(ref q, out var axis);
         return (velocity, axis * (angle * 9.58738e-05f * (1f / -dt)));
-    }
-
-    // Amedo 2026-10-01
-    private static Vector3 AxisAngle_186B50(Quaternion q, out int angle)
-    {
-        float lenSq = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
-        float k = 1.00000005e-20f < lenSq ? 1f / lenSq : 0f;
-        q = new Quaternion(q.X * k, q.Y * k, q.Z * k, q.W * k);
-        float aw = MathF.Abs(q.W);
-        if (!(aw < 1f))
-        {
-            angle = 0;
-            return Vector3.Zero;
-        }
-        float rest = 1f - aw;
-        if (rest < 0f) rest = 0f;
-        float a = (((aw * -0.0187293f + 0.074261f) * aw - 0.2121144f) * aw + 1.5707288f) * MathF.Sqrt(rest);
-        if (q.W < 0f) a = 3.1415927f - a;
-        int units = CamMath.Trunc(a * CamMath.RadToUnit);
-        angle = units + units;
-        var axis = new Vector3(q.X, q.Y, q.Z) * (1f / MathF.Sqrt(1f - q.W * q.W));
-        return axis * RigidBody.InverseLength(axis);
     }
 
     internal bool BodyHit_23D1E0(AgentLabAgent? sender, Vector3 point, Vector3 force)
     {
         if (sender is not null) HitWhileMoving_23D520(sender, point, force); // Amedo
-        float hard = force.LengthSquared();
+        float hard = GameMath.LengthSquared(force);
         if (_physics is { Body: not null } && 10f < hard) MakeNoise_209BC8(12f, MathF.Min(hard * 3f, 1f), point);
         return RecordHit_3C(sender, force); // Amedo 2026-09-30
     }
@@ -433,7 +412,7 @@ public sealed partial class AgentLabAgent
         else if (_physics is { Body: { } body } && (body.Flags & RigidBody.Asleep) != 0)
         {
             Wake_291308();
-            if (1.0000001e-06f < force.LengthSquared()) Knock_24BC60(force, point);
+            if (1.0000001e-06f < GameMath.LengthSquared(force)) Knock_24BC60(force, point);
         }
         ContactReply_23B5A0(args, sender);
     }
@@ -465,7 +444,7 @@ public sealed partial class AgentLabAgent
     private bool CrateBodyHit_13D220(AgentLabAgent? sender, Vector3 force)
     {
         float power = force.X * force.X + force.Y * force.Y + force.Z * force.Z;
-        var d = force * RigidBody.InverseLength(force);
+        var d = force * GameMath.InverseLength(force);
         uint flags = Instance.Source.StateFlags;
         bool respond = !_brokenByBody;
         int slot;

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -103,17 +104,11 @@ public sealed class GamePathFinder
         return x * x + y * y + z * z;
     }
 
-    private static float DistanceSq(Vector3 a, Vector3 b)
-    {
-        float x = a.X - b.X, y = a.Y - b.Y, z = a.Z - b.Z;
-        return x * x + y * y + z * z;
-    }
-
     private float StepCost_178470(NavPath path, NavNode from, NavNode to)
     {
         if ((to.Flags & 1) != 0 || (from.Flags & 1) != 0) return -1f;
         uint r = _request_1234!.Flags;
-        if ((r & 4) != 0) return DistanceSq(from.Position, to.Position);
+        if ((r & 4) != 0) return GameMath.DistanceSq(from.Position, to.Position);
         uint p = path.Flags;
         if ((r & 0x200000) != 0 && (p & 0x40) != 0) return -1f;
         if ((r & 0x1000000) != 0 && (p & 0x1E0) == 0) return -1f;
@@ -129,21 +124,21 @@ public sealed class GamePathFinder
         if ((r & 0x800000) != 0 && (p & 0x100) != 0) return -1f;
         if ((r & 0x400000) != 0 && (p & 0x80) != 0) return -1f;
         if ((r & 0x100000) != 0 && (p & 0x20) != 0) return -1f;
-        float cost = DistanceSq(from.Position, to.Position);
+        float cost = GameMath.DistanceSq(from.Position, to.Position);
         if ((r & 8) != 0 && !(MathF.Abs(Radius2_1230) <= 5e-05f))
-            cost += (1f - DistanceSq(to.Position, Mid_1220) / Radius2_1230) * 100f;
+            cost += (1f - GameMath.DistanceSq(to.Position, Mid_1220) / Radius2_1230) * 100f;
         if ((r & 0x20) != 0) cost += to.Occupancy * 100f;
         if ((r & 0x10) != 0 && !(MathF.Abs(Radius2_1230) <= 5e-05f))
-            cost += DistanceSq(to.Position, Mid_1220) * 100f / Radius2_1230;
+            cost += GameMath.DistanceSq(to.Position, Mid_1220) * 100f / Radius2_1230;
         return cost;
     }
 
     public void SetNearFocusWeight_251CA8(float weight)
     {
         var d = Dest_1210 - Start_1200;
-        d *= Camera.CamMath.InvLengthGuarded_11C030(2.4999998e-09f, new Vector4(d, 0f));
+        d *= GameMath.InvLength_11C030(2.4999998e-09f, new Vector4(d, 0f));
         var side = new Vector3(d.Z, 0f, -d.X);
-        float far = MathF.Sqrt(DistanceSq(Start_1200, Dest_1210));
+        float far = MathF.Sqrt(GameMath.DistanceSq(Start_1200, Dest_1210));
         Mid_1220 += side * (weight * far);
     }
 

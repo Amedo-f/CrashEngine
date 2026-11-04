@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -35,7 +36,7 @@ public sealed partial class AgentLabAgent
         return r;
     }
 
-    internal static float LineDistanceSquared_184340(Vector3 a, Vector3 b, Vector3 p)
+    internal static float LineDistanceSquared_184340(in Vector3 a, in Vector3 b, in Vector3 p)
     {
         float aa = a.X * a.X + a.Y * a.Y + a.Z * a.Z;
         float ba = b.X * a.X + b.Y * a.Y + b.Z * a.Z;
@@ -54,13 +55,13 @@ public sealed partial class AgentLabAgent
     private float ShotHitMe_126708()
     {
         if (World.GunHolder_30A5B0 is not { Destroyed: false } holder || holder.OwnCharacter?.Gun is not { } gun) return 0f;
-        if (!gun.ShotWithin_15F108(CamMath.Trunc(CamMath.SecToTick * 0.2f))) return 0f;
+        if (!gun.ShotWithin_15F108(GameMath.Trunc(GameMath.SecToTick * 0.2f))) return 0f;
         var hm = holder.GameMatrix;
         var from = hm.Translation;
         var fwd = new Vector3(hm.M31, hm.M32, hm.M33);
         var me = GamePosition;
         var d = new Vector4(me.X - from.X, me.Y - from.Y, me.Z - from.Z, 1f);
-        float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, d);
+        float k = GameMath.InvLength_11C030(2.4999998e-09f, d);
         float nx = d.X * k, ny = d.Y * k, nz = d.Z * k;
         if (!(0f < fwd.X * nx + fwd.Y * ny + fwd.Z * nz)) return 0f;
         float r = MaxBoxSide_1FF878(TreeBox);

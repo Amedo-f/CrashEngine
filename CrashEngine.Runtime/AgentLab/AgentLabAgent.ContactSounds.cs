@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -154,7 +155,7 @@ public sealed partial class AgentLabAgent
     private void ContactParticle(ushort pid, Vector3 point, Vector3 velocity)
     {
         if (World.Particles is not { } fx || fx.Spawn(pid, 1, true, Vector3.Zero) is not (var h and >= 0)) return;
-        var m = Along_185A40(velocity * InverseLength(velocity));
+        var m = Along_185A40(velocity * GameMath.InverseLength(velocity));
         m.Translation = point;
         fx.SetEmitMatrix(h, RootMatrix(m));
     }

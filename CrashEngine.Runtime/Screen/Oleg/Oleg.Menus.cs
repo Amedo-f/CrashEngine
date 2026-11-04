@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Game;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -16,10 +17,10 @@ public static class OlegGlobals
     public static readonly uint White_30A3C8 = Colour.Set_101218(1f, 1f, 1f, 1f), Clear_30A3D0 = Colour.Set_101218(1f, 1f, 1f, 0f);
     public static readonly uint Blue_30A3D8 = Colour.Set_101218(0.1f, 0.588f, 1f, 1f), BlueClear_30A3E0 = Colour.Set_101218(0.1f, 0.588f, 1f, 0f);
     public static readonly uint Mint_30A3E8 = Colour.Set_101218(0.325f, 1f, 0.9f, 1f), White_30A3F0 = Colour.Set_101218(1f, 1f, 1f, 1f), Clear_30A3F8 = Colour.Set_101218(1f, 1f, 1f, 0f);
-    public static readonly int Angle15_30A390 = WidgetEffect.AngleFrom_11BFA0(15f, 1), Angle21_30A398 = WidgetEffect.AngleFrom_11BFA0(21f, 1);
-    public static readonly int Angle25_30A3A0 = WidgetEffect.AngleFrom_11BFA0(25f, 1), AngleM35_30A3A8 = WidgetEffect.AngleFrom_11BFA0(-35f, 1);
-    public static readonly int Angle120_30A3B0 = WidgetEffect.AngleFrom_11BFA0(120f, 1), AngleM36_30A3B8 = WidgetEffect.AngleFrom_11BFA0(-36f, 1);
-    public static readonly int Angle122_30A3C0 = WidgetEffect.AngleFrom_11BFA0(122f, 1);
+    public static readonly int Angle15_30A390 = GameMath.FromValue_11BFA0(15f, 1), Angle21_30A398 = GameMath.FromValue_11BFA0(21f, 1);
+    public static readonly int Angle25_30A3A0 = GameMath.FromValue_11BFA0(25f, 1), AngleM35_30A3A8 = GameMath.FromValue_11BFA0(-35f, 1);
+    public static readonly int Angle120_30A3B0 = GameMath.FromValue_11BFA0(120f, 1), AngleM36_30A3B8 = GameMath.FromValue_11BFA0(-36f, 1);
+    public static readonly int Angle122_30A3C0 = GameMath.FromValue_11BFA0(122f, 1);
     public static readonly Vector2Curve CurveA_30A400 = new(new Vector2[8]), CurveB_30A408 = new(new Vector2[8]);
     public static readonly ColourCurve ColourC_30A410 = new(new Vector4[16]), ColourD_30A418 = new(new Vector4[8]);
 }
@@ -432,12 +433,12 @@ public sealed partial class Oleg
         var scale = CyclingScale.Global_30BB90;
         for (int i = 0; i < 30; i++)
         {
-            int angle = WidgetEffect.AngleFrom_11BFA0(i * BitConverter.Int32BitsToSingle(0x3DD67751));
+            int angle = GameMath.FromValue_11BFA0(i * BitConverter.Int32BitsToSingle(0x3DD67751), 0);
             float s = CrashEngine.Core.GameMath.SinCosVu0_2E4C30(angle * BitConverter.Int32BitsToSingle(0x38C90FDB)).Sin * 0.1f + 1f;
             scale.Samples_0C[i] = s;
             if (i == 0) scale.Value_10 = s;
         }
-        int duration = CrashEngine.Runtime.Character.CharacterController.Cvt(Widget.TicksPerSecond * 0.5f);
+        int duration = GameMath.Trunc(Widget.TicksPerSecond * 0.5f);
         if ((scale.Word_00 & 0x8000) == 0)
         {
             scale.Word_00 &= 0x0000FFFFu;

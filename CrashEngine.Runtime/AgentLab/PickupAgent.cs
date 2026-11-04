@@ -1,5 +1,6 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -138,7 +139,7 @@ public sealed class PickupAgent
                 if (ValidCollector() is { } c)
                 {
                     var away = -(c.GamePosition - _home);
-                    _velocity = away * InverseLength(away) * s.Fly;
+                    _velocity = away * GameMath.InverseLength(away) * s.Fly;
                 }
                 else SetState(Idle, now);
                 break;
@@ -265,12 +266,12 @@ public sealed class PickupAgent
         var fruit = _stepPos; // Amedo 2026-09-30
         var d = c.GamePosition - fruit;
         if ((_flags & 0x100) != 0) World.Unimplemented("pickup", 0x109A14, "hand-over to the collector's own collector");
-        if (d.LengthSquared() < 0.25f)
+        if (GameMath.LengthSquared(d) < 0.25f)
         {
             SetState(Collect, now);
             return;
         }
-        var dir = d * InverseLength(d);
+        var dir = d * GameMath.InverseLength(d);
         bool riding = World.PlayerCharacter?.Vehicle is not null; // Amedo
         if (riding) dir *= 4f;
         float a, damp;
@@ -283,7 +284,7 @@ public sealed class PickupAgent
 
     private void FlyAwayStep(int now, float t) // Amedo 2026-09-30
     {
-        if (1600f < Vector3.DistanceSquared(_stepPos, _home)) // Amedo 2026-09-30
+        if (1600f < GameMath.DistanceSq(_stepPos, _home)) // Amedo 2026-09-30
         {
             SetState(Inactive, now);
             return;
@@ -335,12 +336,6 @@ public sealed class PickupAgent
                 default: World.Unimplemented("command", cmd.CommandIndex, AgentLabWorld.CommandName(cmd.CommandIndex)); break;
             }
         }
-    }
-
-    private static float InverseLength(Vector3 v)
-    {
-        float sq = v.LengthSquared();
-        return 2.4999998e-09f < sq ? 1f / MathF.Sqrt(sq) : 0f;
     }
 
     private static Matrix4x4[] BuildSpinFrames()

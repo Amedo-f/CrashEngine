@@ -1,3 +1,5 @@
+using CrashEngine.Core;
+
 namespace CrashEngine.Runtime.Camera;
 
 // Amedo
@@ -50,7 +52,7 @@ public sealed partial class GameCamera
                 break;
             case 1:
                 M.Q(comp + 0x630, M.Q(comp + 0x630) | 0x8000);
-                M.I(comp + 0x6A0, CamMath.FromValue_11BFA0(M.F(cmd + 0x10), 0));
+                M.I(comp + 0x6A0, GameMath.FromValue_11BFA0(M.F(cmd + 0x10), 0));
                 break;
         }
     }
@@ -92,7 +94,7 @@ public sealed partial class GameCamera
         M.U(orbit + 0x14, 0);
         M.U(orbit + 0x24, 0);
         SubCameras[orbit] = new OrbitCamera(orbit);
-        int angle = CamMath.FromValue_11BFA0(60f, 1);
+        int angle = GameMath.FromValue_11BFA0(60f, 1);
         M.Q(comp + 0x630, M.Q(comp + 0x630) | 0x80);
         M.I(comp + 0x678, angle);
         M.I(comp + 0x67C, angle);

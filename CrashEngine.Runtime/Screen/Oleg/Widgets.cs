@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -149,7 +150,7 @@ public abstract class Widget
     private static float Quantised_255188(int elapsed, int fade)
     {
         float t = elapsed * SecondsPerTick / (fade * SecondsPerTick);
-        return CrashEngine.Runtime.Character.CharacterController.Cvt(t * TicksPerSecond) * SecondsPerTick;
+        return GameMath.Trunc(t * TicksPerSecond) * SecondsPerTick;
     }
 
     // Amedo

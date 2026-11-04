@@ -1,3 +1,5 @@
+using CrashEngine.Core;
+
 namespace CrashEngine.Runtime.Character;
 
 // Amedo 2026-09-27
@@ -70,7 +72,7 @@ public sealed class CharacterSpin
         if (0x10000 < SweepAngle) SweepAngle -= 0x10000;
         for (int i = 0; i < 4; i++)
         {
-            float a = (SweepAngle + (int)(i * 1.5707964f * 10430.378f)) * Camera.CamMath.UnitToRad;
+            float a = (SweepAngle + (int)(i * 1.5707964f * 10430.378f)) * GameMath.UnitToRad;
             _c.SweepRay_14E590(new System.Numerics.Vector3(MathF.Cos(a) * reach, 0f, MathF.Sin(a) * reach), push);
         }
     }
@@ -81,7 +83,7 @@ public sealed class CharacterSpin
         var link = _c.Link; // Amedo 2026-10-05
         if (link is not null && (_c.MotionFlagsHigh & 2u) != 0) return 0;
         _c.Trigger(0x12);
-        Duration = CharacterController.Cvt(_c.Param(10) * TickRate);
+        Duration = GameMath.Trunc(_c.Param(10) * TickRate);
         if (link is null) return 2; // Amedo 2026-10-05
         link.Follower_15FE98()?.Trigger(0x12);
         return 1;
@@ -101,7 +103,7 @@ public sealed class CharacterSpin
             var cleared = follower?.Link ?? link;
             cleared.Flags &= 0xFFFFFF0FFFFFFFFFUL; // Amedo
         }
-        Duration = CharacterController.Cvt(_c.Param(11) * TickRate);
+        Duration = GameMath.Trunc(_c.Param(11) * TickRate);
         if (Duration == 0) return 0;
         _c.Trigger(0x13);
         return 3;

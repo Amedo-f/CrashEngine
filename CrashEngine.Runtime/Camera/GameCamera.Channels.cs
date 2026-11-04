@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -93,7 +94,7 @@ public sealed partial class GameCamera
     {
         uint fl = M.U(c);
         if ((fl & 8) == 0) return ((fl >> 4) & 1) != 0;
-        M.I(W(c, 6), CamMath.Trunc(input * dt));
+        M.I(W(c, 6), GameMath.Trunc(input * dt));
         if (clamp)
         {
             bool alt = (M.U(c) & 0x80) != 0;
@@ -107,19 +108,19 @@ public sealed partial class GameCamera
     {
         int dead = M.I(0x30A628);
         bool moving = true;
-        int diff = CamMath.Wrap16(target - M.I(W(c, 5)));
+        int diff = GameMath.Wrap16(target - M.I(W(c, 5)));
         bool clampTo;
         if (dead < diff)
         {
             if (snap) { M.I(W(c, 6), diff); goto Ratio; }
-            M.I(W(c, 6), CamMath.Trunc(M.I(W(c, 9)) * speed));
+            M.I(W(c, 6), GameMath.Trunc(M.I(W(c, 9)) * speed));
             if ((M.U(c) & 0x404) == 0x400)
-                M.I(W(c, 6), CamMath.Trunc(M.I(W(c, 6)) * MathF.Abs(CamMath.Sin_18B8C0(diff))));
+                M.I(W(c, 6), GameMath.Trunc(M.I(W(c, 6)) * MathF.Abs(GameMath.Sin_18B8C0(diff))));
             clampTo = diff < M.I(W(c, 6));
         }
         else
         {
-            diff = CamMath.Wrap16(targetLow - M.I(W(c, 5)));
+            diff = GameMath.Wrap16(targetLow - M.I(W(c, 5)));
             if (-dead <= diff)
             {
                 M.I(W(c, 6), 0);
@@ -127,9 +128,9 @@ public sealed partial class GameCamera
                 goto Ratio;
             }
             if (snap) { M.I(W(c, 6), diff); goto Ratio; }
-            M.I(W(c, 6), CamMath.Trunc(-M.I(W(c, 9)) * speed));
+            M.I(W(c, 6), GameMath.Trunc(-M.I(W(c, 9)) * speed));
             if ((M.U(c) & 0x404) == 0x400)
-                M.I(W(c, 6), CamMath.Trunc(M.I(W(c, 6)) * MathF.Abs(CamMath.Sin_18B8C0(diff))));
+                M.I(W(c, 6), GameMath.Trunc(M.I(W(c, 6)) * MathF.Abs(GameMath.Sin_18B8C0(diff))));
             clampTo = M.I(W(c, 6)) < diff;
         }
         if (clampTo) M.I(W(c, 6), diff);
@@ -152,8 +153,8 @@ public sealed partial class GameCamera
             M.U(c, f2);
             if (!mv)
             {
-                int v = CamMath.Scale_15DE90(M.F(W(c, 2)), M.I(W(c, 10)));
-                v = CamMath.Scale_15DE90(dt, v);
+                int v = GameMath.Scale_15DE90(M.F(W(c, 2)), M.I(W(c, 10)));
+                v = GameMath.Scale_15DE90(dt, v);
                 M.U(c, M.U(c) & 0xFFFFFFFB);
                 M.I(W(c, 6), v);
             }
@@ -163,7 +164,7 @@ public sealed partial class GameCamera
         if ((fl & 0x100) != 0)
         {
             float k = M.F(W(c, 12));
-            int blend = CamMath.Trunc((M.I(W(c, 14)) * CamMath.UnitToRad * k + M.I(W(c, 13)) * CamMath.UnitToRad * (1f - k)) * CamMath.RadToUnit);
+            int blend = GameMath.Trunc((M.I(W(c, 14)) * GameMath.UnitToRad * k + M.I(W(c, 13)) * GameMath.UnitToRad * (1f - k)) * GameMath.RadToUnit);
             bool mv = ChannelApproach_2704B8(dt, c, blend, blend, snap);
             M.U(c, (M.U(c) & 0xFFFFFFFD) | ((mv ? 1u : 0u) << 1) | 4);
             return true;
@@ -189,7 +190,7 @@ public sealed partial class GameCamera
         {
             if (5e-5f < MathF.Abs(M.F(W(c, 2))))
             {
-                int manual = CamMath.Trunc(M.I(W(c, 10)) * M.F(W(c, 2)));
+                int manual = GameMath.Trunc(M.I(W(c, 10)) * M.F(W(c, 2)));
                 M.U(c, fl & 0xFFFFFFF9);
                 return ChannelManual_270818(dt, c, manual, clamp);
             }

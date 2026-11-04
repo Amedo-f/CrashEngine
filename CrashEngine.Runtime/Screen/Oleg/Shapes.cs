@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Character;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -15,7 +16,7 @@ public sealed class ColourCurve
     {
         if (!(t < 1f)) return Keys_04[^1];
         float f = (Keys_04.Length - 1) * t;
-        int i = CharacterController.Cvt(f);
+        int i = GameMath.Trunc(f);
         return Keys_04[i] + (Keys_04[i + 1] - Keys_04[i]) * (f - i);
     }
 }
@@ -84,9 +85,9 @@ public sealed class Ring : Strip
     {
         InnerColour_1C = Colour.GetColor_11BF10(15);
         OuterColour_20 = Colour.GetColor_11BF10(15);
-        Rotation_44 = WidgetEffect.AngleFrom_11BFA0(0f);
-        Start_48 = WidgetEffect.AngleFrom_11BFA0(0f);
-        Sweep_4C = WidgetEffect.AngleFrom_11BFA0(BitConverter.Int32BitsToSingle(0x40C90FDB));
+        Rotation_44 = GameMath.FromValue_11BFA0(0f, 0);
+        Start_48 = GameMath.FromValue_11BFA0(0f, 0);
+        Sweep_4C = GameMath.FromValue_11BFA0(BitConverter.Int32BitsToSingle(0x40C90FDB), 0);
         Positions_58 = new Vector2[(count + 1) * 2];
         Colours_54 = new uint[(count + 1) * 2];
         Material_00 = material;
@@ -95,7 +96,7 @@ public sealed class Ring : Strip
 
     private static Vector2 CosSin16_18B918(int angle)
     {
-        var (s, c) = CrashEngine.Core.GameMath.SinCosVu0_2E4C30(angle * BitConverter.Int32BitsToSingle(0x38C90FDB));
+        var (c, s) = GameMath.CosSin_18B918(angle);
         return new Vector2(c, s);
     }
 
@@ -200,7 +201,7 @@ public sealed class Ring : Strip
         var m = WidgetEffect.Rotation_18BC98(Rotation_44);
         m.M11 *= size.X; m.M12 *= size.X;
         m.M21 *= size.Y; m.M22 *= size.Y;
-        int angle = CharacterController.Cvt(Sweep_4C * t) + Start_48;
+        int angle = GameMath.Trunc(Sweep_4C * t) + Start_48;
         var v = CosSin16_18B918(angle);
         v = new Vector2(v.X * halfX, v.Y * -halfY);
         m.M31 = position.X;

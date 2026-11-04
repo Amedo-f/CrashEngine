@@ -7,6 +7,7 @@ using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -23,7 +24,7 @@ public sealed partial class AgentLabWorld
     private readonly OlegClock _olegClock = new(); // Amedo
     private Action? _oneUpSound;
 
-    private static int Seconds(float s) => CharacterController.Cvt(s * GameScreen.TicksPerSecond);
+    private static int Seconds(float s) => GameMath.Trunc(s * GameScreen.TicksPerSecond);
 
     // Amedo
     public void FadeoutScreen_1124D0(uint flags, float duration, float red, float green, float blue)
@@ -91,7 +92,7 @@ public sealed partial class AgentLabWorld
         var line = Oleg.TextLine_120C;
         line.Text_08 = text;
         line.StyleKey = styleKey;
-        line.Duration_2C = CharacterController.Cvt(seconds * GameScreen.TicksPerSecond);
+        line.Duration_2C = GameMath.Trunc(seconds * GameScreen.TicksPerSecond);
         line.Colour_14 = Colour.Make_11BF30(colour.X, colour.Y, colour.Z);
         line.Position_18 = position;
         line.Scale_20 = new System.Numerics.Vector2(0.75f, 0.75f);

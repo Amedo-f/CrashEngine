@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -226,8 +227,8 @@ public sealed partial class AgentLabAgent
         var delta = f - _moveStart;
         if (Tracing) Trace($"face target {f} from {_moveStart} delta {delta}"); // Amedo
         if (1e-6f < delta.X * delta.X + delta.Z * delta.Z) // Amedo
-            target = CamMath.RotationY_18D620(CamMath.Yaw_18C830(new Vector4(delta, 1f)));
-        if (facingTurns) target = CamMath.Mul_18D558(target, faceEuler); // Amedo
+            target = GameMath.RotationY_18D620(GameMath.Yaw_18C830(new Vector4(delta, 1f)));
+        if (facingTurns) target = GameMath.Mul_18D558(target, faceEuler); // Amedo
         return true;
     }
 
@@ -249,7 +250,7 @@ public sealed partial class AgentLabAgent
 
     private static float AngleUnits(float radians) => (int)(radians * 10430.378f) * 9.58738e-5f;
 
-    // Amedo: 0x206DA0 (variables) / 0x206A60 (literal floats); true = an angle is missing
+    // Amedo
     private bool PacketAngles(TwinBehaviourControlPacket packet, bool variables, out Quaternion euler)
     {
         var holder = variables ? RootController() : null;
@@ -262,12 +263,12 @@ public sealed partial class AgentLabAgent
             if (b == 0xFF)
             {
                 missing = true;
-                angle[i] = CamMath.FromValue_11BFA0(0f, 0);
+                angle[i] = GameMath.FromValue_11BFA0(0f, 0);
             }
             else if (holder is not null && (b & 0x80) != 0) angle[i] = holder.AngleVariable_261778(b & 0x7F);
-            else angle[i] = CamMath.FromValue_11BFA0(b < packet.Floats.Count ? BitConverter.UInt32BitsToSingle(packet.Floats[b]) : 0f, 0);
+            else angle[i] = GameMath.FromValue_11BFA0(b < packet.Floats.Count ? BitConverter.UInt32BitsToSingle(packet.Floats[b]) : 0f, 0);
         }
-        euler = CamMath.Euler_186780(angle[0], angle[1], angle[2]);
+        euler = GameMath.Euler_186780(angle[0], angle[1], angle[2]);
         return missing;
     }
 
@@ -294,7 +295,7 @@ public sealed partial class AgentLabAgent
                 World.Unimplemented("motion rotation", (int)packet.Space, $"{packet.Space} rotation target (unchanged in the game)");
                 return false;
         }
-        target = from is { } b ? angles ? CamMath.Mul_18D558(b, euler) : b : angles ? euler : Quaternion.Identity; // Amedo
+        target = from is { } b ? angles ? GameMath.Mul_18D558(b, euler) : b : angles ? euler : Quaternion.Identity; // Amedo
         return true;
     }
 
@@ -368,21 +369,21 @@ public sealed partial class AgentLabAgent
             _accDistance = angle * 9.58738e-5f;
             return 5e-5f < MathF.Abs(curve) ? 1.0 / curve : 10000.0;
         }
-        float duration = Character.CharacterController.Cvt(angle / speed) * 9.58738e-5f; // Amedo 2026-10-06
+        float duration = GameMath.Trunc(angle / speed) * 9.58738e-5f; // Amedo 2026-10-06
         return 5e-5f < MathF.Abs(duration) ? 1.0 / duration : 1e30;
     }
 
     // Amedo 2026-10-06
     private static int AngleUnits_186F38(Quaternion a, Quaternion b)
     {
-        float la = a.Length(), lb = b.Length();
+        float la = GameMath.Length(a), lb = GameMath.Length(b);
         if (0f < la) a *= 1f / la;
         if (0f < lb) b *= 1f / lb;
         float dot = MathF.Abs(Quaternion.Dot(a, b));
         float s = 1f - dot;
         if (s < 0f) s = 0f;
         float acos = (((dot * -0.0187293f + 0.074261f) * dot - 0.2121144f) * dot + 1.5707288f) * MathF.Sqrt(s);
-        return Character.CharacterController.Cvt(acos * 10430.378f);
+        return GameMath.Trunc(acos * 10430.378f);
     }
 
     private double LinearRate(TwinBehaviourControlPacket packet, float distance)
@@ -474,7 +475,7 @@ public sealed partial class AgentLabAgent
                 if (hasRaw)
                 {
                     var d = chased.GamePosition - GamePosition;
-                    target += Vector3.TransformNormal(raw, Along_185A40(d * InverseLength(d)));
+                    target += Vector3.TransformNormal(raw, Along_185A40(d * GameMath.InverseLength(d)));
                 }
                 return true;
             }
@@ -514,7 +515,7 @@ public sealed partial class AgentLabAgent
         if (PacketFloat(packet, 0x12, out float chance) && World.Rng.GetRandFloat_18C0B8() < chance && PacketFloat(packet, 0x13, out float spread)) // Amedo
         {
             var d = followed - GamePosition;
-            d *= InverseLength(d);
+            d *= GameMath.InverseLength(d);
             _followOffset40 = new Vector3(d.Z, 0f, -d.X) * RandomSpread(spread);
             if (Tracing) Trace($"follow target: new side offset {_followOffset40} (chance {chance}, spread {spread})");
         }
@@ -541,6 +542,13 @@ public sealed partial class AgentLabAgent
     {
         _velocity = Vector3.Zero;
         _chaseCurrentSpeed = 0f;
+    }
+
+    // Amedo
+    private void StopNodeMotion_23DF48()
+    {
+        MotionStop_20E910();
+        _physics?.Body?.Stop_291398();
     }
 
     private void UpdateMotion()
@@ -593,7 +601,7 @@ public sealed partial class AgentLabAgent
             return true;
         }
         if (_smooth) t = 3f * t * t - 2f * t * t * t;
-        if (_turns) TurnInstance_23C468(CamMath.Slerp_187100(t, _rotStart, _rotTarget));
+        if (_turns) TurnInstance_23C468(GameMath.Slerp_187100(t, _rotStart, _rotTarget));
         return false;
     }
 
@@ -608,7 +616,7 @@ public sealed partial class AgentLabAgent
             _rotationDone = true;
             return true;
         }
-        if (_turns) TurnInstance_23C468(CamMath.Slerp_187100(AcceleratedFraction_232FD8(elapsed), _rotStart, _rotTarget));
+        if (_turns) TurnInstance_23C468(GameMath.Slerp_187100(AcceleratedFraction_232FD8(elapsed), _rotStart, _rotTarget));
         return false;
     }
 
@@ -634,13 +642,13 @@ public sealed partial class AgentLabAgent
             return;
         }
         float s = (float)t;
-        if (_accelerated) s = AcceleratedFraction_232FD8((float)(World.Now - _packetStart)); // 0x232A30
+        if (_accelerated) s = AcceleratedFraction_232FD8((float)(World.Now - _packetStart));
         else if (_smooth) s = 3f * s * s - 2f * s * s * s;
         if (moves)
         {
             var step = _moveStart + (_moveTarget - _moveStart) * s;
             SmoothVelocity_20E828(s);
-            if (_sqrTolerance != 0f && Vector3.DistanceSquared(step, _moveTarget) < _sqrTolerance) // Amedo 2026-09-28
+            if (_sqrTolerance != 0f && GameMath.DistanceSq(step, _moveTarget) < _sqrTolerance) // Amedo 2026-09-28
             {
                 _translationDone = true;
                 _rotationDone    = true;
@@ -648,14 +656,14 @@ public sealed partial class AgentLabAgent
             }
             MoveInstance_23C280(step);
         }
-        if (_turns) TurnInstance_23C468(CamMath.Slerp_187100(s, _rotStart, _rotTarget)); // Amedo
+        if (_turns) TurnInstance_23C468(GameMath.Slerp_187100(s, _rotStart, _rotTarget)); // Amedo
     }
 
     // Amedo
     private void SmoothVelocity_20E828(float s)
     {
         var d = _moveTarget - _moveStart;
-        float inv = InverseLength(d);
+        float inv = GameMath.InverseLength(d);
         d = new Vector3(d.X * inv, d.Y * inv, d.Z * inv);
         float k = (s - s * s) * 6f;
         _velocity = new Vector3(d.X * k, d.Y * k, d.Z * k);
@@ -668,10 +676,10 @@ public sealed partial class AgentLabAgent
     // Amedo
     private void FaceMotion_20DD38()
     {
-        float inv = InverseLength(_velocity);
+        float inv = GameMath.InverseLength(_velocity);
         var d = new Vector3(_velocity.X * inv, _velocity.Y * inv, _velocity.Z * inv);
         if (!(1e-6f < d.X * d.X + d.Z * d.Z)) return;
-        var q = CamMath.MatrixToQuat_186900(LookAlong_185920(d, Vector3.UnitY));
+        var q = GameMath.MatrixToQuat_186900(LookAlong_185920(d, Vector3.UnitY));
         var before = LocalRotation;
         if (q != before) SetLocalRotation(q);
         if (Tracing) Trace($"face motion: along {d} -> {q}");
@@ -701,24 +709,16 @@ public sealed partial class AgentLabAgent
         Span<Vector3> rows = stackalloc Vector3[3];
         rows[index] = axis;
         int i = next[index];
-        var a = Perpendicular_18DA40(axis);
-        float ia = InverseLength(a);
+        var a = GameMath.PerpendicularOf_18DA40(axis);
+        float ia = GameMath.InverseLength(a);
         a = new Vector3(a.X * ia, a.Y * ia, a.Z * ia);
         rows[i] = a;
         var b = new Vector3(axis.Y * a.Z - axis.Z * a.Y, axis.Z * a.X - axis.X * a.Z, axis.X * a.Y - axis.Y * a.X);
-        float ib = InverseLength(b);
+        float ib = GameMath.InverseLength(b);
         rows[next[i]] = new Vector3(b.X * ib, b.Y * ib, b.Z * ib);
         return new Matrix4x4(rows[0].X, rows[0].Y, rows[0].Z, 0f,
                              rows[1].X, rows[1].Y, rows[1].Z, 0f,
                              rows[2].X, rows[2].Y, rows[2].Z, 0f,
                              0f, 0f, 0f, 1f);
-    }
-
-    // Amedo
-    private static Vector3 Perpendicular_18DA40(Vector3 v)
-    {
-        float x2 = v.X * v.X, z2 = v.Z * v.Z;
-        if (!(1e-20f < x2 + v.Y * v.Y + z2)) return v;
-        return z2 <= x2 ? new Vector3(-v.Y * 3f, v.X * 3f, 0f) : new Vector3(0f, v.Z * 3f, -v.Y * 3f);
     }
 }

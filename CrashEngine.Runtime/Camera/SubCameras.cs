@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.AgentLab;
 using Twinsanity.TwinsanityInterchange.Common.CameraSubtypes;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -48,26 +49,20 @@ public abstract class SubCamera
         new(m.Column1.X, m.Column1.Y, m.Column1.Z, m.Column1.W, m.Column2.X, m.Column2.Y, m.Column2.Z, m.Column2.W,
             m.Column3.X, m.Column3.Y, m.Column3.Z, m.Column3.W, m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W);
 
-    public static Vector4 Lerp_18C948(float k, Vector4 a, Vector4 b)
+    public static Vector4 Lerp_18C948(float k, in Vector4 a, in Vector4 b)
     {
         if (k == 0f) return a;
         if (k == 1f) return b;
         return new Vector4((b.X - a.X) * k + a.X, (b.Y - a.Y) * k + a.Y, (b.Z - a.Z) * k + a.Z, b.W);
     }
 
-    public static float Project_184260(Vector4 a, Vector4 b, Vector4 p)
+    public static float Project_184260(in Vector4 a, in Vector4 b, in Vector4 p)
     {
         float n = ((b.X * p.X + b.Y * p.Y + b.Z * p.Z) - (a.X * p.X + a.Y * p.Y + a.Z * p.Z))
                 - ((b.X * a.X + b.Y * a.Y + b.Z * a.Z) - (a.X * a.X + a.Y * a.Y + a.Z * a.Z));
         if (n * n == 0f) return 0f;
         float dx = a.X - b.X, dy = a.Y - b.Y, dz = a.Z - b.Z;
         return n / (dx * dx + dy * dy + dz * dz);
-    }
-
-    public static float InvLength_11C030(float eps, Vector4 v)
-    {
-        float sq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return sq <= eps ? 0f : 1f / MathF.Sqrt(sq);
     }
 
     protected static float Clamp01(float t) => 1f < t ? 1f : t < 0f ? 0f : t;
@@ -169,7 +164,7 @@ public sealed class Point2Camera : SubCamera
         else if (_mode is 1 or 2)
         {
             var d = new Vector4(_point.X - t.X, _point.Y - t.Y, _point.Z - t.Z, _point.W);
-            float inv = InvLength_11C030(Eps, d);
+            float inv = GameMath.InvLength_11C030(Eps, d);
             var o = new Vector4(d.X * inv * _k + t.X, d.Y * inv * _k + t.Y, d.Z * inv * _k + t.Z, _point.W);
             if (_mode == 2 && 1f < Project_184260(t, _point, o)) o = _point;
             cam.M.V(output, o);
@@ -183,7 +178,6 @@ public sealed class Point2Camera : SubCamera
 // Amedo 2026-09-29
 public sealed class SplineCamera : SubCamera
 {
-    private static readonly float Golden = BitConverter.Int32BitsToSingle(0x3EC3910C);
     private static readonly float Tol = BitConverter.Int32BitsToSingle(0x3851B717);
     private static readonly float Shrink = BitConverter.Int32BitsToSingle(0x3F7F7CEE);
     private static readonly float Far = BitConverter.Int32BitsToSingle(0x7149F2CA);
@@ -324,20 +318,14 @@ public sealed class SplineCamera : SubCamera
         return new Vector3(r.X + _p[k + 3].X * h11, r.Y + _p[k + 3].Y * h11, r.Z + _p[k + 3].Z * h11);
     }
 
-    private static float Dist2(Vector3 a, Vector3 b)
-    {
-        float dx = a.X - b.X, dy = a.Y - b.Y, dz = a.Z - b.Z;
-        return dx * dx + dy * dy + dz * dz;
-    }
-
     private void Closest_18A7E8(Vector3 target)
     {
         _hitDist = Far;
         int best = 0;
-        float bestD = Dist2(_p[0], target);
+        float bestD = GameMath.DistanceSq(_p[0], target);
         for (int i = 2; i < _n * 2 + 2; i += 2)
         {
-            float d = Dist2(_p[i], target);
+            float d = GameMath.DistanceSq(_p[i], target);
             if (d < bestD)
             {
                 bestD = d;
@@ -364,9 +352,9 @@ public sealed class SplineCamera : SubCamera
         _cur = _fd0;
         _seg = seg;
         _bestU = 0f;
-        _bestDist = Dist2(target, _fd0);
+        _bestDist = GameMath.DistanceSq(target, _fd0);
         var end = _p[2 * seg + 2];
-        float dEnd = Dist2(target, end);
+        float dEnd = GameMath.DistanceSq(target, end);
         if (dEnd < _bestDist)
         {
             _cur = end;
@@ -377,12 +365,13 @@ public sealed class SplineCamera : SubCamera
         do
         {
             var cur = _fd0;
-            float d = Dist2(target, cur);
+            float d = GameMath.DistanceSq(target, cur);
             float next;
             if (0f < u && d < _bestDist * Shrink)
             {
                 float x = u, fx = d;
-                Brent_18EC40(ref x, ref fx);
+                var distance = new DistanceAt { Camera = this };
+                GameMath.FindMinimum_18EC40(ref distance, 4, Tol, Tol, 0f, 1f, ref x, ref fx, true);
                 next = u + h;
                 float x2 = x * x;
                 float x3 = x2 * x;
@@ -446,82 +435,13 @@ public sealed class SplineCamera : SubCamera
         float c = (u3 + u3) - u2 * 3f;
         float h10 = (h11 - u2) + u;
         var p = Blend_18A228(2 * _seg, c + 1f, h10, -c, h11);
-        return Dist2(_target, p);
+        return GameMath.DistanceSq(_target, p);
     }
 
-    private int Brent_18EC40(ref float x, ref float fx)
+    private struct DistanceAt : GameMath.IScalarFunction
     {
-        const int itmax = 4;
-        float a = 0f, b = 1f;
-        float v = x, w = x, fv = fx, fw = fx;
-        float d = 0f, e = 0f;
-        for (int iter = 1; ; )
-        {
-            float tol = Tol * MathF.Abs(x);
-            if (tol < Tol) tol = Tol;
-            float xm = (a + b) * 0.5f;
-            if (MathF.Abs(x - xm) < tol - (b - a) * 0.5f) return 0;
-            float tol1 = tol * 0.5f;
-            float p = 0f, q = 0f, etemp = 0f;
-            if (tol1 < MathF.Abs(e))
-            {
-                float r = (x - w) * (fx - fv);
-                q = (x - v) * (fx - fw);
-                p = (x - v) * q - (x - w) * r;
-                float qr = q - r;
-                q = qr + qr;
-                if (0f < q) p = -p;
-                q = MathF.Abs(q);
-                etemp = e;
-                e = d;
-            }
-            float u;
-            if (MathF.Abs(p) < MathF.Abs(q * etemp * 0.5f) && q * (a - x) < p && p < q * (b - x))
-            {
-                d = p / q;
-                u = x + d;
-                if (u - a < tol || b - u < tol) d = xm <= x ? -tol1 : tol1;
-            }
-            else
-            {
-                e = x < xm ? b - x : a - x;
-                d = e * Golden;
-            }
-            if (tol1 <= MathF.Abs(d)) u = x + d;
-            else if (d < 0f) u = x - tol1;
-            else u = x + tol1;
-            float fu = Distance_18A6D8(u);
-            if (fu <= fx)
-            {
-                if (u < x) b = x;
-                else a = x;
-                v = w;
-                fv = fw;
-                w = x;
-                fw = fx;
-                x = u;
-                fx = fu;
-            }
-            else
-            {
-                if (u < x) a = u;
-                else b = u;
-                if (fu <= fw || w == x)
-                {
-                    v = w;
-                    fv = fw;
-                    w = u;
-                    fw = fu;
-                }
-                else if (fu <= fv || v == x || v == w)
-                {
-                    v = u;
-                    fv = fw;
-                }
-            }
-            iter++;
-            if (itmax < iter) return -1;
-        }
+        public SplineCamera Camera;
+        public readonly float At(float u) => Camera.Distance_18A6D8(u);
     }
 
     private float Lead_279728(float t)
@@ -643,7 +563,7 @@ public sealed class BossAreaCamera : SubCamera
 
     public override float Compute_14(GameCamera cam, uint target, uint x, uint output)
     {
-        var local = CamMath.Transform_18E4F0(_toLocal, cam.M.V(x + 0x40));
+        var local = GameMath.Transform_18E4F0(_toLocal, cam.M.V(x + 0x40));
         if (!(0f < local.Y) || !(local.Y < _top))
         {
             cam.M.V(output, cam.M.V(target));
@@ -651,17 +571,17 @@ public sealed class BossAreaCamera : SubCamera
         }
         float y = _scaled ? local.Y + Height_27C700(local) : local.Y + _height;
         var dir = new Vector4(local.X, 0f, local.Z, local.W);
-        float inv = InvLength_11C030(Eps, dir);
+        float inv = GameMath.InvLength_11C030(Eps, dir);
         dir = new Vector4(dir.X * inv, dir.Y * inv, dir.Z * inv, dir.W);
         float dist = _scaled ? Distance_27C6A0(local) : _distance;
         var o = Turn_2792A0(new Vector4(dir.X * dist, y, dir.Z * dist, 1f), dist);
-        cam.M.V(output, CamMath.Transform_18E4F0(_toWorld, o));
+        cam.M.V(output, GameMath.Transform_18E4F0(_toWorld, o));
         return 0f;
     }
 
     public override void At_1C(GameCamera cam, float t, uint output) { }
 
-    public override void Enter_24(GameCamera cam, uint eye, uint target) => _prev = CamMath.Transform_18E4F0(_toLocal, cam.M.V(eye));
+    public override void Enter_24(GameCamera cam, uint eye, uint target) => _prev = GameMath.Transform_18E4F0(_toLocal, cam.M.V(eye));
 
     private float Height_27C700(Vector4 v)
     {
@@ -682,12 +602,12 @@ public sealed class BossAreaCamera : SubCamera
             float lo = MathF.Sqrt(o.X * o.X + o.Z * o.Z), lp = MathF.Sqrt(_prev.X * _prev.X + _prev.Z * _prev.Z);
             float dot = o.X * _prev.X + o.Z * _prev.Z;
             float limit = _turn / dist;
-            int angle = CamMath.Acos_18B738(dot / (lo * lp));
-            if (CamMath.Trunc(limit * CamMath.RadToUnit) < angle)
+            int angle = GameMath.Acos_18B738(dot / (lo * lp));
+            if (GameMath.Trunc(limit * GameMath.RadToUnit) < angle)
             {
                 float r = _turn / dist;
-                var a = RotY_18BEC0(CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(r, 0)), _prev);
-                var b = RotY_18BEC0(CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(-r, 0)), _prev);
+                var a = RotY_18BEC0(GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(r, 0)), _prev);
+                var b = RotY_18BEC0(GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(-r, 0)), _prev);
                 o = Distance(o, a) < Distance(o, b) ? a : b;
             }
         }
@@ -711,7 +631,7 @@ public sealed class ZoneCamera : SubCamera
     private static readonly float Far = BitConverter.Int32BitsToSingle(0x7149F2CA);
     private static readonly float SegEps = BitConverter.Int32BitsToSingle(0x2EDBE6FF);
 
-    private readonly record struct Rect(Vector4 U, Vector4 V, Vector4 O, float LenU, float LenV)
+    private readonly record struct Rect(in Vector4 U, in Vector4 V, in Vector4 O, float LenU, float LenV)
     {
         public static Rect From(Twinsanity.TwinsanityInterchange.Common.Vector4[] d) =>
             new(SubCamera.V(d[1]), SubCamera.V(d[2]), SubCamera.V(d[3]), d[4].X, d[4].Y);
@@ -764,7 +684,7 @@ public sealed class ZoneCamera : SubCamera
         if (Edge(c0, c3, p, ref best, out t)) { v = t; u = 0f; }
     }
 
-    private static bool Edge(Vector4 a, Vector4 b, Vector4 p, ref float best, out float t)
+    private static bool Edge(in Vector4 a, in Vector4 b, in Vector4 p, ref float best, out float t)
     {
         t = 0f;
         float d = Closest_184668(a, b, p, out var c);
@@ -775,7 +695,7 @@ public sealed class ZoneCamera : SubCamera
         return true;
     }
 
-    private static float Closest_184668(Vector4 a, Vector4 b, Vector4 p, out Vector4 c)
+    private static float Closest_184668(in Vector4 a, in Vector4 b, in Vector4 p, out Vector4 c)
     {
         float aa = a.X * a.X + a.Y * a.Y + a.Z * a.Z;
         float ba = b.X * a.X + b.Y * a.Y + b.Z * a.Z;
@@ -825,7 +745,7 @@ public sealed class OrbitCamera : SubCamera
         float dist = MathF.Sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z);
         float min = m.F(_obj + 0x14);
         float radius = m.F(_obj + 0x10) + (dist < min ? min : dist);
-        float inv = InvLength_11C030(Eps, d);
+        float inv = GameMath.InvLength_11C030(Eps, d);
         var eye = new Vector4(d.X * inv * radius + c.X, d.Y * inv * radius + c.Y, d.Z * inv * radius + c.Z, 1f);
         float near = m.F(_obj + 0x24), far = m.F(_obj + 0x20);
         float height;

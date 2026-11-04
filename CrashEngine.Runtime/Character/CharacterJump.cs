@@ -1,3 +1,5 @@
+using CrashEngine.Core;
+
 namespace CrashEngine.Runtime.Character;
 
 // Amedo 2026-09-27
@@ -103,8 +105,8 @@ public sealed class CharacterJump
             ApexTime = 0;
             float apex = Speed / Gravity;
             float land = Landing(Gravity * -0.5f, Speed);
-            ApexTime = CharacterController.Cvt(apex * TickRate);
-            LandTime = CharacterController.Cvt(land * TickRate);
+            ApexTime = GameMath.Trunc(apex * TickRate);
+            LandTime = GameMath.Trunc(land * TickRate);
             _c.SetParam(14, land * 0.95f);
             next = 5;
         }
@@ -125,7 +127,7 @@ public sealed class CharacterJump
         else
         {
             LeftGround = 0;
-            canJump = true;
+            canJump = _c.Carrying ? _c.Link?.Phase != 2 : !(_c.StandingOn is { } on && _c.MotionStateOf?.Invoke(on) >= 0); // Amedo
         }
         if (!allowed || !canJump || !crossOn || (Flags & 0x400) != 0) return;
         bool fits = _c.Fits(6);
@@ -151,7 +153,7 @@ public sealed class CharacterJump
                 next = 1; turn = _c.IntParam(6); v = _c.Param(16); air = _c.Param(15);
                 break;
             case 3:
-                v = 10f; turn = CharacterController.Mul(_c.IntParam(6), 0.2f); next = 2; air = _c.Param(15);
+                v = 10f; turn = GameMath.Scale_15DE90(0.2f, _c.IntParam(6)); next = 2; air = _c.Param(15);
                 break;
             case 4:
                 turn = _c.IntParam(7); v = _c.Param(20); air = _c.Param(19);
@@ -168,7 +170,7 @@ public sealed class CharacterJump
                 break;
             case 6:
                 turn = _c.IntParam(6);
-                if (_c.Carrying) turn = CharacterController.Mul(turn, 0.2f);
+                if (_c.Carrying) turn = GameMath.Scale_15DE90(0.2f, turn);
                 v = Speed; next = 5; air = _c.Param(15); reuse = true;
                 break;
             case 10:
@@ -197,8 +199,8 @@ public sealed class CharacterJump
         ApexTime = 0;
         float apex = Speed / Gravity;
         float land = Landing(Gravity * -0.5f, Speed);
-        ApexTime = CharacterController.Cvt(apex * TickRate);
-        LandTime = CharacterController.Cvt(land * TickRate);
+        ApexTime = GameMath.Trunc(apex * TickRate);
+        LandTime = GameMath.Trunc(land * TickRate);
         _c.SetParam(14, land * 0.95f);
         return next;
     }
@@ -269,7 +271,7 @@ public sealed class CharacterJump
         Speed = 0f;
         _c.Gravity = Gravity;
         _c.StartFall(trigger);
-        ApexTime = CharacterController.Cvt((LandTime * TickTime - ApexTime * TickTime) * TickRate);
+        ApexTime = GameMath.Trunc((LandTime * TickTime - ApexTime * TickTime) * TickRate);
         return type switch
         {
             2 => 0x10, 3 => 0xF, 4 => 0x11, 5 => 0x12, 6 => 0x13, 8 => 9, 9 => 0xB, 10 => 0xE, _ => -1,
@@ -290,8 +292,8 @@ public sealed class CharacterJump
         int start = PhaseTime;
         int doubleJump = 0;
         if ((Flags & 0x1000) != 0 && 5e-5f < MathF.Abs(_c.Param(20)))
-            doubleJump = PressWindow(frameTicks, CrossTime, CharacterController.Cvt(TickRate * 0.15f));
-        int attack = (Flags & 0x2000) == 0 ? 0 : PressWindow(frameTicks, CircleTime, CharacterController.Cvt(_c.Param(29) * TickRate));
+            doubleJump = PressWindow(frameTicks, CrossTime, GameMath.Trunc(TickRate * 0.15f));
+        int attack = (Flags & 0x2000) == 0 ? 0 : PressWindow(frameTicks, CircleTime, GameMath.Trunc(_c.Param(29) * TickRate));
         if (attack == 0) Flags &= ~0x2000000u;
         if (doubleJump != 0) next = StartJump(now, 4, doubleJump == 2, false);
         else if (attack != 0 || (Flags & 0x2000000) != 0) next = AerialAttack(type);
@@ -310,13 +312,13 @@ public sealed class CharacterJump
         if ((Flags & 0x1000) != 0)
         {
             int t = frameTicks / 8;
-            int w = CharacterController.Cvt(TickRate * 0.4f);
+            int w = GameMath.Trunc(TickRate * 0.4f);
             doubleJump = CrossTime < PhaseTime - t ? 0 : CrossTime < PhaseTime + w - t ? 1 : 2;
         }
         int attack = 0;
         if ((Flags & 0x2000) != 0)
         {
-            int w = CharacterController.Cvt(_c.Param(30) * TickRate);
+            int w = GameMath.Trunc(_c.Param(30) * TickRate);
             int t = frameTicks / 8;
             attack = CircleTime < PhaseTime - t ? 0 : CircleTime < PhaseTime + w - t ? 1 : 2;
         }
@@ -330,7 +332,7 @@ public sealed class CharacterJump
     {
         Flags &= ~0x3000u;
         if (type == 5 && (_c.JumpRules & SlideJumpBodySlamBit) == 0) return -1;
-        ApexTime = CharacterController.Cvt(_c.Param(37) * TickRate); // Amedo
+        ApexTime = GameMath.Trunc(_c.Param(37) * TickRate); // Amedo
         if (type == 2 && _c.Gun is { } gun && ApexTime != 0)
         {
             if (gun.TakeAmmo_15EFE8(5))
@@ -341,13 +343,13 @@ public sealed class CharacterJump
             _c.Trigger(0x6C);
             return -1;
         }
-        ApexTime = CharacterController.Cvt(_c.Param(34) * TickRate);
+        ApexTime = GameMath.Trunc(_c.Param(34) * TickRate);
         if (type == 2 && ApexTime != 0)
         {
             _c.Trigger(0x1D);
             return 10;
         }
-        ApexTime = CharacterController.Cvt(_c.Param(31) * TickRate);
+        ApexTime = GameMath.Trunc(_c.Param(31) * TickRate);
         if (ApexTime == 0) return -1;
         if (_c.Fits(7, push: true)) // Amedo 2026-10-06
         {

@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -143,10 +144,10 @@ public sealed class RollerBrawl : Vehicle
         CrashMatrix = deformed;
         var p = new Vector3(m.M41, m.M42 + (0.05f - Radius), m.M43);
         var fwd = new Vector3(Heading.X, 0f, Heading.Z);
-        fwd *= RigidBody.InverseLength(fwd);
+        fwd *= GameMath.InverseLength(fwd);
         var up = Vector3.UnitY;
         var right = new Vector3(up.Y * fwd.Z - up.Z * fwd.Y, up.Z * fwd.X - up.X * fwd.Z, up.X * fwd.Y - up.Y * fwd.X);
-        right *= RigidBody.InverseLength(right);
+        right *= GameMath.InverseLength(right);
         Frame = new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, fwd.X, fwd.Y, fwd.Z, 0f, p.X, p.Y, p.Z, 1f);
         return true;
     }
@@ -238,7 +239,7 @@ public sealed class RollerBrawl : Vehicle
         len *= len;
         var force = new Vector3(0f, -(len * len * 10f), 0f);
         var flat = new Vector3(body.Velocity.X, 0f, body.Velocity.Z);
-        flat *= RigidBody.InverseLength(flat);
+        flat *= GameMath.InverseLength(flat);
         float along = (1f - (x * flat.X + 0f * flat.Y + z * flat.Z)) * 0.5f;
         if (along < 0f) along = 0f;
         if (1f < along) along = 1f;
@@ -305,14 +306,14 @@ public sealed class RollerBrawl : Vehicle
             Wobble = amp;
             if (0.5f < amp) Wobble = 0.5f;
             else if (amp < -0.5f) Wobble = -0.5f;
-            var d = dv * RigidBody.InverseLength(dv);
+            var d = dv * GameMath.InverseLength(dv);
             WobbleAxis = Vector3.TransformNormal(d, body.Inverse);
             float a = MathF.Abs(Wobble);
             Owner.CameraImpulse?.Invoke(a + a, 0.01f, body.Position);
             WobblePhase = 0f;
         }
         if (Wobble == 0f) return;
-        float c = MathF.Cos(CamMath.FromValue_11BFA0(WobblePhase, 0) * CamMath.UnitToRad);
+        float c = MathF.Cos(GameMath.FromValue_11BFA0(WobblePhase, 0) * GameMath.UnitToRad);
         float w = Wobble;
         WobblePhase += dt * 21f;
         Wobble = w * (1f - dt * 1.5f);
@@ -335,20 +336,20 @@ public sealed class RollerBrawl : Vehicle
     {
         var node = Owner.GameMatrix;
         StopPosition = node.Translation;
-        StopFrom = CamMath.MatrixToQuat_186900(node);
+        StopFrom = GameMath.MatrixToQuat_186900(node);
         var b = new Vector3(node.M21, node.M22, node.M23);
-        b *= RigidBody.InverseLength(b);
+        b *= GameMath.InverseLength(b);
         var axis = new Vector3(b.Y * 0f - b.Z * 1f, b.Z * 0f - b.X * 0f, b.X * 1f - b.Y * 0f);
         if (5e-05f < axis.X * axis.X + axis.Y * axis.Y + axis.Z * axis.Z)
         {
-            axis *= RigidBody.InverseLength(axis);
-            int angle = Acos_18B738(b.X * 0f + b.Y * 1f + b.Z * 0f);
-            var q = CamMath.AxisAngle_18D798(axis, angle);
-            q = CamMath.Mul_18D558(q, StopFrom);
+            axis *= GameMath.InverseLength(axis);
+            int angle = GameMath.Acos_18B738(b.X * 0f + b.Y * 1f + b.Z * 0f);
+            var q = GameMath.AxisAngle_18D798(axis, angle);
+            q = GameMath.Mul_18D558(q, StopFrom);
             float yaw = Owner.Rng.RandomBelowFloat_18C180(360f); // Amedo
-            float h = CamMath.FromValue_11BFA0(yaw, 0) * CamMath.UnitToRad * 0.5f;
+            float h = GameMath.FromValue_11BFA0(yaw, 0) * GameMath.UnitToRad * 0.5f;
             var spinY = h == 0f ? Quaternion.Identity : new Quaternion(0f, MathF.Sin(h), 0f, MathF.Cos(h));
-            StopTo = CamMath.Mul_18D558(q, spinY);
+            StopTo = GameMath.Mul_18D558(q, spinY);
         }
         else StopTo = StopFrom;
         byte bump = (byte)Owner.Rng.GetRandom_18C018(0xFF); // Amedo
@@ -377,8 +378,8 @@ public sealed class RollerBrawl : Vehicle
         var w = body.Spin;
         float energy = v.X * v.X + v.Y * v.Y + v.Z * v.Z + w.X * w.X + w.Y * w.Y + w.Z * w.Z;
         if (1f < t) t = 1f;
-        var q = CamMath.Slerp_187100(t * t * 3f - (t + t) * t * t, StopFrom, StopTo);
-        var m = CamMath.QuatToMatrix_18E620(q);
+        var q = GameMath.Slerp_187100(t * t * 3f - (t + t) * t * t, StopFrom, StopTo);
+        var m = GameMath.QuatToMatrix_18E620(q);
         m.Translation = body.Position;
         body.InitFromTransform(m);
         UpdateFrames();
@@ -482,10 +483,10 @@ public sealed class RollerBrawl : Vehicle
             {
                 const float eps = 2.4999998e-09f;
                 var flat = new Vector4(v.X, 0f, v.Z, 0f);
-                float k = CamMath.InvLengthGuarded_11C030(eps, flat);
+                float k = GameMath.InvLength_11C030(eps, flat);
                 var dir = new Vector4(flat.X * k, flat.Y * k, flat.Z * k, 0f);
                 var side = new Vector4(dir.Y * 0f - dir.Z * 1f, dir.Z * 0f - dir.X * 0f, dir.X * 1f - dir.Y * 0f, 1f);
-                float ks = CamMath.InvLengthGuarded_11C030(eps, side);
+                float ks = GameMath.InvLength_11C030(eps, side);
                 side = new Vector4(side.X * ks, side.Y * ks, side.Z * ks, 1f);
                 float offset = Radius * 0.5f;
                 IReadOnlyList<CollisionWorld.Triangle> tris = (body.Terrain ??= new TriangleCache()).Triangles;
@@ -512,7 +513,7 @@ public sealed class RollerBrawl : Vehicle
             for (int part = 0; part < target.Parts.Count; part++) // Amedo
             {
                 var (hull, m) = target.Parts[part];
-                var local = Vector3.Transform(p, CamMath.RigidInverse_18E808(m));
+                var local = Vector3.Transform(p, GameMath.RigidInverse_18E808(m));
                 if (!HullQueries.SphereHull_1FC818(Radius, hull, local, out _)) continue;
                 Owner.SurfaceMessage_140958(Owner.CollisionWorld.SurfaceAt(Owner.HullSurfaceOf?.Invoke(target.Owner, part) ?? 0)); // Amedo
                 Owner.TouchFrom_137858(target.Owner, body.Velocity, -body.Velocity);
@@ -520,15 +521,6 @@ public sealed class RollerBrawl : Vehicle
                     Owner.BodyHit_23D1E0?.Invoke(self, target.Owner, body.Position, -body.Velocity);
             }
         }
-    }
-
-    private static int Acos_18B738(float x)
-    {
-        float ax = MathF.Abs(x), rest = 1f - ax;
-        if (rest < 0f) rest = 0f;
-        float a = (((ax * -0.0187293f + 0.074261f) * ax - 0.2121144f) * ax + 1.5707288f) * MathF.Sqrt(rest);
-        if (x < 0f) a = 3.1415927f - a;
-        return CamMath.Trunc(a * CamMath.RadToUnit);
     }
 
     public override void Transfer(Matrix4x4 obj) => LastVelocity = Vector3.TransformNormal(LastVelocity, obj);

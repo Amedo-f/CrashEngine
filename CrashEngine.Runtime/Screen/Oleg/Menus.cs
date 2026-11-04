@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Game;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -305,7 +306,7 @@ public class ValueItem : MenuItem
 
     public override bool SetFloat(int col, float value)
     {
-        Values_14[col] = CharacterController.Cvt(value);
+        Values_14[col] = GameMath.Trunc(value);
         return true;
     }
 

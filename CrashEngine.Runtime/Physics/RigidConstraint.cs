@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -16,18 +17,6 @@ public sealed class RigidConstraint
     public Vector3 LineOrigin, LineDir;
     public Vector4 Plane;
 
-    private static float InvLen_11C030(Vector3 v)
-    {
-        float l = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return l <= 2.4999998e-09f ? 0f : 1f / MathF.Sqrt(l);
-    }
-
-    private static float Rsqrt_11C0B8(Quaternion q)
-    {
-        float l = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
-        return 0f < l ? 1f / MathF.Sqrt(l) : 0f;
-    }
-
     private static Quaternion Scale(Quaternion q, float k) => new(q.X * k, q.Y * k, q.Z * k, q.W * k);
 
     private static float Dot4(Quaternion a, Quaternion b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
@@ -42,7 +31,7 @@ public sealed class RigidConstraint
     {
         Flags = (Flags & ~0x70u) | 0x20;
         LineOrigin = origin;
-        LineDir = dir * InvLen_11C030(dir);
+        LineDir = dir * GameMath.InverseLength(dir);
     }
 
     public void Plane_2911E0(Vector3 n, Vector3 p)
@@ -76,15 +65,15 @@ public sealed class RigidConstraint
             s = MathF.Sqrt((1f - c) * 0.5f);
             c = -MathF.Sqrt((c + 1f) * 0.5f);
         }
-        var axis = cr * InvLen_11C030(cr) * s;
+        var axis = cr * GameMath.InverseLength(cr) * s;
         var a = new Quaternion(axis, c);
         var b = new Quaternion(
             axis.Y * l.Z - axis.Z * l.Y + l.X * c,
             axis.Z * l.X - axis.X * l.Z + l.Y * c,
             axis.X * l.Y - axis.Y * l.X + l.Z * c,
             -(l.X * axis.X + l.Y * axis.Y + l.Z * axis.Z));
-        a = Scale(a, Rsqrt_11C0B8(a));
-        b = Scale(b, Rsqrt_11C0B8(b));
+        a = Scale(a, GameMath.QuatInvLength_11C0B8(a, 0f, 0f));
+        b = Scale(b, GameMath.QuatInvLength_11C0B8(b, 0f, 0f));
         A = new Quaternion(-a.X, -a.Y, -a.Z, a.W);
         B = new Quaternion(-b.X, -b.Y, -b.Z, b.W);
     }
@@ -96,26 +85,26 @@ public sealed class RigidConstraint
         body.Velocity = ProjectVector_2885B0(body.Velocity);
         body.Orientation = ProjectOrientation_2886F8(body.Orientation);
         if ((Flags & 1) == 0) return;
-        body.AngularMomentum = AxisWorld * Vector3.Dot(body.AngularMomentum, AxisWorld);
-        body.Spin = AxisWorld * Vector3.Dot(body.Spin, AxisWorld);
+        body.AngularMomentum = AxisWorld * GameMath.Dot(body.AngularMomentum, AxisWorld);
+        body.Spin = AxisWorld * GameMath.Dot(body.Spin, AxisWorld);
     }
 
     private Vector3 ProjectPoint_288430(Vector3 p)
     {
         if ((Flags & 0x10) != 0) return Point;
-        if ((Flags & 0x20) != 0) return LineOrigin + LineDir * Vector3.Dot(LineDir, p - LineOrigin);
+        if ((Flags & 0x20) != 0) return LineOrigin + LineDir * GameMath.Dot(LineDir, p - LineOrigin);
         if ((Flags & 0x40) == 0) return p;
         var n = new Vector3(Plane.X, Plane.Y, Plane.Z);
-        return p - n * (Vector3.Dot(n, p) + Plane.W);
+        return p - n * (GameMath.Dot(n, p) + Plane.W);
     }
 
     private Vector3 ProjectVector_2885B0(Vector3 v)
     {
         if ((Flags & 0x10) != 0) return Vector3.Zero;
-        if ((Flags & 0x20) != 0) return LineDir * Vector3.Dot(LineDir, v);
+        if ((Flags & 0x20) != 0) return LineDir * GameMath.Dot(LineDir, v);
         if ((Flags & 0x40) == 0) return v;
         var n = new Vector3(Plane.X, Plane.Y, Plane.Z);
-        return v - n * Vector3.Dot(n, v);
+        return v - n * GameMath.Dot(n, v);
     }
 
     private Quaternion ProjectOrientation_2886F8(Quaternion q)
@@ -126,7 +115,7 @@ public sealed class RigidConstraint
             float kb = Dot4(q, new Quaternion(A.X * ab - B.X, A.Y * ab - B.Y, A.Z * ab - B.Z, A.W * ab - B.W)) / (ab * ab - 1f);
             float ka = Dot4(q, A) - kb * ab;
             var r = new Quaternion(A.X * ka + B.X * kb, A.Y * ka + B.Y * kb, A.Z * ka + B.Z * kb, A.W * ka + B.W * kb);
-            q = 9.999999e-09f < Dot4(r, r) ? Scale(r, Rsqrt_11C0B8(r)) : A;
+            q = 9.999999e-09f < Dot4(r, r) ? Scale(r, GameMath.QuatInvLength_11C0B8(r, 0f, 0f)) : A;
         }
         if ((Flags & 0x100) != 0) q = Limit_288938(q);
         return q;
@@ -134,35 +123,14 @@ public sealed class RigidConstraint
 
     private Quaternion Limit_288938(Quaternion q)
     {
-        float k = Rsqrt_11C0B8(Rest);
+        float k = GameMath.QuatInvLength_11C0B8(Rest, 0f, 0f);
         var inverse = new Quaternion(-Rest.X * k, -Rest.Y * k, -Rest.Z * k, Rest.W * k);
-        var rel = CamMath.Mul_18D558(inverse, q);
-        int angle = AxisAngle_186B50(ref rel, out var axis);
-        float a = angle * CamMath.UnitToRad;
+        var rel = GameMath.Mul_18D558(inverse, q);
+        int angle = GameMath.AxisAngle_186B50(ref rel, out var axis);
+        float a = angle * GameMath.UnitToRad;
         if (!(a < -Limit) && !(Limit < a)) return q;
         a = a < -Limit ? -Limit : Limit;
-        rel = CamMath.AxisAngle_18D798(axis, CamMath.Trunc(a * CamMath.RadToUnit));
-        return CamMath.Mul_18D558(Rest, rel);
-    }
-
-    private static int AxisAngle_186B50(ref Quaternion q, out Vector3 axis)
-    {
-        float l = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
-        q = Scale(q, 1.00000005e-20f < l ? 1f / MathF.Sqrt(l) : 0f);
-        float aw = MathF.Abs(q.W);
-        if (!(aw < 1f))
-        {
-            axis = Vector3.UnitZ;
-            return 0;
-        }
-        float rest = 1f - aw;
-        if (rest < 0f) rest = 0f;
-        float a = (((aw * -0.0187293f + 0.074261f) * aw - 0.2121144f) * aw + 1.5707288f) * MathF.Sqrt(rest);
-        if (q.W < 0f) a = 3.1415927f - a;
-        int half = CamMath.Trunc(a * CamMath.RadToUnit);
-        float s = 1f / MathF.Sqrt(1f - q.W * q.W);
-        axis = new Vector3(q.X * s, q.Y * s, q.Z * s);
-        axis *= InvLen_11C030(axis);
-        return half + half;
+        rel = GameMath.AxisAngle_18D798(axis, GameMath.Trunc(a * GameMath.RadToUnit));
+        return GameMath.Mul_18D558(Rest, rel);
     }
 }

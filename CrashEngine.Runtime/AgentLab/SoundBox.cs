@@ -1,5 +1,6 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -23,7 +24,7 @@ public sealed class SoundBox
         Min_00 = -Max_10;
         Center_20 = new Vector3(t.Position.X, t.Position.Y, t.Position.Z);
         Matrix_30 = Matrix4x4.CreateFromQuaternion(new Quaternion(t.Rotation.X, t.Rotation.Y, t.Rotation.Z, t.Rotation.W)) * Matrix4x4.CreateTranslation(Center_20);
-        Inverse_70 = Camera.CamMath.RigidInverse_18E808(Matrix_30);
+        Inverse_70 = GameMath.RigidInverse_18E808(Matrix_30);
         var h = (Min_00 - Max_10) * 0.5f;
         float r = MathF.Sqrt(h.X * h.X + h.Y * h.Y + h.Z * h.Z);
         Radius2_B0 = r * r;

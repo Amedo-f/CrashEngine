@@ -3,6 +3,7 @@ using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -55,7 +56,7 @@ public sealed partial class AgentLabWorld
         _pickupClock += ticks * (1f / 9000f);
         if (0.8f <= _pickupClock)
             while (0.8f <= _pickupClock) _pickupClock -= 0.8f;
-        PickupFrame = Character.CharacterController.Cvt(_pickupClock * 60f);
+        PickupFrame = GameMath.Trunc(_pickupClock * 60f);
         PickupFrameFraction = _pickupClock * 60f - PickupFrame; // Amedo 2026-09-30
     }
 

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -25,7 +26,7 @@ public sealed partial class GameCamera
             if ((M.B(time) & 1) == 0) M.Q(comp + 0x18, M.Q(comp + 0x18) | 1);
             else
             {
-                float left = CamMath.Trunc(M.I(comp + 0x760) - M.I(time + 8) * M.F(SecondsPerTick));
+                float left = GameMath.Trunc(M.I(comp + 0x760) - M.I(time + 8) * M.F(SecondsPerTick));
                 M.I(comp + 0x760, (int)left);
                 if (left < 0f) M.I(comp + 0x760, 0);
                 ControllerUpdate_1436A8(comp + 0x30, time, c, Handle(comp + 0x20));
@@ -51,7 +52,7 @@ public sealed partial class GameCamera
             fl = (fl & 0x10) == 0 ? fl | 0x10 : fl & ~0x10UL;
             M.Q(p, fl);
             uint c9 = CameraComponent(camObj);
-            M.U(p + 0x720, StartTransition_2700C0(c9, p + 0x20, CamMath.Trunc(M.F(TicksPerSecond) * 0.5f), 0));
+            M.U(p + 0x720, StartTransition_2700C0(c9, p + 0x20, GameMath.Trunc(M.F(TicksPerSecond) * 0.5f), 0));
             M.Q(p, M.Q(p) & ~8UL);
         }
         fl = M.Q(p);
@@ -112,7 +113,7 @@ public sealed partial class GameCamera
         if ((M.Q(d + 0x50) & 0x400) == 0) M.U(d + 0x3E8, M.U(d + 0x54));
         M.U(d + 0x438, M.U(d + 0x5C));
         PlayerMode_1428B0(d, c);
-        M.I(d + 0x6C0, CamMath.FromValue_11BFA0(M.F(c + 0x300), 0));
+        M.I(d + 0x6C0, GameMath.FromValue_11BFA0(M.F(c + 0x300), 0));
         PartnerAngle_15E4F8(d, c);
     }
 
@@ -238,7 +239,7 @@ public sealed partial class GameCamera
         M.Q(d + 0x50, M.Q(d + 0x50) | 8);
         EyeQuick_27BD60(d + 0x2F0, true);
         M.U(d + 0x3E4, M.U(d + 0x3E4) | 0x401);
-        M.I(d + 0x400, CamMath.Trunc(M.F(TicksPerSecond) * 0.2f));
+        M.I(d + 0x400, GameMath.Trunc(M.F(TicksPerSecond) * 0.2f));
         M.U(d + 0x408, M.U(0x30A210));
         M.U(d + 0x344, M.U(d + 0x344) | 1);
         M.U(d + 0x360, 0);
@@ -265,7 +266,7 @@ public sealed partial class GameCamera
         M.Q(d + 0x330, M.Q(d + 0x330) | 0x10000);
         M.F(d + 0x2F0 + 0x394, 0.3f);
         M.F(d + 0x2F0 + 0x390, 25f);
-        int wide = CamMath.FromValue_11BFA0(80f, 1), narrow = CamMath.FromValue_11BFA0(20f, 1);
+        int wide = GameMath.FromValue_11BFA0(80f, 1), narrow = GameMath.FromValue_11BFA0(20f, 1);
         M.V(d + 0x1D0, new Vector4(0f, 1f, 0f, 1f));
         M.V(d + 0x1E0, new Vector4(0f, 1f, 0f, 1f));
         M.F(d + 0x434 + 0x38, 2.3f);
@@ -297,9 +298,9 @@ public sealed partial class GameCamera
 
     public void Rate_142B88(float speed, uint d)
     {
-        if (50f < speed) speed = M.I(0x30A228) * CamMath.UnitToRad;
-        int rate = CamMath.Scale_15DE90(speed * 0.02f, M.I(0x30A230)) + M.I(0x30A220);
-        M.I(d + 0x400, CamMath.Trunc(M.F(TicksPerSecond) * 0.2f));
+        if (50f < speed) speed = M.I(0x30A228) * GameMath.UnitToRad;
+        int rate = GameMath.Scale_15DE90(speed * 0.02f, M.I(0x30A230)) + M.I(0x30A220);
+        M.I(d + 0x400, GameMath.Trunc(M.F(TicksPerSecond) * 0.2f));
         M.I(d + 0x408, rate);
     }
 
@@ -357,33 +358,33 @@ public sealed partial class GameCamera
         }
         var vel = Velocity_13FE50(c);
         float speed = MathF.Sqrt(vel.X * vel.X + vel.Y * vel.Y + vel.Z * vel.Z);
-        int wanted = CamMath.FromValue_11BFA0(0f, 0);
+        int wanted = GameMath.FromValue_11BFA0(0f, 0);
         if ((sbyte)M.B(d + 0x3E4) >= 0)
         {
             float grounded = ((M.I(M.U(c + 0x10) + 0x14) >> 2) & 1) != 0 ? 1f : 0.5f;
             int prev = M.I(d + 0x6F0);
             if (M.F(d + 0x6C) != 0f || M.F(d + 0x70) != 0f)
             {
-                int a = CamMath.Yaw_18C830(new Vector4(M.F(d + 0x70), 0f, M.F(d + 0x6C), 1f));
-                a = CamMath.Wrap16(a);
-                a = CamMath.FromValue_11BFA0(MathF.Abs(a * CamMath.UnitToRad), 0);
+                int a = GameMath.Yaw_18C830(new Vector4(M.F(d + 0x70), 0f, M.F(d + 0x6C), 1f));
+                a = GameMath.Wrap16(a);
+                a = GameMath.FromValue_11BFA0(MathF.Abs(a * GameMath.UnitToRad), 0);
                 int r = M.I(0x30A210);
                 if (0xB5 < a && a <= 0x3FFF)
-                    wanted = CamMath.Trunc(r * (float)CamMath.Divide_11C008(1.5533430f, a - 0xB6) * CamMath.UnitToRad);
+                    wanted = GameMath.Trunc(r * (float)GameMath.Divide_11C008(1.5533430f, a - 0xB6) * GameMath.UnitToRad);
                 else if (0x3FFF < a && a <= 0x6000)
                 {
-                    int k = CamMath.Divide_11C008(0.7853982f, a - 0x4000);
-                    wanted = CamMath.Trunc(CamMath.Scale_15DE90(0.5f, r) * (k * CamMath.UnitToRad)) + r;
+                    int k = GameMath.Divide_11C008(0.7853982f, a - 0x4000);
+                    wanted = GameMath.Trunc(GameMath.Scale_15DE90(0.5f, r) * (k * GameMath.UnitToRad)) + r;
                 }
                 else if (0x6000 < a && a < 0x7F49)
                 {
-                    int k = CamMath.Divide_11C008(0.7679449f, a - 0x6000);
-                    wanted = CamMath.Trunc(CamMath.Scale_15DE90(1.3f, r) * (1f - k * CamMath.UnitToRad));
+                    int k = GameMath.Divide_11C008(0.7679449f, a - 0x6000);
+                    wanted = GameMath.Trunc(GameMath.Scale_15DE90(1.3f, r) * (1f - k * GameMath.UnitToRad));
                 }
             }
-            wanted = CamMath.Trunc((wanted - prev) * 0.1f) + prev;
-            int scaled = CamMath.Scale_15DE90(speed, wanted);
-            M.I(d + 0x408, CamMath.Scale_15DE90(grounded, scaled));
+            wanted = GameMath.Trunc((wanted - prev) * 0.1f) + prev;
+            int scaled = GameMath.Scale_15DE90(speed, wanted);
+            M.I(d + 0x408, GameMath.Scale_15DE90(grounded, scaled));
         }
         M.I(d + 0x6F0, wanted);
     }
@@ -403,18 +404,18 @@ public sealed partial class GameCamera
         if (!quick)
         {
             M.U(d + 0x408, M.U(0x30A200));
-            M.I(d + 0x400, CamMath.Trunc(tps));
+            M.I(d + 0x400, GameMath.Trunc(tps));
         }
         else
         {
             M.U(d + 0x408, M.U(0x30A210));
-            M.I(d + 0x400, CamMath.Trunc(tps * 0.2f));
+            M.I(d + 0x400, GameMath.Trunc(tps * 0.2f));
         }
         M.U(d + 0x344, (M.U(d + 0x344) & 0xFFFFFFFE) | (quick ? 1u : 0u));
         if (!quick)
         {
             M.U(d + 0x368, M.U(0x30A208));
-            M.I(d + 0x360, CamMath.Trunc(tps * 0.1f));
+            M.I(d + 0x360, GameMath.Trunc(tps * 0.1f));
         }
         else
         {

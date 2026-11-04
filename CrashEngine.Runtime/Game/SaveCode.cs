@@ -1,5 +1,6 @@
 using CrashEngine.Runtime.Screen;
 using CrashEngine.Runtime.Screen.Oleg;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Game;
 
@@ -498,7 +499,7 @@ public class SaveCodeScreens : SaveCode
     // Amedo
     public SaveCodeScreens(string name, Oleg oleg, SaveDevice device, GameTexts? texts) : base(name, device, texts) => Oleg_1C = oleg;
 
-    private static int Half => CrashEngine.Runtime.Character.CharacterController.Cvt(Widget.TicksPerSecond * 0.5f);
+    private static int Half => GameMath.Trunc(Widget.TicksPerSecond * 0.5f);
 
     // Amedo
     public override void Message(int message, int slot)

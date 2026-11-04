@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Importer;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -44,8 +45,8 @@ public abstract class InstanceCell
     {
         int l = CellLevel_1E8C10(BoxMin_40, BoxMax_50);
         var p = Position_30;
-        int x = MeshDecoder.Cvt(p.X / Size_2FBB30[l]) & Mask_2FBB70[l];
-        int z = MeshDecoder.Cvt(p.Z / Size_2FBB30[l]) & Mask_2FBB70[l];
+        int x = GameMath.Trunc(p.X / Size_2FBB30[l]) & Mask_2FBB70[l];
+        int z = GameMath.Trunc(p.Z / Size_2FBB30[l]) & Mask_2FBB70[l];
         return Base_3B4640[l] + x + z * Span_2FBB50[l];
     }
 
@@ -56,10 +57,10 @@ public abstract class InstanceCell
         for (int l = 0; l < 3; l++)
         {
             float s = Size_2FBB30[l], h = Margin_2FBB40[l];
-            int x0 = MeshDecoder.Cvt((min.X - h) / s);
-            int z0 = MeshDecoder.Cvt((min.Z - h) / s);
-            int x1 = MeshDecoder.Cvt((max.X + h) / s);
-            int z1 = MeshDecoder.Cvt((max.Z + h) / s);
+            int x0 = GameMath.Trunc((min.X - h) / s);
+            int z0 = GameMath.Trunc((min.Z - h) / s);
+            int x1 = GameMath.Trunc((max.X + h) / s);
+            int z1 = GameMath.Trunc((max.Z + h) / s);
             int span = Span_2FBB50[l];
             if (!(x1 < x0 + span - 1)) x1 = x0 + span - 1;
             if (!(z1 < z0 + span - 1)) z1 = z0 + span - 1;

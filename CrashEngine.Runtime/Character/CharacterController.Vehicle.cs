@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Character.Vehicles;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -15,6 +16,7 @@ public sealed partial class CharacterController
     public Action<bool>? SetCollidable;
     public Action<(Vector3 Min, Vector3 Max)?>? SetInstanceBox;
     public Action<int>? TriggerForced;
+    public Action<int, int>? TriggerOnChannel;
 
     public void EnterVehicle_13B938(int kind, CharacterController? other, int param4, object? otherObject = null)
     {
@@ -22,7 +24,7 @@ public sealed partial class CharacterController
         if (Vehicle is not { } old)
         {
             v = Velocity;
-            if (v.Length() < 15f)
+            if (GameMath.Length(v) < 15f)
             {
                 var node = _getMatrix();
                 v = new Vector3(node.M31, node.M32, node.M33) * 15f;
@@ -163,7 +165,7 @@ public sealed partial class CharacterController
     public void TouchFrom_137858(object owner, Vector3 velocity, Vector3 direction)
     {
         var d = direction;
-        d *= RigidBody.InverseLength(d);
+        d *= GameMath.InverseLength(d);
         float dirY;
         if (d.Y < -0.9f && velocity.Y < -1f) dirY = -1f;
         else if (0.9f < d.Y) dirY = 1f;
@@ -188,9 +190,9 @@ public sealed partial class CharacterController
         InputDisabled &= ~0x38u;
         if (x == 0f && y == 0f) return;
         var right = new Vector3(CameraRight.X, 0f, CameraRight.Z);
-        right *= RigidBody.InverseLength(right);
+        right *= GameMath.InverseLength(right);
         var fwd = new Vector3(CameraForward.X, 0f, CameraForward.Z);
-        fwd *= RigidBody.InverseLength(fwd);
+        fwd *= GameMath.InverseLength(fwd);
         float mx = right.X * x + fwd.X * y;
         float mz = right.Z * x + fwd.Z * y;
         float len = MathF.Sqrt(mx * mx + mz * mz);

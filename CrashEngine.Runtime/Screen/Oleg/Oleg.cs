@@ -3,6 +3,7 @@ using System.Numerics;
 using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Character.Vehicles;
 using CrashEngine.Runtime.Game;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -67,7 +68,7 @@ public sealed class CyclingScale : IWidgetScale
         if (t < 1f)
         {
             float f = (count - 1) * t;
-            int i = CharacterController.Cvt(f);
+            int i = GameMath.Trunc(f);
             Value_10 = Samples_0C[i] + (Samples_0C[i + 1] - Samples_0C[i]) * (f - i);
         }
         else Value_10 = Samples_0C[count - 1];
@@ -192,7 +193,7 @@ public sealed partial class Oleg : WidgetController
         for (int i = 30; i < SpriteCount; i++) Sprites_B4C[i].Centred_08 = true;
         foreach (int i in (ReadOnlySpan<int>)[1, 2, 19, 20, 21, 23, 29]) Sprites_B4C[i].Centred_08 = true;
         ParticleSprite_81C.Centred_08 = true; // Amedo
-        WumpaTimer_324 = CharacterController.Cvt(Widget.TicksPerSecond * 0.15f);
+        WumpaTimer_324 = GameMath.Trunc(Widget.TicksPerSecond * 0.15f);
         Pulse_328.Duration_00 = 0.15f;
         for (int i = 0; i < GameProgress.Gems; i++) PauseGems_314C[i] = new SpriteWidget(Sprites_B4C[13 + i], 0.5f);
         SetGroups_16A040();
@@ -336,7 +337,7 @@ public sealed partial class Oleg : WidgetController
     {
         TextLine_120C.Text_08 = "";
         WumpaPending_311 = 0;
-        WumpaTimer_324 = CharacterController.Cvt(Widget.TicksPerSecond * 0.15f);
+        WumpaTimer_324 = GameMath.Trunc(Widget.TicksPerSecond * 0.15f);
         for (int i = FirstHudIconSprite; i < FirstIconSprite; i++) Sprites_B4C[i].SetMaterial_1ABD50(null);
     }
 
@@ -345,7 +346,7 @@ public sealed partial class Oleg : WidgetController
     {
         int lives = Progress_390.Lives + n;
         Progress_390.Lives = lives < 0 ? 0 : lives < 100 ? lives & 0x7F : 100;
-        Show_259B20(Groups_08[LivesGroup], CharacterController.Cvt(Widget.TicksPerSecond), CharacterController.Cvt(Widget.TicksPerSecond * 1.5f));
+        Show_259B20(Groups_08[LivesGroup], GameMath.Trunc(Widget.TicksPerSecond), GameMath.Trunc(Widget.TicksPerSecond * 1.5f));
         Rock_378.Count_0C = 0;
         Rock_378.Elapsed_04 = 0f;
         Rock_378.Progress_08 = 0f;
@@ -355,7 +356,7 @@ public sealed partial class Oleg : WidgetController
         LivesIcon_4358.Next_1C?.SetEffect_259950(Rock_378);
         if (!fromWumpa) return;
         OneUp_4414.Sprite_88 = Sprites_B4C[FirstIconSprite + Progress_390.Character];
-        OneUp_4414.Appear_254EE0(CharacterController.Cvt(Widget.TicksPerSecond * 0.5f), CharacterController.Cvt(Widget.TicksPerSecond));
+        OneUp_4414.Appear_254EE0(GameMath.Trunc(Widget.TicksPerSecond * 0.5f), GameMath.Trunc(Widget.TicksPerSecond));
         Slide_348.Count_0C = 0;
         Slide_348.Elapsed_04 = 0f;
         Slide_348.Progress_08 = 0f;
@@ -378,9 +379,9 @@ public sealed partial class Oleg : WidgetController
         CyclingScale.Global_30BB90.Step_179F18(clock);
         if (runState == 3)
         {
-            WumpaTimer_324 = CharacterController.Cvt(Widget.TicksPerSecond * 0.15f);
-            Hide_259BC0(Groups_08[WumpaGroup], CharacterController.Cvt(Widget.TicksPerSecond * 0.1f), 0);
-            OneUp_4414.Disappear_255040(CharacterController.Cvt(Widget.TicksPerSecond * 0.1f), 0);
+            WumpaTimer_324 = GameMath.Trunc(Widget.TicksPerSecond * 0.15f);
+            Hide_259BC0(Groups_08[WumpaGroup], GameMath.Trunc(Widget.TicksPerSecond * 0.1f), 0);
+            OneUp_4414.Disappear_255040(GameMath.Trunc(Widget.TicksPerSecond * 0.1f), 0);
         }
         else if (WumpaPending_311 != 0)
         {
@@ -399,9 +400,9 @@ public sealed partial class Oleg : WidgetController
                     interval *= CrashEngine.Core.GameMath.SinCosVu0_2E4C30(1f / WumpaPending_311).Sin;
                 WumpaPending_311--;
                 Pulse_328.Duration_00 = interval;
-                WumpaTimer_324 = CharacterController.Cvt(interval * Widget.TicksPerSecond);
+                WumpaTimer_324 = GameMath.Trunc(interval * Widget.TicksPerSecond);
                 Pulse_328.Count_0C++;
-                Show_259B20(Groups_08[WumpaGroup], CharacterController.Cvt(Widget.TicksPerSecond * 0.1f), CharacterController.Cvt(Widget.TicksPerSecond * 1.5f));
+                Show_259B20(Groups_08[WumpaGroup], GameMath.Trunc(Widget.TicksPerSecond * 0.1f), GameMath.Trunc(Widget.TicksPerSecond * 1.5f));
                 SetEffect_259A90(Groups_08[WumpaGroup], Pulse_328);
                 if (WumpaPending_311 == 0 && !(Pulse_328.Count_0C < 2)) Pulse_328.Count_0C = 1;
             }
@@ -475,7 +476,7 @@ public sealed partial class Oleg : WidgetController
         }
         if (worm)
         {
-            int seconds = CharacterController.Cvt(p.WormTicks_7C * Widget.SecondsPerTick);
+            int seconds = GameMath.Trunc(p.WormTicks_7C * Widget.SecondsPerTick);
             int minutes = seconds / 60, rest = seconds - minutes * 60;
             var key = (p.WormCount, p.WormTotal);
             if (_wormKey != key)

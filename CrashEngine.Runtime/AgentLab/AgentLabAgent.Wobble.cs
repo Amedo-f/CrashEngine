@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -140,7 +141,7 @@ public sealed partial class AgentLabAgent
             if (LocalMatrix.Translation != w.RestPose) SetLocalPosition(w.RestPose);
             return;
         }
-        if (_attachedTo is not null) return; // Amedo: 0x18E620 on the attachment, rebuilt by TrajectoryFrame
+        if (_attachedTo is not null) return; // Amedo
         if (LocalRotation != w.RestQuat) SetLocalRotation(w.RestQuat);
     }
 
@@ -180,8 +181,8 @@ public sealed partial class AgentLabAgent
             if (rest && space is 1 or 2 or 7)
                 for (int i = 0; i < 3; i++) w.Angles[i] = (int)(angle[i] * WobbleUnits);
             else
-                w.Rotation = Camera.CamMath.Euler_186780(Camera.CamMath.FromValue_11BFA0(angle[0], 0), // Amedo
-                    Camera.CamMath.FromValue_11BFA0(angle[1], 0), Camera.CamMath.FromValue_11BFA0(angle[2], 0));
+                w.Rotation = GameMath.Euler_186780(GameMath.FromValue_11BFA0(angle[0], 0), // Amedo
+                    GameMath.FromValue_11BFA0(angle[1], 0), GameMath.FromValue_11BFA0(angle[2], 0));
         }
         else w.Offset = new Vector3(angle[0], angle[1], angle[2]);
 
@@ -233,7 +234,7 @@ public sealed partial class AgentLabAgent
         float v;
         switch (wave)
         {
-            case 1: v = w.Amp[axis] * Camera.CamMath.SinCos(w.Phase[axis] * WobbleRadians).Sin; break; // Amedo
+            case 1: v = w.Amp[axis] * GameMath.SinCos(w.Phase[axis] * WobbleRadians).Sin; break; // Amedo
             case 2:
             case 3: v = ((int)(freq * (w.Phase[axis] * WobbleRadians)) & 1) != 0 ? -w.Amp[axis] : w.Amp[axis]; break;
             case 4: v = World.Rng.GetRandFloat__18C130(w.Amp[axis]); break; // Amedo
@@ -255,8 +256,8 @@ public sealed partial class AgentLabAgent
     {
         const float E = 1e-4f;
         if (MathF.Abs(q.X) <= E && MathF.Abs(q.Y) <= E && MathF.Abs(q.Z) <= E && (MathF.Abs(q.W - 1f) <= E || MathF.Abs(q.W + 1f) <= E)) return node;
-        var r = Camera.CamMath.Mul_18D558(q, node);
-        float k = Camera.CamMath.QuatInvLength_11C0B8(r, 0f, 1e-10f);
+        var r = GameMath.Mul_18D558(q, node);
+        float k = GameMath.QuatInvLength_11C0B8(r, 0f, 1e-10f);
         return new Quaternion(r.X * k, r.Y * k, r.Z * k, r.W * k);
     }
 
@@ -274,14 +275,14 @@ public sealed partial class AgentLabAgent
         {
             Quaternion LocalAxes(Quaternion from) // Amedo
             {
-                if (w.Angles[0] != 0) from = Camera.CamMath.Mul_18D558(from, Camera.CamMath.RotationX_18D590(w.Angles[0]));
-                if (w.Angles[1] != 0) from = Camera.CamMath.Mul_18D558(from, Camera.CamMath.RotationY_18D620(w.Angles[1]));
-                if (w.Angles[2] != 0) from = Camera.CamMath.Mul_18D558(from, Camera.CamMath.RotationZ_18D6B0(w.Angles[2]));
+                if (w.Angles[0] != 0) from = GameMath.Mul_18D558(from, GameMath.RotationX_18D590(w.Angles[0]));
+                if (w.Angles[1] != 0) from = GameMath.Mul_18D558(from, GameMath.RotationY_18D620(w.Angles[1]));
+                if (w.Angles[2] != 0) from = GameMath.Mul_18D558(from, GameMath.RotationZ_18D6B0(w.Angles[2]));
                 return from;
             }
             if (space == 1 && _attachedTo is not null) // Amedo
             {
-                w.AttachedTurn = Camera.CamMath.QuatToMatrix_18E620(Camera.CamMath.Euler_186780(w.Angles[0], w.Angles[1], w.Angles[2]));
+                w.AttachedTurn = GameMath.QuatToMatrix_18E620(GameMath.Euler_186780(w.Angles[0], w.Angles[1], w.Angles[2]));
                 return;
             }
             w.AttachedTurn = null;

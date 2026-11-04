@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -197,7 +198,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
     // Amedo 2026-09-30
     private void StepSprings(float dt)
     {
-        int frameTicks = (int)MathF.Round(dt * CamMath.SecToTick);
+        int frameTicks = (int)MathF.Round(dt * GameMath.SecToTick);
         if (frameTicks < 0) frameTicks = 0;
         _springTicks += frameTicks;
         int steps = _springTicks / SpringStepTicks;
@@ -219,7 +220,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
                     ? now
                     : Vector3.Lerp(now, rec.FrameTip, (float)before / frameTicks);
                 Array.Copy(rec.Angles, rec.PrevAngles, 3);
-                StepSpring(rec, src, p, SpringStepTicks * CamMath.TickToSec);
+                StepSpring(rec, src, p, SpringStepTicks * GameMath.TickToSec);
             }
             rec.FrameTip = now;
             rec.HasFrameTip = true;
@@ -239,9 +240,9 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
         rec.Velocity = rec.Velocity * k1 + delta * (1f - k1);
         rec.Smoothed = rec.Smoothed * k2 + rec.Velocity * (1f - k2);
         var diff = rec.Velocity - rec.Smoothed;
-        var local = CamMath.Rotate3_18E4B8(CamMath.RigidInverse_18E808(src), new Vector4(diff, 1f));
+        var local = GameMath.Rotate3_18E4B8(GameMath.RigidInverse_18E808(src), new Vector4(diff, 1f));
         if (_c.Link is { } link) // Amedo
-            local = CamMath.Rotate3_18E4B8(CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(-(link.Scale40 * 0.25f * 3f), 0)), local);
+            local = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(-(link.Scale40 * 0.25f * 3f), 0)), local);
         float a = -Axis(local, rec.AxisA) * rec.GainA;
         float b = Axis(local, rec.AxisB) * rec.GainB;
         if (rec.LimitA < a) a = rec.LimitA;
@@ -249,9 +250,9 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
         if (rec.LimitB < b) b = rec.LimitB;
         if (b < -rec.LimitB) b = -rec.LimitB;
         int sa = Slot(rec.SlotA);
-        rec.Angles[sa] = CamMath.Scale_15DE90(k1, rec.Angles[sa]) + CamMath.Trunc((1f - k1) * a * CamMath.RadToUnit);
+        rec.Angles[sa] = GameMath.Scale_15DE90(k1, rec.Angles[sa]) + GameMath.Trunc((1f - k1) * a * GameMath.RadToUnit);
         int sb = Slot(rec.SlotB);
-        rec.Angles[sb] = CamMath.Scale_15DE90(k1, rec.Angles[sb]) + CamMath.Trunc((1f - k1) * b * CamMath.RadToUnit);
+        rec.Angles[sb] = GameMath.Scale_15DE90(k1, rec.Angles[sb]) + GameMath.Trunc((1f - k1) * b * GameMath.RadToUnit);
         rec.Angles[Slot(3 - rec.SlotB - rec.SlotA)] = 0;
     }
 
@@ -269,7 +270,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
             float max = rec.Step * dt;
             if (max < MathF.Sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z))
             {
-                float inv = CharacterController.InverseLength(d);
+                float inv = GameMath.InverseLength(d);
                 d = new Vector3(d.X * inv * max, d.Y * inv * max, d.Z * inv * max);
             }
             rec.Normal += d;
@@ -368,7 +369,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
         if (Look.Rotate_148148(reactId, ref rot, hasRotation)) return; // Amedo 2026-09-29
         if (Find(reactId) is not { Mode: Spring } rec) return;
         float alpha = DisplayAlpha; // Amedo 2026-09-30
-        var q = CamMath.Euler_186780(Shown(rec, 0, alpha), Shown(rec, 1, alpha), Shown(rec, 2, alpha));
+        var q = GameMath.Euler_186780(Shown(rec, 0, alpha), Shown(rec, 1, alpha), Shown(rec, 2, alpha));
         rot = hasRotation ? Quaternion.Multiply(q, rot) : q;
     }
 
@@ -413,16 +414,16 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
                     r = b;
                     break;
                 }
-                int angle = Acos_18B738(0f * n.X + 1f * n.Y + 0f * n.Z);
-                var q = AxisAngle_18D798(c, angle);
+                int angle = GameMath.Acos_18B738(0f * n.X + 1f * n.Y + 0f * n.Z);
+                var q = GameMath.AxisAngle_18D798(c, angle);
                 var node = _c.GameMatrix;
                 node.M41 = node.M42 = node.M43 = 0f;
                 node.M44 = 1f;
-                var qm = CamMath.QuatToMatrix_18E620(q);
+                var qm = GameMath.QuatToMatrix_18E620(q);
                 qm.M41 = qm.M42 = qm.M43 = 0f;
                 qm.M44 = 1f;
                 qm = node * qm;
-                qm *= CamMath.RigidInverse_18E808(node);
+                qm *= GameMath.RigidInverse_18E808(node);
                 r = b * qm;
                 break;
             }
@@ -443,8 +444,4 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
         model = r;
         return true;
     }
-
-    private static int Acos_18B738(float x) => CamMath.Acos_18B738(x); // Amedo 2026-10-02
-
-    private static Quaternion AxisAngle_18D798(Vector3 axis, int angle) => CamMath.AxisAngle_18D798(axis, angle); // Amedo 2026-09-29
 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -30,11 +31,11 @@ public sealed partial class GameCamera
             uint node = M.U(inst + 8);
             NodeRefresh_18AFA8(node);
             M.V(x + 0x40, TargetPoint_276C60(x, node));
-            M.V(x + 0x30, ToV(CamMath.MatrixToQuat_186900(M.M(node))));
+            M.V(x + 0x30, ToV(GameMath.MatrixToQuat_186900(M.M(node))));
         }
         else
         {
-            M.V(x + 0x30, ToV(CamMath.MatrixToQuat_186900(M.M(M.U(x + 0x78))))); // Amedo 2026-09-29
+            M.V(x + 0x30, ToV(GameMath.MatrixToQuat_186900(M.M(M.U(x + 0x78))))); // Amedo 2026-09-29
             M.V(x + 0x40, M.V(M.U(x + 0x78) + 0x30));
             M.F(x, 0f);
         }
@@ -81,7 +82,7 @@ public sealed partial class GameCamera
         fl = M.Q(x + 0x70);
         Vector4 off;
         if ((fl & 0x40000) != 0 || (fl & 0x90000) == 0x80000) off = M.V(x + 0xA0);
-        else off = CamMath.RotateByQuat_186D98(ToQ(M.V(x + 0x10)), M.V(x + 0xA0), false);
+        else off = GameMath.RotateByQuat_186D98(ToQ(M.V(x + 0x10)), M.V(x + 0xA0), false);
         M.F(x + 0xB0, M.F(x + 0xB0) + off.X);
         M.F(x + 0xB4, M.F(x + 0xB4) + off.Y);
         M.F(x + 0xB8, M.F(x + 0xB8) + off.Z);
@@ -120,7 +121,7 @@ public sealed partial class GameCamera
             float inv = 1f / (q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W);
             q *= inv;
             M.V(node + 0x50, q);
-            var m = CamMath.QuatToMatrix_18E620(ToQ(q));
+            var m = GameMath.QuatToMatrix_18E620(ToQ(q));
             var keep = M.V(node + 0x30);
             M.M(node, m);
             M.V(node + 0x30, keep);
@@ -149,7 +150,7 @@ public sealed partial class GameCamera
         var basePos = M.V(node + 0x30);
         float k = M.F(x + 0x80), maxLen = M.F(x + 0x84);
         var d = (sum * (1f / n) - new Vector3(basePos.X, basePos.Y, basePos.Z)) * k;
-        float len = d.Length();
+        float len = GameMath.Length(d);
         M.F(x, len);
         if (maxLen < len)
         {
@@ -217,7 +218,7 @@ public sealed partial class GameCamera
                     if (blend && (f & 2) == 0)
                     {
                         M.Copy16(x + 0xE0, x + 0x20);
-                        M.I(x + 0xD4, CamMath.Trunc(M.F(zd + 0x10) * M.F(TicksPerSecond)));
+                        M.I(x + 0xD4, GameMath.Trunc(M.F(zd + 0x10) * M.F(TicksPerSecond)));
                         M.Copy16(x + 0x130, x + 0x150);
                         M.Copy16(x + 0x140, x + 0x160);
                         f = (f & 0xFFFFFFFFFFFDFFFFUL) | (((M.Q(zd) >> 25) & 1) << 17);
@@ -271,7 +272,7 @@ public sealed partial class GameCamera
         {
             ulong g = M.Q(x + 0x70) & 0xFFFFFFFFFFFDFFFFUL;
             M.Copy16(x + 0xE0, x + 0x20);
-            M.I(x + 0xD4, CamMath.Trunc(M.F(zd + 0x10) * M.F(TicksPerSecond)));
+            M.I(x + 0xD4, GameMath.Trunc(M.F(zd + 0x10) * M.F(TicksPerSecond)));
             M.Copy16(x + 0x130, x + 0x150);
             M.Copy16(x + 0x140, x + 0x160);
             g |= ((M.Q(zd) >> 25) & 1) << 17;

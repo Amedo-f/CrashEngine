@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -90,7 +91,7 @@ public sealed class WallCling : Vehicle
         _place.Translation = p;
         if (0.001f < MathF.Sqrt(push.X * push.X + push.Y * push.Y + push.Z * push.Z))
         {
-            var n = push * RigidBody.InverseLength(push);
+            var n = push * GameMath.InverseLength(push);
             if (0.707f < n.Y) return true;
         }
         var z = new Vector3(_place.M31, _place.M32, _place.M33);
@@ -105,11 +106,11 @@ public sealed class WallCling : Vehicle
         var z = new Vector3(_place.M31, _place.M32, _place.M33);
         var n = WallNormal;
         var axis = new Vector3(z.Y * n.Z - z.Z * n.Y, z.Z * n.X - z.X * n.Z, z.X * n.Y - z.Y * n.X);
-        z *= RigidBody.InverseLength(z);
+        z *= GameMath.InverseLength(z);
         if (!(5e-5f < axis.X * axis.X + axis.Y * axis.Y + axis.Z * axis.Z)) return;
-        axis *= RigidBody.InverseLength(axis);
+        axis *= GameMath.InverseLength(axis);
         float dot = z.X * n.X + z.Y * n.Y + z.Z * n.Z;
-        var r = CrashEngine.Runtime.Character.Vehicles.Humiliskate.AxisAngle_18CEA8(axis, CamMath.Acos_18B738(dot));
+        var r = CrashEngine.Runtime.Character.Vehicles.Humiliskate.AxisAngle_18CEA8(axis, GameMath.Acos_18B738(dot));
         var p = _place.Translation;
         _place *= r;
         _place.Translation = p;

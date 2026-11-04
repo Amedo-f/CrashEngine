@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -104,7 +105,7 @@ public sealed partial class AgentLabAgent
         if (matrix is { } m) child.GameMatrix = m * holder; // Amedo
         if (push != 0f) PushFromHolder_192768(child, push);
         if (!relative) return;
-        node.Relative = child.LocalMatrix * CamMath.RigidInverse_18E808(holder); // Amedo
+        node.Relative = child.LocalMatrix * GameMath.RigidInverse_18E808(holder); // Amedo
         node.Flags |= RelativeFlag; // Amedo
     }
 
@@ -117,7 +118,7 @@ public sealed partial class AgentLabAgent
         if (matrix is { } m) child.GameMatrix = m * ExitAnchor_293B70(exit); // Amedo
         if (!relative) return;
         var anchor = ExitAnchor_293B70(exit);
-        node.Relative = child.LocalMatrix * CamMath.RigidInverse_18E808(anchor); // Amedo
+        node.Relative = child.LocalMatrix * GameMath.RigidInverse_18E808(anchor); // Amedo
         node.Flags |= RelativeFlag; // Amedo
     }
 
@@ -155,7 +156,7 @@ public sealed partial class AgentLabAgent
         if (node.Kind == KindInstance) m = node.Child?.LocalMatrix ?? Matrix4x4.Identity;
         else if (node.Kind == KindPosition) m = Matrix4x4.CreateTranslation(node.Target?.Position ?? Vector3.Zero);
         else m = Matrix4x4.Identity;
-        node.Relative = m * CamMath.RigidInverse_18E808(LocalMatrix); // Amedo
+        node.Relative = m * GameMath.RigidInverse_18E808(LocalMatrix); // Amedo
     }
 
     // Amedo
@@ -712,15 +713,15 @@ public sealed partial class AgentLabAgent
         var axis = (flags & 8) != 0 ? new Vector3(pm.M11, pm.M12, pm.M13)
                  : (flags & 0x10) != 0 ? new Vector3(pm.M21, pm.M22, pm.M23)
                  : (flags & 0x20) != 0 ? new Vector3(pm.M31, pm.M32, pm.M33) : Vector3.Zero;
-        float along = Vector3.Dot(Unit(axis), parent._velocity);
-        int angle = Camera.CamMath.FromValue_11BFA0(along * BitConverter.UInt32BitsToSingle(arg0) * StepDt, 1);
+        float along = GameMath.Dot(Unit(axis), parent._velocity);
+        int angle = GameMath.FromValue_11BFA0(along * BitConverter.UInt32BitsToSingle(arg0) * StepDt, 1);
         if (angle == 0) return;
         Quaternion turn;
-        if ((flags & 1) != 0) turn = Camera.CamMath.RotationX_18D590(angle); // Amedo
-        else if ((flags & 2) != 0) turn = Camera.CamMath.RotationY_18D620(angle);
-        else if ((flags & 4) != 0) turn = Camera.CamMath.RotationZ_18D6B0(angle);
+        if ((flags & 1) != 0) turn = GameMath.RotationX_18D590(angle); // Amedo
+        else if ((flags & 2) != 0) turn = GameMath.RotationY_18D620(angle);
+        else if ((flags & 4) != 0) turn = GameMath.RotationZ_18D6B0(angle);
         else return;
-        SetLocalRotation(Camera.CamMath.Mul_18D558(LocalRotation, turn));
+        SetLocalRotation(GameMath.Mul_18D558(LocalRotation, turn));
     }
 
     // Amedo
@@ -779,7 +780,7 @@ public sealed partial class AgentLabAgent
         child.AgentFlags &= ~0x40u;
         float g = FloatValueOf(Arg(5));
         var target = SourcePosition((int)((w >> 12) & 0xFF), (int)((w >> 20) & 0xFF), (int)((w >> 8) & 0xF), (w & 0x20000000) != 0 ? new Vector3(F(1), F(2), F(3)) : null);
-        if ((w & 0x40000000) != 0) target = Jitter_23C848(target, F(7), 1f, 1f, 1f); // Amedo
+        if ((w & 0x40000000) != 0) target = World.Rng.JitterVector_23C848(target, F(7), 1f, 1f, 1f); // Amedo
         var p = child.GamePosition;
         float dx = target.X - p.X, dz = target.Z - p.Z, dy = target.Y - p.Y;
         float hd = MathF.Sqrt(dx * dx + dz * dz);
@@ -871,7 +872,7 @@ public sealed partial class AgentLabAgent
         _destroyed = true;
         Entity.Active = false;
         ClearTrails();
-        if (World.Spawned.Contains(this)) World.UnlinkEverywhere(this); // Amedo
+        if (World.Spawned.Contains(this)) _spawnedBy?.DropLinksTo(this);
         ReleaseAttachments();
         if (!_hasLinkList) return; // Amedo
         UnlinkAll_1966F8();

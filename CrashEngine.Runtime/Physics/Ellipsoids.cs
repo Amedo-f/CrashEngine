@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -223,10 +224,15 @@ public static class Ellipsoids
         S(e, 0x128, F(e, 0x128) + shift);
     }
 
-    private static Vector3 Transform_18E4F0(float[] e, int m, Vector3 v) => new(
-        F(e, m) * v.X + F(e, m + 0x10) * v.Y + F(e, m + 0x20) * v.Z + F(e, m + 0x30),
-        F(e, m + 4) * v.X + F(e, m + 0x14) * v.Y + F(e, m + 0x24) * v.Z + F(e, m + 0x34),
-        F(e, m + 8) * v.X + F(e, m + 0x18) * v.Y + F(e, m + 0x28) * v.Z + F(e, m + 0x38));
+    private static Vector3 TransformAt(float[] e, int m, Vector3 v)
+    {
+        var mat = new Matrix4x4(F(e, m), F(e, m + 4), F(e, m + 8), F(e, m + 0xC),
+                                F(e, m + 0x10), F(e, m + 0x14), F(e, m + 0x18), F(e, m + 0x1C),
+                                F(e, m + 0x20), F(e, m + 0x24), F(e, m + 0x28), F(e, m + 0x2C),
+                                F(e, m + 0x30), F(e, m + 0x34), F(e, m + 0x38), F(e, m + 0x3C));
+        var r = GameMath.Transform_18E4F0(mat, new Vector4(v, 1f));
+        return new Vector3(r.X, r.Y, r.Z);
+    }
 
     private static float Value_2904E0(float[] e, float t)
     {
@@ -243,9 +249,9 @@ public static class Ellipsoids
         det += c2;
         det *= t;
         det += u3;
-        var s = Transform_18E4F0(e, 0x150, dir) * t2;
+        var s = TransformAt(e, 0x150, dir) * t2;
         a += s;
-        s = Transform_18E4F0(e, 0x100, dir);
+        s = TransformAt(e, 0x100, dir);
         float k = u / det;
         s *= ut;
         a -= s;
@@ -257,6 +263,12 @@ public static class Ellipsoids
     }
 
     private static float NegValue_291C88(float[] e, float t) => -Value_2904E0(e, t);
+
+    private struct NegValue : GameMath.IScalarFunction
+    {
+        public float[] E;
+        public readonly float At(float t) => NegValue_291C88(E, t);
+    }
 
     private static bool Apart_290B50(float[] e, ref Vector3 outA, ref Vector3 outB, Matrix4x4 wa, Matrix4x4 wb, bool degenerate)
     {
@@ -281,7 +293,8 @@ public static class Ellipsoids
         }
         float fx = -best;
         float x = bestT;
-        FindMinimum_18EC40(16, 5e-05f, 5e-05f, 0f, 1f, e, ref x, ref fx, false);
+        var target = new NegValue { E = e };
+        GameMath.FindMinimum_18EC40(ref target, 16, 5e-05f, 5e-05f, 0f, 1f, ref x, ref fx, false);
         best = -fx;
         float level = best * F(e, 0x80);
         if (!(level <= 1f)) return true;
@@ -319,76 +332,5 @@ public static class Ellipsoids
         float kb = 1f / MathF.Sqrt(best);
         outB *= kb;
         return false;
-    }
-
-    private static int FindMinimum_18EC40(int iterations, float tolAbs, float tolRel, float a, float b, float[] ctx, ref float x, ref float fx, bool haveFx)
-    {
-        float v = x, w = x;
-        if (!haveFx) fx = NegValue_291C88(ctx, x);
-        float fv = fx, fw = fx;
-        float d = 0f, eStep = 0f;
-        if (iterations <= 0) return -1;
-        for (int iter = 1; ; )
-        {
-            float xm = (a + b) * 0.5f;
-            float tol1 = tolRel * MathF.Abs(x);
-            if (tol1 < tolAbs) tol1 = tolAbs;
-            float half = tol1 * 0.5f;
-            if (MathF.Abs(x - xm) < tol1 - (b - a) * 0.5f) return 0;
-            float p = 0f, q = 0f, etemp = 0f;
-            if (half < MathF.Abs(eStep))
-            {
-                float r = (x - w) * (fx - fv);
-                float qq = (x - v) * (fx - fw);
-                float pw = (x - w) * r;
-                float diff = qq - r;
-                float pv = (x - v) * qq;
-                q = diff + diff;
-                p = pv - pw;
-                if (0f < q) p = -p;
-                q = MathF.Abs(q);
-                etemp = eStep;
-                eStep = d;
-            }
-            bool parabolic = false;
-            if (MathF.Abs(p) < MathF.Abs(q * etemp * 0.5f) && q * (a - x) < p && p < q * (b - x))
-            {
-                d = p / q;
-                float u0 = x + d;
-                parabolic = true;
-                if (u0 - a < tol1 || b - u0 < tol1) d = xm <= x ? -half : half;
-            }
-            if (!parabolic)
-            {
-                eStep = x < xm ? b - x : a - x;
-                d = eStep * 0.381966f;
-            }
-            float u = half <= MathF.Abs(d) ? x + d : d < 0f ? x - half : x + half;
-            float fu = NegValue_291C88(ctx, u);
-            if (fu <= fx)
-            {
-                if (u < x) b = x;
-                else a = x;
-                v = w; fv = fw;
-                w = x; fw = fx;
-                x = u; fx = fu;
-            }
-            else
-            {
-                if (u < x) a = u;
-                else b = u;
-                if (fu <= fw || w == x)
-                {
-                    v = w; fv = fw;
-                    w = u; fw = fu;
-                }
-                else if (fu <= fv || v == x || v == w)
-                {
-                    v = u;
-                    fv = fw;
-                }
-            }
-            if (iterations < ++iter) return -1;
-        }
     }
 }

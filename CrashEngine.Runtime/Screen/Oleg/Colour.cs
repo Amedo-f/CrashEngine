@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -17,7 +18,7 @@ public static class Colour
         18 => 0x80787878u, 19 => 0x80606060u, 20 => 0x80484848u, 21 => 0x80303030u, 22 => 0x80181818u, _ => 0u,
     };
 
-    private static uint Byte(float f, float full) => (uint)CrashEngine.Runtime.Character.CharacterController.Cvt(f * full) & 0xFF;
+    private static uint Byte(float f, float full) => (uint)GameMath.Trunc(f * full) & 0xFF;
 
     // Amedo
     public static uint SetRed_101748(uint c, float f) => (c & 0xFFFFFF00u) | Byte(f, RgbFull);

@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -176,12 +177,12 @@ public sealed class Hoverboard : Vehicle
         if (AutoForward)
         {
             var n = new Vector3(body.World.M31, 0f, body.World.M33);
-            n *= RigidBody.InverseLength(n);
+            n *= GameMath.InverseLength(n);
             float d = n.X * s.X + n.Y * s.Y + n.Z * s.Z;
             var g = n * (1f - Knock);
             g *= 1f - d;
             s += g;
-            s *= RigidBody.InverseLength(s);
+            s *= GameMath.InverseLength(s);
         }
         float push = 32f;
         if (Armed) push = (1f - (HoverHeight - 3.5f) * 0.048780486f * 0.5f) * 32f;
@@ -239,11 +240,11 @@ public sealed class Hoverboard : Vehicle
         if (3f < h) h = 3f;
         if (h < -3f) h = -3f;
         up += new Vector3(w.M31, w.M32, w.M33) * (h * -0.07f);
-        up *= RigidBody.InverseLength(up);
+        up *= GameMath.InverseLength(up);
         var r = new Vector3(w.M21, w.M22, w.M23);
         var axis = new Vector3(r.Y * up.Z - r.Z * up.Y, r.Z * up.X - r.X * up.Z, r.X * up.Y - r.Y * up.X);
         float d = r.X * up.X + r.Y * up.Y + r.Z * up.Z;
-        if (d < 0f) axis = axis * RigidBody.InverseLength(axis) * (1f - d);
+        if (d < 0f) axis = axis * GameMath.InverseLength(axis) * (1f - d);
         float gain = Armed ? -45f : -40f;
         body.Torque += axis * gain * (1f - Knock) * 5f;
     }
@@ -253,8 +254,8 @@ public sealed class Hoverboard : Vehicle
         if (!(0.001f < MathF.Sqrt(s.X * s.X + s.Y * s.Y + s.Z * s.Z))) return;
         var body = Body!;
         var f = new Vector3(w.M31, w.M32, w.M33);
-        f *= RigidBody.InverseLength(f);
-        var t = s * RigidBody.InverseLength(s);
+        f *= GameMath.InverseLength(f);
+        var t = s * GameMath.InverseLength(s);
         var axis = new Vector3(t.Y * f.Z - t.Z * f.Y, t.Z * f.X - t.X * f.Z, t.X * f.Y - t.Y * f.X);
         float gain = Armed ? 20f : 14f;
         body.Torque += axis * gain * (1f - Knock) * 5f;
@@ -347,8 +348,8 @@ public sealed class Hoverboard : Vehicle
         if (Owner.PositionOf?.Invoke(source) is not { } q) return;
         var d = p - q;
         float k = strength * 4f / (d.X * d.X + d.Y * d.Y + d.Z * d.Z + 4f);
-        var j = d * RigidBody.InverseLength(d) * k;
-        body.ApplyImpulse_289CC0(j, Vector3.Transform(q, CamMath.RigidInverse_18E808(m)));
+        var j = d * GameMath.InverseLength(d) * k;
+        body.ApplyImpulse_289CC0(j, Vector3.Transform(q, GameMath.RigidInverse_18E808(m)));
     }
 
     public override void Destroy()

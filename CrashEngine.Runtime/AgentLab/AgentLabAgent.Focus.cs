@@ -3,6 +3,7 @@ using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -96,7 +97,7 @@ public sealed partial class AgentLabAgent
         var p = player.GamePosition;
         var pm = player.GameMatrix;
         var n = new Vector3(me.X - p.X, 0f, me.Z - p.Z);
-        n *= InverseLength(n);
+        n *= GameMath.InverseLength(n);
         float side = pm.M11 * n.X + pm.M12 * n.Y + pm.M13 * n.Z;
         var c = new Vector3(n.Z, 0f, -n.X) * (side < 0f ? -distance : distance);
         FocusAt(c + me);
@@ -106,6 +107,20 @@ public sealed partial class AgentLabAgent
     {
         _storedPosition    = position;
         _hasStoredPosition = true;
+    }
+
+    internal void ForgetReleased()
+    {
+        if (_messageSource is { Released: true }) _messageSource = null;
+        if (_slot118 is { Released: true }) _slot118 = null;
+        if (_slot11C is { Released: true }) _slot11C = null;
+        if (_controller is { Released: true }) _controller = null;
+        if (Requester is { Released: true }) Requester = null;
+        if (_focusObject is { Released: true })
+        {
+            _focusObject = null;
+            _hasFocusObject = _hasFocusPosition = false;
+        }
     }
 
     private static AgentLabAgent? Alive(ref AgentLabAgent? slot)
@@ -270,7 +285,7 @@ public sealed partial class AgentLabAgent
                     if (Alive(ref _slotAC) is { } facing)
                     {
                         var d = facing.GamePosition - GamePosition;
-                        pos += Vector3.TransformNormal(o, Along_185A40(d * InverseLength(d)));
+                        pos += Vector3.TransformNormal(o, Along_185A40(d * GameMath.InverseLength(d)));
                     }
                     break;
                 case 5: if (_physics?.RideObject_80 is { } rideOn) pos += Vector3.TransformNormal(o, SupportMatrix(rideOn)); break; // Amedo
@@ -355,7 +370,7 @@ public sealed partial class AgentLabAgent
                 if (target is not null && target.JointPosition_22DA00((int)(Arg(16) & 0xFF), out var joint)) pos = joint;
             }
 
-            if ((flags & 0x400000) != 0) pos = Jitter_23C848(pos, F(7), F(8), 1f, 1f); // Amedo
+            if ((flags & 0x400000) != 0) pos = World.Rng.JitterVector_23C848(pos, F(7), F(8), 1f, 1f); // Amedo
         }
 
         if ((flags & 0x1C000000) != 0)
@@ -396,10 +411,10 @@ public sealed partial class AgentLabAgent
         switch (a[0] & 7)
         {
             case 0:
-                if (FocusPosition is { } fp) FocusAt(Jitter_23C848(fp, radius, F(3), F(2), F(4))); // Amedo
+                if (FocusPosition is { } fp) FocusAt(World.Rng.JitterVector_23C848(fp, radius, F(3), F(2), F(4))); // Amedo
                 break;
             case 3:
-                if (_hasStoredPosition) Store(Jitter_23C848(_storedPosition, radius, F(3), F(2), F(4))); // Amedo
+                if (_hasStoredPosition) Store(World.Rng.JitterVector_23C848(_storedPosition, radius, F(3), F(2), F(4))); // Amedo
                 break;
         }
     }
@@ -411,7 +426,7 @@ public sealed partial class AgentLabAgent
     {
         var pos = GamePosition;
         var d = new Vector4(focus.X - pos.X, 0f, focus.Z - pos.Z, 1f);
-        return new Vector3(d.X, d.Y, d.Z) * Camera.CamMath.InvLengthGuarded_11C030(FocusEps, d);
+        return new Vector3(d.X, d.Y, d.Z) * GameMath.InvLength_11C030(FocusEps, d);
     }
 
     private void SetFocusPositionOffset_2150C0(List<uint> a)
@@ -446,8 +461,8 @@ public sealed partial class AgentLabAgent
     {
         var p = _hasFocusPosition ? _focusPosition : Vector3.Zero;
         var n = FlatDirectionToFocus(p);
-        int angle = Camera.CamMath.FromValue_11BFA0(BitConverter.UInt32BitsToSingle(angleWord), 1);
-        var r = Camera.CamMath.RotateAxis_18DE00(new Vector4(n, 1f), new Vector4(0f, 1f, 0f, 1f), angle, true);
+        int angle = GameMath.FromValue_11BFA0(BitConverter.UInt32BitsToSingle(angleWord), 1);
+        var r = GameMath.RotateAxis_18DE00(new Vector4(n, 1f), new Vector4(0f, 1f, 0f, 1f), angle, true);
         Store(p + new Vector3(r.X, r.Y, r.Z) * BitConverter.UInt32BitsToSingle(distWord));
     }
 
@@ -552,7 +567,7 @@ public sealed partial class AgentLabAgent
         }
         var p = axis * (d.X * axis.X + d.Y * axis.Y + d.Z * axis.Z);
         if (!(0.1f < MathF.Sqrt(p.X * p.X + p.Y * p.Y + p.Z * p.Z))) return;
-        var pos = me + p * InverseLength(p) * F(1) * dt;
+        var pos = me + p * GameMath.InverseLength(p) * F(1) * dt;
         float limit = F(2);
         if (!(limit <= 0f))
         {
@@ -620,11 +635,11 @@ public sealed partial class AgentLabAgent
         for (int i = 0; i < _keys.Count; i++)
         {
             if (i < first || i > last || (!includeCurrent && i == _keyCurrent)) continue;
-            float dSq = Vector3.DistanceSquared(_keys[i], target);
+            float dSq = GameMath.DistanceSq(_keys[i], target);
             if (range != 0f)
             {
                 if (dSq >= range) continue;
-                dSq = Vector3.DistanceSquared(_keys[i], GamePosition);
+                dSq = GameMath.DistanceSq(_keys[i], GamePosition);
             }
             if (dSq >= bestSq) continue;
             bestSq = dSq;
@@ -738,9 +753,8 @@ public sealed partial class AgentLabAgent
         };
 
         int count = (int)((Arg(8) >> 16) & 7);
+        int heldCount = (int)((opt >> 3) & 3); // Amedo
         bool nearest = (Arg(8) & 0x80000) != 0; // Amedo 2026-10-05
-        if ((opt & 0x18) != 0 && count != 0)
-            World.Unimplemented("command", 557, $"RequestFocus selection 0x{Arg(8):X8}/0x{Arg(9):X8} (attached owner; nearest used)");
 
         // Amedo 2026-09-30
         uint require = (opt & 4) != 0 ? 0u : 8u, exclude = 1u;
@@ -762,12 +776,22 @@ public sealed partial class AgentLabAgent
         AgentLabAgent? best = null;
         float bestSq = 1e30f;
         bool picked = false;
-        var matches = (Arg(8) & 0x400000) != 0 ? new List<AgentLabAgent>() : null; // Amedo 2026-10-05
+        var matches = (Arg(8) & 0x400000) != 0 && heldCount == 0 ? new List<AgentLabAgent>() : null; // Amedo 2026-10-05
         foreach (var o in World.QuerySphere(center, radius, components, exclude, this, true, require, true, 0x80)) // Amedo
         {
+            if (heldCount != 0 && count != 0) // Amedo
+            {
+                if (o is AgentLabAgent held && MatchesObject(a, held.Instance.ObjectId, heldCount, 7)
+                    && held.AttachedTo is { } holder && MatchesObject(a, holder.Instance.ObjectId, count))
+                {
+                    best = holder;
+                    break;
+                }
+                continue;
+            }
             if (picked) break;
             if (o is not AgentLabAgent other) continue;
-            float dSq = Vector3.DistanceSquared(center, other.GamePosition);
+            float dSq = GameMath.DistanceSq(center, other.GamePosition);
             if (!nearest) // Amedo 2026-10-05
             {
                 if (count > 0 && !MatchesObject(a, other.Instance.ObjectId, count)) continue;
@@ -805,11 +829,11 @@ public sealed partial class AgentLabAgent
         if ((Arg(8) & 0x20000000) != 0) best._busy = true; // Amedo 2026-09-30
     }
 
-    private static bool MatchesObject(List<uint> a, ushort objectId, int count)
+    private static bool MatchesObject(List<uint> a, ushort objectId, int count, int first = 5) // Amedo
     {
         for (int i = 0; i < count; i++)
         {
-            int word = 5 + i / 2;
+            int word = first + i / 2;
             if (word >= a.Count) return false;
             if ((ushort)(a[word] >> (16 * (i & 1))) == objectId) return true;
         }
@@ -921,7 +945,7 @@ public sealed partial class AgentLabAgent
         }
         else if (FocusPosition is { } p) focus = p;
         else return 0f;
-        return Vector3.DistanceSquared(GamePosition, focus);
+        return GameMath.DistanceSq(GamePosition, focus);
     }
 
     // Amedo

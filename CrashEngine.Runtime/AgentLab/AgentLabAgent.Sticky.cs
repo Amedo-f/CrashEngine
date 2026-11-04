@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -80,7 +81,7 @@ public sealed partial class AgentLabAgent
         var hc = (hmax - hmin) * 0.5f + hmin;
         var cc = (cmax - cmin) * 0.5f + cmin;
         var d = new Vector4(cc.X - hc.X, cc.Y - hc.Y, cc.Z - hc.Z, 1f);
-        float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, d);
+        float k = GameMath.InvLength_11C030(2.4999998e-09f, d);
         var move = new Vector3(d.X * k * f, d.Y * k * f, d.Z * k * f);
         if (MathF.Abs(move.X) <= 5e-05f && MathF.Abs(move.Y) <= 5e-05f && MathF.Abs(move.Z) <= 5e-05f) return;
         var p = child.GamePosition;

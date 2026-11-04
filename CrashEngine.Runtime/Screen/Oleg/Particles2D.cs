@@ -227,7 +227,7 @@ public class Emitter2D : IPlacedEmitter
         var k = turns.Keys_04;
         if (!(t < 1f)) return k[^1];
         float f = (k.Length - 1) * t;
-        int i = CharacterController.Cvt(f);
+        int i = GameMath.Trunc(f);
         return k[i] + (k[i + 1] - k[i]) * (f - i);
     }
 
@@ -246,7 +246,7 @@ public class Emitter2D : IPlacedEmitter
             var m = Matrix3x2.Identity;
             m.M11 = Size_14.X * aspect * scale.X;
             m.M22 = Size_14.Y * scale.Y;
-            if (Turns_44 is { } turns) m *= WidgetEffect.Rotation_18BC98(WidgetEffect.AngleFrom_11BFA0(TurnAt(turns, t)));
+            if (Turns_44 is { } turns) m *= WidgetEffect.Rotation_18BC98(GameMath.FromValue_11BFA0(TurnAt(turns, t), 0));
             m.M31 = p.Position_00.X;
             m.M32 = p.Position_00.Y;
             m *= placed;
@@ -289,8 +289,8 @@ public sealed class RadialEmitter2D : Emitter2D
         p.Position_00.X = cos * r + Centre_24.X;
         p.Position_00.Y = sin * r + Centre_24.Y;
         p.Age_08 = 0f;
-        p.VelocityX_0C = (short)CharacterController.Cvt(cos * Speed);
-        p.VelocityY_0E = (short)CharacterController.Cvt(sin * Speed);
+        p.VelocityX_0C = (short)GameMath.Trunc(cos * Speed);
+        p.VelocityY_0E = (short)GameMath.Trunc(sin * Speed);
     }
 
     // Amedo
@@ -331,7 +331,7 @@ public sealed class RadialEmitter2D : Emitter2D
             var m = Matrix3x2.Identity;
             m.M11 = Size_14.X * scale.X;
             m.M22 = Size_14.Y * aspect * scale.Y;
-            m *= WidgetEffect.Rotation_18BC98(WidgetEffect.AngleFrom_11BFA0(TurnAt(Turns_44!, t)));
+            m *= WidgetEffect.Rotation_18BC98(GameMath.FromValue_11BFA0(TurnAt(Turns_44!, t), 0));
             m.M31 = p.Position_00.X;
             m.M32 = p.Position_00.Y;
             m *= placed;

@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -39,7 +40,7 @@ public sealed class SkidMark
         Active = false;
     }
 
-    public void Lay_15BDB0(Vector4 point, Vector4 side, IReadOnlyList<CollisionWorld.Triangle> tris, CollisionWorld world,
+    public void Lay_15BDB0(in Vector4 point, in Vector4 side, IReadOnlyList<CollisionWorld.Triangle> tris, CollisionWorld world,
                            float offset, float width, Func<float, float> signed)
     {
         if (Length < 2.5f)
@@ -86,7 +87,7 @@ public sealed class SkidMark
         Bottom.Y -= width;
     }
 
-    private void Segment(Vector4 d0, Vector4 d1, Vector4 side, float width)
+    private void Segment(in Vector4 d0, in Vector4 d1, in Vector4 side, float width)
     {
         var s = new Vector3(side.X * width, side.Y * width, side.Z * width);
         var a = new Vector3(d0.X, d0.Y, d0.Z);
@@ -95,10 +96,10 @@ public sealed class SkidMark
         var d = new Vector3(d1.X, d1.Y + -width, d1.Z) - s;
         var n = HullQueries.PlaneFrom3_18D0A0(a, c, d);
         var light = new Vector4(1.2f, 0.8f, 0.5f, 1f);
-        float inv = CamMath.InvLengthGuarded_11C030(Eps, light);
+        float inv = GameMath.InvLength_11C030(Eps, light);
         light = new Vector4(light.X * inv, light.Y * inv, light.Z * inv, 1f);
         if (n.Y < 0f) n = new Vector4(-n.X, -n.Y, -n.Z, n.W);
-        int v = CamMath.Trunc((n.X * light.X + n.Y * light.Y + n.Z * light.Z) * 48f - 24f);
+        int v = GameMath.Trunc((n.X * light.X + n.Y * light.Y + n.Z * light.Z) * 48f - 24f);
         uint color = ((uint)(v < 0 ? -v : v) << 24) + Faded;
         Ring.Quads[Index] = new SkidQuad
         {
@@ -121,7 +122,7 @@ public sealed class SkidMark
         q1 = p;
         Span<Vector4> planes = stackalloc Vector4[3];
         for (int i = 0; i < 3; i++)
-            if (!EdgePlane_186050(out planes[i], Vertex(tri, (i + 1) % 3), Vertex(tri, i), Up)) return false;
+            if (!GameMath.PlaneThroughEdge_186050(out planes[i], new Vector4(Vertex(tri, (i + 1) % 3), 1f), new Vector4(Vertex(tri, i), 1f), Up)) return false;
         for (int k = 0; k < 3; k++)
         {
             var pl = planes[k];
@@ -138,23 +139,6 @@ public sealed class SkidMark
             if (0f <= d0) q0 = x;
             else q1 = x;
         }
-        return true;
-    }
-
-    private static bool EdgePlane_186050(out Vector4 plane, Vector3 a, Vector3 b, Vector4 up)
-    {
-        plane = default;
-        float ex = b.X - a.X, ey = b.Y - a.Y, ez = b.Z - a.Z;
-        float nx = ey * up.Z - ez * up.Y;
-        float ny = ez * up.X - ex * up.Z;
-        float nz = ex * up.Y - ey * up.X;
-        float l = nx * nx + ny * ny + nz * nz;
-        float inv = Eps < l ? 1f / MathF.Sqrt(l) : 0f;
-        if (inv == 0f) return false;
-        nx *= inv;
-        ny *= inv;
-        nz *= inv;
-        plane = new Vector4(nx, ny, nz, -(nx * a.X + ny * a.Y + nz * a.Z));
         return true;
     }
 

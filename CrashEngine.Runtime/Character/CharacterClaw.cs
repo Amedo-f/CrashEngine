@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.AgentLab;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -53,7 +54,7 @@ public sealed class CharacterClaw
         Lock.Reset_15D178();
     }
 
-    private int Seconds(float s) => CharacterController.Cvt(TicksPerSecond * s);
+    private int Seconds(float s) => GameMath.Trunc(TicksPerSecond * s);
 
     private void SetMode(int mode) => Word = (Word & ~0x700UL) | ((ulong)(mode & 7) << 8);
 
@@ -234,7 +235,7 @@ public sealed class CharacterClaw
             else span = 1f;
             float inv = 1f / span;
             self?.SetMotionVelocity_145270(new Vector3((to.X - From.X) * inv, (to.Y - From.Y) * inv, (to.Z - From.Z) * inv));
-            Duration = CharacterController.Cvt(span * TicksPerSecond);
+            Duration = GameMath.Trunc(span * TicksPerSecond);
         }
         else End = Lerp(From, Target, t);
         PlaceGraple_144B20(End, Hand);
@@ -291,9 +292,9 @@ public sealed class CharacterClaw
     {
         if (Self is not { } self) return;
         var q = self.NodeQuat;
-        CamMath.AnglesOfRotation_18D740(q, out int pitch, out _, out int roll);
-        int yaw = CamMath.Trunc((toYaw * CamMath.UnitToRad * t + fromYaw * CamMath.UnitToRad * (1f - t)) * CamMath.RadToUnit);
-        var r = CamMath.Euler_186780(pitch, yaw, roll);
+        GameMath.AnglesOfRotation_18D740(q, out int pitch, out _, out int roll);
+        int yaw = GameMath.Trunc((toYaw * GameMath.UnitToRad * t + fromYaw * GameMath.UnitToRad * (1f - t)) * GameMath.RadToUnit);
+        var r = GameMath.Euler_186780(pitch, yaw, roll);
         if (r != q) self.SetNodeQuat(r);
     }
 
@@ -326,7 +327,7 @@ public sealed class CharacterClaw
         var landing = AimPoints_144680().Landing ?? Vector4.Zero;
         float dx = landing.X - Target.X, dy = landing.Y - Target.Y, dz = landing.Z - Target.Z;
         Span<float> roots = stackalloc float[2];
-        int n = CamMath.SolveQuadratic_18C2E8(g * -0.5f, 10f, -dy, roots);
+        int n = GameMath.SolveQuadratic_18C2E8(g * -0.5f, 10f, -dy, roots);
         float time = n == 1 ? roots[0] : n == 2 ? MathF.Max(roots[1], roots[0]) : 0.01f;
         float speed = MathF.Sqrt(dx * dx + dz * dz) / time * 1.1f;
         _c.Launch(new Vector3(0f, 10f, speed), true, g, 0x3D);
@@ -352,14 +353,14 @@ public sealed class CharacterClaw
         Hand = aim.Hand;
         Target = aim.Target;
         var q = self.NodeQuat;
-        CamMath.AnglesOfRotation_18D740(q, out int pitch, out int yaw, out int roll);
+        GameMath.AnglesOfRotation_18D740(q, out int pitch, out int yaw, out int roll);
         var pos = self.GamePosition;
-        int to = CamMath.Yaw_18C830(new Vector4(old.X - pos.X, old.Y - pos.Y, old.Z - pos.Z, old.W));
+        int to = GameMath.Yaw_18C830(new Vector4(old.X - pos.X, old.Y - pos.Y, old.Z - pos.Z, old.W));
         int d = to - yaw;
         if (0x8000 < d) to += -0x10000;
         else if (d < -0x8000) to += 0x10000;
-        int turned = CamMath.Trunc((to * CamMath.UnitToRad * t + yaw * CamMath.UnitToRad * (1f - t)) * CamMath.RadToUnit);
-        var r = CamMath.Euler_186780(pitch, turned, roll);
+        int turned = GameMath.Trunc((to * GameMath.UnitToRad * t + yaw * GameMath.UnitToRad * (1f - t)) * GameMath.RadToUnit);
+        var r = GameMath.Euler_186780(pitch, turned, roll);
         if (r != q) self.SetNodeQuat(r);
     }
 
@@ -399,7 +400,7 @@ public sealed class CharacterClaw
         PlaceGraple_144B20(End, Hand);
     }
 
-    private static Vector4 Lerp(Vector4 a, Vector4 b, float t) =>
+    private static Vector4 Lerp(in Vector4 a, in Vector4 b, float t) =>
         new((b.X - a.X) * t + a.X, (b.Y - a.Y) * t + a.Y, (b.Z - a.Z) * t + a.Z, 1f);
 
     private readonly record struct Aim(Vector4 Hand, int Yaw, Vector4 Target, int? YawTo, Vector4? Landing);
@@ -418,13 +419,13 @@ public sealed class CharacterClaw
             float k = 5f / MathF.Sqrt(h.M31 * h.M31 + h.M32 * h.M32 + h.M33 * h.M33);
             target = new Vector4(h.M31 * k + h.M41, h.M32 * k + h.M42, h.M33 * k + h.M43, h.M34);
         }
-        int yaw = CamMath.Yaw_18C830(new Vector4(node.M31, node.M32, node.M33, node.M34));
+        int yaw = GameMath.Yaw_18C830(new Vector4(node.M31, node.M32, node.M33, node.M34));
         Vector4 landing;
         if (tgt is null) landing = new Vector4(0f, 0f, 0f, 1f);
         else if (tgt.IsGrabbable && tgt.GrabbableLandingPoint_1724E8(node) is { } lp) landing = lp;
         else
         {
-            var off = CamMath.Rotate3_18E4B8(node, new Vector4(0f, -4.8f, 14.4f, 1f));
+            var off = GameMath.Rotate3_18E4B8(node, new Vector4(0f, -4.8f, 14.4f, 1f));
             var tp = tgt.GamePosition;
             landing = new Vector4(tp.X + off.X, tp.Y + off.Y, tp.Z + off.Z, 1f);
         }
@@ -433,13 +434,13 @@ public sealed class CharacterClaw
         if (Mode == 1)
         {
             yawTo = tgt is not null
-                ? CamMath.Yaw_18C830(new Vector4(-Lock.TargetMatrix.M31, -Lock.TargetMatrix.M32, -Lock.TargetMatrix.M33, Lock.TargetMatrix.M34))
+                ? GameMath.Yaw_18C830(new Vector4(-Lock.TargetMatrix.M31, -Lock.TargetMatrix.M32, -Lock.TargetMatrix.M33, Lock.TargetMatrix.M34))
                 : null;
         }
         else
         {
             var to = zero ? target : landing;
-            yawTo = CamMath.Yaw_18C830(new Vector4(to.X - Hand.X, to.Y - Hand.Y, to.Z - Hand.Z, to.W));
+            yawTo = GameMath.Yaw_18C830(new Vector4(to.X - Hand.X, to.Y - Hand.Y, to.Z - Hand.Z, to.W));
         }
         return new Aim(hand, yaw, target, yawTo, zero ? null : landing);
     }
@@ -456,7 +457,7 @@ public sealed class CharacterClaw
             self.SetNodePosition(new Vector3(pos.X - h.M41 + start.X, pos.Y - h.M42 + start.Y, pos.Z - h.M43 + start.Z));
             return;
         }
-        var q = CamMath.MatrixToQuat_186900(h);
+        var q = GameMath.MatrixToQuat_186900(h);
         if (q != weapon.NodeQuat) weapon.SetNodeQuat(q);
     }
 }

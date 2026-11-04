@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -83,7 +84,7 @@ public sealed partial class GameCamera
         if (y == 0)
         {
             fov = M.I(0x30A450);
-            rot = CamMath.MatrixToQuat_186900(current);
+            rot = GameMath.MatrixToQuat_186900(current);
             eye = new Vector4(current.M41, current.M42, current.M43, current.M44);
         }
         else
@@ -152,14 +153,14 @@ public sealed partial class GameCamera
         Matrix4x4 m;
         if (t <= 0f || 1f <= t)
         {
-            m = CamMath.QuatToMatrix_18E620(rot);
+            m = GameMath.QuatToMatrix_18E620(rot);
             m.M41 = eye.X; m.M42 = eye.Y; m.M43 = eye.Z; m.M44 = eye.W;
         }
         else
         {
-            fov = CamMath.Trunc((newFov * CamMath.UnitToRad * t + fov * CamMath.UnitToRad * (1f - t)) * CamMath.RadToUnit);
-            var q = CamMath.Slerp_187100(t, rot, newRot);
-            m = CamMath.QuatToMatrix_18E620(q);
+            fov = GameMath.Trunc((newFov * GameMath.UnitToRad * t + fov * GameMath.UnitToRad * (1f - t)) * GameMath.RadToUnit);
+            var q = GameMath.Slerp_187100(t, rot, newRot);
+            m = GameMath.QuatToMatrix_18E620(q);
             m.M41 = eye.X + (newEye.X - eye.X) * t;
             m.M42 = eye.Y + (newEye.Y - eye.Y) * t;
             m.M43 = eye.Z + (newEye.Z - eye.Z) * t;

@@ -1,4 +1,5 @@
 using CrashEngine.Runtime.Screen.Oleg;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -7,7 +8,8 @@ public sealed partial class AgentLabWorld
 {
     public const int ModeBoot = 0, ModeLogo = 1, ModeWaitingForPad = 2, ModeCheckingCard = 3, ModeIntroMovie = 4, ModeIdentMovie = 5;
     public const int ModeTitle = 0x7, ModeMainMenu = 0x8, ModeNewGame = 0xA;
-    public const string TitleChunk_30BB00 = @"Levels\Earth\Hub\Beach";
+    public const string DiscTitleChunk = @"Levels\Earth\Hub\Beach";
+    public string TitleChunk_30BB00 { get; private set; } = DiscTitleChunk;
     public const int IntroMovie = 0x14, IdentMovie = 0, AttractMovie = 0xD, FirstGameMovie = 1;
 
     public int StreamState_309738 { get; set; } // Amedo
@@ -27,13 +29,10 @@ public sealed partial class AgentLabWorld
         _modeEnteredFrame = Frame;
         _snapshotTaken = true;
         StartChunk_500 = startChunk ?? "";
+        TitleChunk_30BB00 = RootChunk.Name;
         WorldShown = false; // Amedo
         Log?.Invoke($"[mode {Now:0.00}s] boot (state 0){(startChunk is null ? " to the title" : " straight into " + startChunk)}");
     }
-
-    // Amedo
-    public static bool IsTitleChunk(string level) =>
-        string.Equals(Streaming.StreamLink.Normalize(level), Streaming.StreamLink.Normalize(TitleChunk_30BB00), StringComparison.OrdinalIgnoreCase);
 
     // Amedo
     private int Boot_1772C8()
@@ -201,6 +200,7 @@ public sealed partial class AgentLabWorld
         const ulong states = (0x3Ful << 50) | (0x3Ful << 44) | (0x3Ful << 38);
         Word_00 = (from.Word_00 & ~states) | ((ulong)NoMode << 50) | ((ulong)ModeLoadingLevel << 44) | ((ulong)ModeLoadingLevel << 38);
         GalleryWord_08 = from.GalleryWord_08;
+        TitleChunk_30BB00 = from.TitleChunk_30BB00;
         AutosaveTime_20 = from.AutosaveTime_20;
         AutosavePauses_8F0 = from.AutosavePauses_8F0;
         Progress.CopyFrom(from.Progress);
@@ -240,7 +240,7 @@ public sealed partial class AgentLabWorld
             StartChunk_500 = TitleChunk_30BB00;
             float r = Rng.GetRandFloat_18C0B8();
             int picture = 3;
-            if (r < 1f) picture = Character.CharacterController.Cvt(r * 3f) + 1;
+            if (r < 1f) picture = GameMath.Trunc(r * 3f) + 1;
             uint high = (uint)(Oleg.Picture_318 >> 32);
             high = (high & 0xFFFE01FFu) | (((uint)picture & 0xFF) << 9);
             Oleg.Picture_318 = (Oleg.Picture_318 & 0xFFFFFFFFul) | ((ulong)high << 32);
@@ -283,7 +283,7 @@ public sealed partial class AgentLabWorld
     public bool RequestRandomMovie_17B8B0(int fadeTicks, int first, int last)
     {
         float r = Rng.GetRandFloat_18C0B8();
-        if (r < 1f) last = first + Character.CharacterController.Cvt((last - first + 1) * r);
+        if (r < 1f) last = first + GameMath.Trunc((last - first + 1) * r);
         RequestMovie_17B868(fadeTicks, last);
         return true;
     }

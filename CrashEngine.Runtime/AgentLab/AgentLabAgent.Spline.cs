@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -41,7 +42,7 @@ public sealed partial class AgentLabAgent
         _pathDirection = dir;
         bool grounded = _physics is { } ctrl && (ctrl.State & PhysicsController.StateHadContact) != 0;
         var tilt = new Vector4(dir.X, dir.Y - f.Slope, dir.Z, 1f);
-        float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, tilt);
+        float k = GameMath.InvLength_11C030(2.4999998e-09f, tilt);
         var aim = new Vector3(tilt.X * k * 6f + cm.X, tilt.Y * k * 6f + cm.Y, tilt.Z * k * 6f + cm.Z);
         SteerBodyTowards_22C330(aim, grounded ? f.Turn * dt : f.Turn * (dt * 0.3f), true, 0f);
         if (_physics is { } track) GroundTrack(track, dt);

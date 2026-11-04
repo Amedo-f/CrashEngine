@@ -1,5 +1,6 @@
 using CrashEngine.Importer;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -138,7 +139,7 @@ public sealed partial class AgentLabAgent
             case 29: RotationWarp(a); return;
             case 178: RotateAgent_217A38(a); return; // Amedo
             case 617: HitInstancesInBoxes_10EE60(a); return; // Amedo
-            case 61: _chaseCurrentSpeed = 0f; return;
+            case 61: StopNodeMotion_23DF48(); return; // Amedo
             case 96: Launch_24E358(a); return; // Amedo 2026-09-30
             case 193: LaunchSelf_244B60(a); return; // Amedo 2026-09-30
             case 72: ColliderLaunchNow_244538(a); return; // Amedo 2026-09-30
@@ -217,7 +218,7 @@ public sealed partial class AgentLabAgent
             case 638: World.EnableBossMode_176D40(BitConverter.UInt32BitsToSingle(Arg(2)), ValueOf(Arg(1)), IconOgi_261548(Arg(0))); return; // Amedo 2026-10-01
             case 639: World.DamageBoss_1796B8((int)Arg(0)); return; // Amedo 2026-10-01
             case 636: World.PlayerCharacter?.Gun?.AddAmmo_15F0A0((int)Arg(0)); return; // Amedo
-            case 596: World.StartWhackaworm_176E30(Character.CharacterController.Cvt(FloatValueOf(Arg(1)) * 9000f), ValueOf(Arg(2)), IconOgi_261548(Arg(0))); return; // Amedo 2026-10-01
+            case 596: World.StartWhackaworm_176E30(GameMath.Trunc(FloatValueOf(Arg(1)) * 9000f), ValueOf(Arg(2)), IconOgi_261548(Arg(0))); return; // Amedo 2026-10-01
             case 597: World.ProgressWhackaworm_179748((int)Arg(0)); return; // Amedo 2026-10-01
             case 598: World.EndWhackaworm_17BB50(); return; // Amedo 2026-10-01
             case 640: World.ExitBossMode_17BAD0(); return; // Amedo 2026-10-01
@@ -389,8 +390,8 @@ public sealed partial class AgentLabAgent
     // Amedo
     private int AngleValue_209320(uint word)
     {
-        if (((word >> 1) & 3) != 1) return Camera.CamMath.FromValue_11BFA0(0f, 0);
-        if ((word & 1) == 0) return Camera.CamMath.FromValue_11BFA0(BitConverter.UInt32BitsToSingle(word & ~7u), 0);
+        if (((word >> 1) & 3) != 1) return GameMath.FromValue_11BFA0(0f, 0);
+        if ((word & 1) == 0) return GameMath.FromValue_11BFA0(BitConverter.UInt32BitsToSingle(word & ~7u), 0);
         return AngleVariable_261778((int)(word >> 3));
     }
 
@@ -402,7 +403,7 @@ public sealed partial class AgentLabAgent
         if (index < count) return (int)own![index];
         var defaults = GameObject?.InstFlags;
         int k = index - count;
-        return Camera.CamMath.FromValue_11BFA0(defaults is not null && k < defaults.Count ? BitConverter.UInt32BitsToSingle(defaults[k]) : 0f, 0);
+        return GameMath.FromValue_11BFA0(defaults is not null && k < defaults.Count ? BitConverter.UInt32BitsToSingle(defaults[k]) : 0f, 0);
     }
 
     // Amedo

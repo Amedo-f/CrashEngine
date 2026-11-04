@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -35,7 +36,7 @@ public sealed class LinkIk
         for (int i = 0; i < Lengths.Length; i++)
         {
             var j = new Joint { Parent = tail, Len = Lengths[i] };
-            (j.LocalCos, j.LocalSin) = CamMath.CosSin_18B918(CamMath.FromValue_11BFA0(Angles[i], 0));
+            (j.LocalCos, j.LocalSin) = GameMath.CosSin_18B918(GameMath.FromValue_11BFA0(Angles[i], 0));
             Fk_18B408(j);
             if (tail is null) ik._head = j;
             else tail.Next = j;
@@ -55,11 +56,11 @@ public sealed class LinkIk
     {
         var j = _head!;
         for (int i = 1; i < index; i++) j = j.Next!;
-        var (c, s) = CamMath.CosSin_18B918(CamMath.FromValue_11BFA0(min, 0));
+        var (c, s) = GameMath.CosSin_18B918(GameMath.FromValue_11BFA0(min, 0));
         Normalize_18C548(ref s, ref c, RotEps);
         j.MinSin = s;
         j.MinCos = c;
-        (c, s) = CamMath.CosSin_18B918(CamMath.FromValue_11BFA0(max, 0));
+        (c, s) = GameMath.CosSin_18B918(GameMath.FromValue_11BFA0(max, 0));
         Normalize_18C548(ref s, ref c, RotEps);
         j.MaxSin = s;
         j.MaxCos = c;
@@ -70,7 +71,7 @@ public sealed class LinkIk
     {
         _origin = start;
         var d = new Vector3(target.X - start.X, 0f, target.Z - start.Z);
-        _dir = d * CamMath.InvLengthGuarded_11C030(DirEps, new Vector4(d, 0f));
+        _dir = d * GameMath.InvLength_11C030(DirEps, new Vector4(d, 0f));
         var t = target - _origin;
         _targetX = t.X * _dir.X + t.Y * _dir.Y + t.Z * _dir.Z;
         _targetY = t.Y;

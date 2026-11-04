@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -15,7 +16,7 @@ public sealed partial class GameCamera
         {
             if ((M.Q(y + 0x48) & 0x200) != 0 && M.I(y + 0x1C4) <= M.I(time + 4) - M.I(y + 0x1C0)) EyeRestoreSpeeds_27BDB0(y);
             EyeTilt_27BD80(y);
-            int pitchTarget = CamMath.FromValue_11BFA0(0f, 1);
+            int pitchTarget = GameMath.FromValue_11BFA0(0f, 1);
             int basePitch = M.I(0x30A658);
             if ((M.Q(y + 0x40) & 0x100) != 0)
             {
@@ -55,7 +56,7 @@ public sealed partial class GameCamera
                             if ((f48 & 0x40) == 0)
                             {
                                 float durS = dur * M.F(SecondsPerTick);
-                                f = CamMath.Trunc(el * M.F(SecondsPerTick) / durS * M.F(TicksPerSecond)) * M.F(SecondsPerTick);
+                                f = GameMath.Trunc(el * M.F(SecondsPerTick) / durS * M.F(TicksPerSecond)) * M.F(SecondsPerTick);
                             }
                             else
                             {
@@ -88,9 +89,9 @@ public sealed partial class GameCamera
                 v = new Vector4(target.X - px, target.Y - py, target.Z - pz, target.W);
             }
             float d = MathF.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
-            int yaw = CamMath.Yaw_18C830(v);
-            var flat = CamMath.Rotate3_18E4B8(CamMath.RotY_18BBC0(-yaw), v);
-            int pitch = CamMath.Pitch_18C898(flat);
+            int yaw = GameMath.Yaw_18C830(v);
+            var flat = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(-yaw), v);
+            int pitch = GameMath.Pitch_18C898(flat);
             if ((M.Q(y + 0x48) & 0x40) != 0)
             {
                 M.I(y + 0x68, pitch);
@@ -103,21 +104,21 @@ public sealed partial class GameCamera
                 M.I(y + 0x68, pitch);
                 M.I(y + 0x108, yaw);
                 M.F(y + 0x158, d);
-                M.I(y + 0x6C, CamMath.FromValue_11BFA0(0f, 0));
-                M.I(y + 0x10C, CamMath.FromValue_11BFA0(0f, 0));
+                M.I(y + 0x6C, GameMath.FromValue_11BFA0(0f, 0));
+                M.I(y + 0x10C, GameMath.FromValue_11BFA0(0f, 0));
                 M.F(y + 0x15C, 0f);
             }
             else
             {
                 if ((M.U(y + 0x54) & 8) != 0)
                 {
-                    M.I(y + 0x6C, CamMath.Trunc(Wrap(pitch - M.I(y + 0x68)) * f));
+                    M.I(y + 0x6C, GameMath.Trunc(Wrap(pitch - M.I(y + 0x68)) * f));
                     ChannelClamp_270360(y + 0x54, pitch, pitch);
                     M.U(y + 0x54, M.U(y + 0x54) | 0x10);
                 }
                 if ((M.U(y + 0xF4) & 8) != 0)
                 {
-                    M.I(y + 0x10C, CamMath.Trunc(Wrap(yaw - M.I(y + 0x108)) * f));
+                    M.I(y + 0x10C, GameMath.Trunc(Wrap(yaw - M.I(y + 0x108)) * f));
                     ChannelClamp_270360(y + 0xF4, yaw, yaw);
                     M.U(y + 0xF4, M.U(y + 0xF4) | 0x10);
                 }
@@ -147,20 +148,20 @@ public sealed partial class GameCamera
         uint x = M.U(y + 0x50);
         bool valid = true;
         Vector4 fwd;
-        if (x == 0) fwd = CamMath.Rotate3_18E4B8(Matrix4x4.Identity, new Vector4(0f, 0f, 1f, 1f));
+        if (x == 0) fwd = GameMath.Rotate3_18E4B8(Matrix4x4.Identity, new Vector4(0f, 0f, 1f, 1f));
         else if (M.B(x + 0x60) == 0)
-            fwd = CamMath.Rotate3_18E4B8(CamMath.QuatToMatrix_18E620(ToQ(M.V(x + 0x10))), new Vector4(0f, 0f, 1f, 1f));
+            fwd = GameMath.Rotate3_18E4B8(GameMath.QuatToMatrix_18E620(ToQ(M.V(x + 0x10))), new Vector4(0f, 0f, 1f, 1f));
         else
         {
             var vel = M.V(x + 0x50);
             vel.Y = 0f;
-            valid = 2.4999998e-09f < CamMath.LengthSq3(vel);
-            var between = CamMath.MatrixBetween_185480(new Vector4(0f, 0f, 1f, 1f), vel); // Amedo
+            valid = 2.4999998e-09f < GameMath.LengthSq3(vel);
+            var between = GameMath.MatrixBetween_185480(new Vector4(0f, 0f, 1f, 1f), vel); // Amedo
             fwd = new Vector4(between.M31, between.M32, between.M33, between.M34);
         }
         if (valid)
         {
-            int yaw = CamMath.Yaw_18C830(fwd);
+            int yaw = GameMath.Yaw_18C830(fwd);
             M.I(y + 0x2E8, yaw);
             return yaw;
         }

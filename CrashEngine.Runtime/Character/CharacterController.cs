@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Runtime.Character.Vehicles; // Amedo
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -110,6 +111,7 @@ public sealed partial class CharacterController
     public uint InputDisabled;
 
     public Func<Vector3, Vector3, uint, IReadOnlyList<CharacterBody>>? Bodies; // Amedo 2026-09-27
+    public Func<object?>? SolveSkip_139964;
     public Func<object, object, bool>? LinkedTo; // Amedo 2026-10-05
     public float HullRadius = 0.29f;
     public Action<object, int>? Touch;
@@ -202,11 +204,6 @@ public sealed partial class CharacterController
     // Amedo
     internal bool Controlled_13FD18() => IntParam(0) == 4 || AutomaticInput;
     public void SetParam(int i, float value) { if (i < _floats.Length) _floats[i] = value; }
-
-    public static int Cvt(float f) =>
-        float.IsNaN(f) ? 0 : 2147483520f <= f ? int.MaxValue : f <= -2147483648f ? int.MinValue : (int)f;
-
-    public static int Mul(int value, float f) => Cvt(value * f);
 
     public bool Carrying => (MotionFlagsHigh & ((1u << 21) | (1u << 22))) != 0;
 
@@ -414,7 +411,7 @@ public sealed partial class CharacterController
         Limbs.Accumulated = Vector3.Zero; // Amedo 2026-09-27
         MotionFlagsHigh &= ~(ForwardOverride | SideOverride | VerticalOverride | AccelOverride);
         var v = Velocity; // Amedo
-        if (3600f < v.X * v.X + v.Y * v.Y + v.Z * v.Z) Velocity = v * InverseLength(v) * 60f;
+        if (3600f < v.X * v.X + v.Y * v.Y + v.Z * v.Z) Velocity = v * GameMath.InverseLength(v) * 60f;
         CheckTriggers_131320?.Invoke(); // Amedo
     }
 
@@ -550,7 +547,7 @@ public sealed partial class CharacterController
             return;
         }
         int state = MotionState;
-        Jump.Update(Cross, Circle, Ticks, frameTicks, Crouch.JumpAllowed);
+        Jump.Update(Cross, Circle, Ticks, frameTicks, !HasCrouch || Crouch.JumpAllowed); // Amedo 2026-10-30
         int p = Jump.Phase;
         int s = p is 6 or 7 ? (state == 3 ? 7 : state) : (state == 7 ? 3 : state);
         if ((Jump.Flags & 0x1000000) != 0) { if (s == 7) s = 11; }
@@ -681,6 +678,7 @@ public sealed partial class CharacterController
         if (IsLinkFollower && Link is { } link) FollowerPlace_1302F8(link, dt); // Amedo 2026-10-05
         else
         {
+            if ((MotionFlagsHigh & LeaderBit) != 0) turn = (int)(turn * 0.65f); // Amedo 2026-10-30
             float turnOut = MoveBody(disp, turn * AngleToRadians, shape, dt, groundedIn);
             if ((MotionFlagsHigh & LeaderBit) == 0 && (MotionFlagsHigh & (1u << 4)) == 0) Rotate(turnOut); // Amedo 2026-10-05
         }
@@ -752,7 +750,7 @@ public sealed partial class CharacterController
             return;
         }
         float a = LastSurface is { } last ? last.Grip * 40f + 10f : 10f;
-        float speed = Velocity.Length();
+        float speed = GameMath.Length(Velocity);
         if (30f < speed)
         {
             float cap = 1500f / speed;
@@ -763,7 +761,7 @@ public sealed partial class CharacterController
         else if ((MotionFlagsHigh & AccelOverride) != 0) a *= AccelScale;
         float maxDelta = dt * a;
         var d = new Vector3(target.X - Velocity.X, 0f, target.Z - Velocity.Z);
-        if (maxDelta * maxDelta < d.X * d.X + d.Z * d.Z) d = d * InverseLength(d) * maxDelta;
+        if (maxDelta * maxDelta < d.X * d.X + d.Z * d.Z) d = d * GameMath.InverseLength(d) * maxDelta;
         Velocity.X += d.X;
         Velocity.Z += d.Z;
     }
@@ -775,7 +773,7 @@ public sealed partial class CharacterController
         {
             var h = new Vector3(GroundNormal.X, 0f, GroundNormal.Z);
             float hLen = MathF.Sqrt(GroundNormal.X * GroundNormal.X + GroundNormal.Z * GroundNormal.Z);
-            h *= InverseLength(h);
+            h *= GameMath.InverseLength(h);
             float k = hLen + hLen;
             if (1f < k) k = 1f;
             slide = h * surface.Slide * k;
@@ -788,7 +786,7 @@ public sealed partial class CharacterController
         float len = MathF.Sqrt(dh.X * dh.X + dh.Z * dh.Z);
         if (len != 0f)
         {
-            dh *= InverseLength(dh);
+            dh *= GameMath.InverseLength(dh);
             dh *= maxDelta < len ? maxDelta : len;
         }
         Velocity.X += dh.X;
@@ -808,7 +806,7 @@ public sealed partial class CharacterController
         MakeBoxOfExitPoints_1395A0(); // Amedo
         var before = Position;
         var d = disp;
-        if (1f < d.Length()) d *= InverseLength(d);
+        if (1f < GameMath.Length(d)) d *= GameMath.InverseLength(d);
         float turnOut = Carrying // Amedo 2026-10-05
             ? CollideLinked_13A500(d, turn, dt, groundedIn)
             : Collide(d, turn, Mode270 == 1 ? LowestPoint() : 0f, dt, groundedIn); // Amedo 2026-09-27
@@ -843,6 +841,17 @@ public sealed partial class CharacterController
             float r = mLen / dLen;
             Efficiency = r < 0.705f ? r * 1.41443f : 1f;
         }
+        if (Crouch.Phase is 5 or 6 && 0f < Circle)
+        {
+            float t = LastSurface is { } surface ? 3.5f / surface.Accel : 0f;
+            if (0.001f < mLen)
+            {
+                float down = delta.Y / mLen;
+                if (down < 0f) t += down * -4f;
+            }
+            if (1f < t) t = 1f;
+            Crouch.PhaseTime += GameMath.Trunc(t * dt * GameMath.SecToTick);
+        }
         return turnOut;
     }
 
@@ -863,9 +872,9 @@ public sealed partial class CharacterController
         var hull = (Crouch.LowShape && (MotionFlagsHigh & 1u) != 0) || InAirState ? LowHull : StandHull;
         Collision.Begin();
         Collision.Gather(_world, p, ref mv, hull);
-        GatherAgents_2846E8(p, mv, hull, MotionState is 13 or 14 ? 0x5A010u : 0x5B010u); // Amedo
+        GatherAgents_2846E8(p, mv, hull, MotionState is 13 or 14 ? 0x5A010u : 0x5B010u, SolveSkip_139964?.Invoke()); // Amedo
         if (StateFlagsOf is { } flagsOf) Collision.ClassFilter(ShapeClass(), flagsOf, MotionStateOf); // Amedo 2026-09-27
-        if (StandingOn is { } support && (State70 & 0xF00) == 0x300 && 1e-4f < plat.Length()) // Amedo 2026-09-29
+        if (StandingOn is { } support && (State70 & 0xF00) == 0x300 && 1e-4f < GameMath.Length(plat)) // Amedo 2026-09-29
             Collision.MarkPart_287E90(support, StandingPart, 8);
         if (0.1f < stepAdjust) stepAdjust = 0.1f;
         if (stepAdjust < -0.1f) stepAdjust = -0.1f;
@@ -887,13 +896,13 @@ public sealed partial class CharacterController
         }
         if (push != Vector3.Zero)
         {
-            var pn = push * InverseLength(push);
-            float into = Vector3.Dot(mv, pn);
+            var pn = push * GameMath.InverseLength(push);
+            float into = GameMath.Dot(mv, pn);
             mv -= pn * MathF.Min(0f, into);
             Collision.Slide(p, push, out start, out _, false);
         }
         var (_, box) = CharacterCollision.LocalBounds((MotionFlagsHigh & 1u) != 0 ? LowHull : StandHull); // Amedo 2026-09-30
-        mv += Collision.SpherePush_284DF0(start + plat, mv, box.Y, box.X);
+        mv += Collision.SpherePush_284DF0(start + plat, disp, box.Y, box.X);
         int hit = Collision.Slide(start, mv, out var newPos, out var normal, groundedIn);
         LastHit = hit;
         LastMove = mv;
@@ -970,12 +979,15 @@ public sealed partial class CharacterController
 
     // Amedo
     public int CrushCounter_CC;
+    private readonly List<CharacterCollision.Record> _crushSolids = new();
 
     // Amedo
     private bool CrushedAgents_136478()
     {
         bool crushed = true;
-        foreach (var r in Collision.Solids.ToArray())
+        _crushSolids.Clear();
+        _crushSolids.AddRange(Collision.Solids);
+        foreach (var r in _crushSolids)
         {
             if ((r.Flags & CharacterCollision.Dynamic) == 0 || (r.Flags & 0x104) == 0 || r.Owner is not { } owner) continue;
             if (((ComponentMaskOf?.Invoke(owner) ?? 0u) & 0x1FF000u) == 0) continue;
@@ -1004,7 +1016,7 @@ public sealed partial class CharacterController
     }
 
     // Amedo
-    internal void GatherAgents_2846E8(Vector3 p, Vector3 mv, ConvexHull hull, uint mask)
+    internal void GatherAgents_2846E8(Vector3 p, Vector3 mv, ConvexHull hull, uint mask, object? skip = null)
     {
         if (Bodies is not { } bodies) return;
         var (qmin, qmax) = CharacterCollision.LocalBounds(hull);
@@ -1017,8 +1029,19 @@ public sealed partial class CharacterController
         qmax += new Vector3(0.1f);
         qmin += p;
         qmax += p;
-        Collision.GatherBodies(bodies(qmin, qmax, mask), qmin, qmax, hull);
+        var found = bodies(qmin, qmax, mask);
+        if (skip is not null)
+        {
+            _skipBodies.Clear();
+            foreach (var b in found)
+                if (!ReferenceEquals(b.Owner, skip)) _skipBodies.Add(b);
+            found = _skipBodies;
+        }
+        Collision.GatherBodies(found, qmin, qmax, hull);
     }
+
+    private readonly List<CharacterBody> _skipBodies = new();
+    private readonly List<CharacterCollision.Record> _clingSolids = new();
 
     // Amedo
     private void ClingToWall_135E20()
@@ -1027,7 +1050,9 @@ public sealed partial class CharacterController
         var m = _getMatrix();
         var fwd = new Vector3(m.M31, m.M32, m.M33);
         var probe = m.Translation + fwd * 0.4f;
-        foreach (var r in Collision.Solids.ToArray())
+        _clingSolids.Clear();
+        _clingSolids.AddRange(Collision.Solids);
+        foreach (var r in _clingSolids)
         {
             if ((r.Flags & CharacterCollision.Static) == 0) continue;
             if (((_world.SurfaceMask(r.Triangle.Surface) >> 11) & 1) == 0) continue;
@@ -1037,7 +1062,7 @@ public sealed partial class CharacterController
             n *= 1f / MathF.Sqrt(n.X * n.X + n.Y * n.Y + n.Z * n.Z);
             m = _getMatrix();
             if (!(0.707f < n.X * m.M31 + n.Y * m.M32 + n.Z * m.M33)) continue;
-            n *= InverseLength(n);
+            n *= GameMath.InverseLength(n);
             if (!(MathF.Abs(n.Y) < 0.01f)) continue;
             var at = _getMatrix().Translation;
             if (_world.SegmentCast(at + new Vector3(0f, 0.1f, 0f), at - new Vector3(0f, 2f, 0f), 0x10, out _)) continue;
@@ -1159,7 +1184,7 @@ public sealed partial class CharacterController
     }
 
     // Amedo
-    private void SweepPush_14E590(Vector3 hit, Vector3 end, Vector3 dir, float push)
+    private void SweepPush_14E590(in Vector3 hit, in Vector3 end, in Vector3 dir, float push)
     {
         float dx = hit.X - end.X, dy = hit.Y - end.Y, dz = hit.Z - end.Z;
         float d = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
@@ -1226,21 +1251,18 @@ public sealed partial class CharacterController
         var w = Vector3.Transform(SupportLocal, m);
         plat = w - (Position + new Vector3(0f, CenterOffset, 0f));
         var r = SupportInverse * m;
-        platTurn = -Asin_18B7F8(r.M13) * AngleToRadians;
+        platTurn = -GameMath.Asin16_18B7F8(r.M13) * AngleToRadians;
         PlatformTurn = platTurn;
         return true;
     }
 
     // Amedo 2026-09-29
-    private static int Asin_18B7F8(float x) => CrashEngine.Core.GameMath.Asin16_18B7F8(x); // Amedo
-
-    // Amedo 2026-09-29
     private static bool Rigid(in Matrix4x4 m) =>
-        !(0.1f < MathF.Abs(new Vector3(m.M11, m.M12, m.M13).Length() - 1f)) &&
-        !(0.1f < MathF.Abs(new Vector3(m.M21, m.M22, m.M23).Length() - 1f)) &&
-        !(0.1f < MathF.Abs(new Vector3(m.M31, m.M32, m.M33).Length() - 1f));
+        !(0.1f < MathF.Abs(GameMath.Length(new Vector3(m.M11, m.M12, m.M13)) - 1f)) &&
+        !(0.1f < MathF.Abs(GameMath.Length(new Vector3(m.M21, m.M22, m.M23)) - 1f)) &&
+        !(0.1f < MathF.Abs(GameMath.Length(new Vector3(m.M31, m.M32, m.M33)) - 1f));
 
-    private void AfterSlide(int hit, Vector3 disp, Vector3 normal, Vector3 newPos)
+    private void AfterSlide(int hit, in Vector3 disp, in Vector3 normal, in Vector3 newPos)
     {
         if (hit == -1)
         {
@@ -1320,7 +1342,7 @@ public sealed partial class CharacterController
         var m = _getMatrix();
         var v = relative ? Vector3.TransformNormal(velocity, m) : velocity;
         var up = new Vector3(m.M21, m.M22, m.M23);
-        float vertical = Vector3.Dot(v, up);
+        float vertical = GameMath.Dot(v, up);
         Jump.RequestLaunch(slot, vertical, gravity);
         var h = v - up * vertical;
         if (MathF.Abs(h.X) <= 0.005f && MathF.Abs(h.Y) <= 0.005f && MathF.Abs(h.Z) <= 0.005f) Velocity = Vector3.Zero;
@@ -1457,7 +1479,7 @@ public sealed partial class CharacterController
         }
         var s = v * (1f / MaxSpeed_13FDA8());
         float len = MathF.Sqrt(s.X * s.X + s.Y * s.Y + s.Z * s.Z);
-        MoveFromDirection(s * InverseLength(s), len, _getMatrix());
+        MoveFromDirection(s * GameMath.InverseLength(s), len, _getMatrix());
     }
 
     // Amedo 2026-09-29
@@ -1472,9 +1494,9 @@ public sealed partial class CharacterController
     {
         var up = new Vector3(m.M21, m.M22, m.M23);
         var fwd = new Vector3(m.M31, m.M32, m.M33);
-        var d = dir * InverseLength(dir);
+        var d = dir * GameMath.InverseLength(dir);
         var qDesired = FrameQuaternion(Vector3.Cross(up, d), up, d);
-        var f = fwd * InverseLength(fwd);
+        var f = fwd * GameMath.InverseLength(fwd);
         var qCurrent = FrameQuaternion(Vector3.Cross(up, f), up, f);
         float qLenSq = qCurrent.X * qCurrent.X + qCurrent.Y * qCurrent.Y + qCurrent.Z * qCurrent.Z + qCurrent.W * qCurrent.W;
         float inv = 1.00000005e-20f < qLenSq ? 1f / MathF.Sqrt(qLenSq) : 0f; // Amedo
@@ -1482,11 +1504,11 @@ public sealed partial class CharacterController
         var delta = qDesired * qInverse;
         var rot = m;
         rot.Translation = Vector3.Zero;
-        var qNode = Camera.CamMath.MatrixToQuat_186900(rot); // Amedo
-        var moved = Camera.CamMath.RotateByQuat_186D98(qNode * delta, new Vector4(0f, 0f, len, 1f), false); // Amedo
+        var qNode = GameMath.MatrixToQuat_186900(rot); // Amedo
+        var moved = GameMath.RotateByQuat_186D98(qNode * delta, new Vector4(0f, 0f, len, 1f), false); // Amedo
         var vec = new Vector3(moved.X, moved.Y, moved.Z);
         float vecLen = MathF.Sqrt(vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z); // Amedo
-        int angle = QuaternionAngle(ref delta, out var axis);
+        int angle = GameMath.AxisAngle_186B50(ref delta, out var axis);
         int signed = ((angle - 0x8000) & 0xFFFF) - 0x8000;
         float turn = signed * AngleToRadians * (axis.Y < 0f ? -0.31830987f : 0.31830987f);
         float z = vec.Z, xx = vec.X;
@@ -1501,34 +1523,9 @@ public sealed partial class CharacterController
         Move = vec;
     }
 
-    private static Quaternion FrameQuaternion(Vector3 right, Vector3 up, Vector3 forward) =>
-        Camera.CamMath.MatrixToQuat_186900(new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, // Amedo
+    private static Quaternion FrameQuaternion(in Vector3 right, in Vector3 up, in Vector3 forward) =>
+        GameMath.MatrixToQuat_186900(new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, // Amedo
                                                          forward.X, forward.Y, forward.Z, 0f, 0f, 0f, 0f, 1f));
-
-    private static int QuaternionAngle(ref Quaternion q, out Vector3 axis)
-    {
-        float lenSq = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;
-        float k = 1.00000005e-20f < lenSq ? 1f / MathF.Sqrt(lenSq) : 0f; // Amedo
-        q = new Quaternion(q.X * k, q.Y * k, q.Z * k, q.W * k);
-        axis = Vector3.Zero;
-        float a = MathF.Abs(q.W);
-        if (!(a < 1f)) return 0;
-        float s = 1f - a;
-        if (s < 0f) s = 0f;
-        float acos = (((-0.0187293f * a + 0.074261f) * a - 0.2121144f) * a + 1.5707288f) * MathF.Sqrt(s);
-        if (q.W < 0f) acos = MathF.PI - acos;
-        int angle = (int)((int)(acos * 10430.378f) * 2f);
-        float sin = MathF.Sqrt(1f - q.W * q.W);
-        var v = new Vector3(q.X, q.Y, q.Z) * (1f / sin);
-        axis = v * InverseLength(v);
-        return angle;
-    }
-
-    public static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return 2.4999998e-09f < lenSq ? 1f / MathF.Sqrt(lenSq) : 0f;
-    }
 
     public void Trigger(int slot) => _trigger(slot);
 }

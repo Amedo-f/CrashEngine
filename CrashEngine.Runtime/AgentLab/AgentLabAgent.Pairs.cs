@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -132,7 +133,7 @@ public sealed partial class AgentLabAgent
     private static void KeepRidePosition_253F50(PhysicsController ctrl, Vector3 position)
     {
         if (ctrl.RideObject_80 is not { } ride) return;
-        ctrl.RideLocal_70 = Vector3.Transform(position, CamMath.RigidInverse_18E808(SupportFrames(ride).Cur)); // Amedo
+        ctrl.RideLocal_70 = Vector3.Transform(position, GameMath.RigidInverse_18E808(SupportFrames(ride).Cur)); // Amedo
     }
 
     // Amedo
@@ -160,30 +161,19 @@ public sealed partial class AgentLabAgent
         {
             _keep88 |= 0x40;
             ctrl.RideObject_80 = support;
-            ctrl.RideLocal_70 = Vector3.Transform(position, CamMath.RigidInverse_18E808(SupportMatrix(support))); // Amedo
+            ctrl.RideLocal_70 = Vector3.Transform(position, GameMath.RigidInverse_18E808(SupportMatrix(support))); // Amedo
             Trace($"rides {(support as AgentLabAgent)?.Entity.Name ?? "dynamic scenery"}");
             return;
         }
         var (prev, cur) = SupportFrames(support);
         var delta = Vector3.Transform(ctrl.RideLocal_70, cur) - position;
-        int yaw = -ArcSin16_18B7F8((CamMath.RigidInverse_18E808(prev) * cur).M13); // Amedo
+        int yaw = -GameMath.Asin16_18B7F8((GameMath.RigidInverse_18E808(prev) * cur).M13); // Amedo
         if (!(MathF.Abs(delta.X) <= 5e-5f && MathF.Abs(delta.Y) <= 5e-5f && MathF.Abs(delta.Z) <= 5e-5f)) SetLocalPosition(position + delta);
-        if (yaw != 0) SetLocalRotation(Quaternion.Multiply(RotationFromYaw_18D620(yaw), LocalRotation));
+        if (yaw != 0) SetLocalRotation(Quaternion.Multiply(GameMath.RotationY_18D620(yaw), LocalRotation));
         float k = (int)Math.Round(World.Dt * 9000.0) * (1f / 9000f);
         var next = _prevVelocity + delta * k;
         _prevVelocity = _velocity;
         _velocity = next;
-    }
-
-    // Amedo
-    internal static int ArcSin16_18B7F8(float x) => CrashEngine.Core.GameMath.Asin16_18B7F8(x); // Amedo
-
-    // Amedo
-    internal static Quaternion RotationFromYaw_18D620(int yaw)
-    {
-        if (yaw == 0) return Quaternion.Identity;
-        float half = yaw * 9.58738e-5f * 0.5f;
-        return new Quaternion(0f, MathF.Sin(half), 0f, MathF.Cos(half));
     }
 
     private bool HullPair_248428(PhysicsController ctrl, object other, uint otherFlags, int otherController, List<(ConvexHull Hull, Matrix4x4 World)> parts, Vector3 center, Vector3 qmin, Vector3 qmax) // Amedo
@@ -279,7 +269,7 @@ public sealed partial class AgentLabAgent
     {
         if (ctrl.PairType == 5 || theirs.PairType == 5) return EllipsoidPair_2498E8(ctrl, theirs, other, center, r); // Amedo 2026-10-05
         var d = center - other._sphereCenter;
-        float dist = d.Length();
+        float dist = GameMath.Length(d);
         if (!(0f < dist)) return false;
         float ro = other._logicalRadius;
         float overlap = r + ro - dist;
@@ -340,7 +330,7 @@ public sealed partial class AgentLabAgent
 
     private static Vector3 ClampLength_254080(Vector3 v, float max)
     {
-        float len = v.Length();
+        float len = GameMath.Length(v);
         return max < len ? v * (max / len) : v;
     }
 
@@ -353,8 +343,8 @@ public sealed partial class AgentLabAgent
     private bool ContactLanding_24A9D8(PhysicsController ctrl, object other, uint otherFlags, Vector3 push) // Amedo 2026-10-06
     {
         bool airborne = ctrl.Has(PhysicsController.Airborne);
-        if (!airborne && 0f <= Vector3.Dot(_velocity, push)) return true;
-        var n = push * InverseLength(push);
+        if (!airborne && 0f <= GameMath.Dot(_velocity, push)) return true;
+        var n = push * GameMath.InverseLength(push);
         if (ctrl.Has(PhysicsController.Gripped) && ctrl.GripNow == 0f) ctrl.GripNow = 0.8f;
         if (0.7f < n.Y)
         {
@@ -369,7 +359,7 @@ public sealed partial class AgentLabAgent
         }
         if (airborne || (ctrl.State & PhysicsController.StateSmoothNormal) != 0)
         {
-            if (-0.1f < Vector3.Dot(n, ctrl.GroundNormal))
+            if (-0.1f < GameMath.Dot(n, ctrl.GroundNormal))
             {
                 _pairPush += n;
                 _pairCount += 1f;
@@ -385,7 +375,7 @@ public sealed partial class AgentLabAgent
         var mine = _prevVelocity; // Amedo
         var theirs = other.OwnCharacter is { } oc ? oc.Velocity : other._velocity;
         var impulse = LimitedImpulse(ctrl, (mine - theirs) * FloatVar(0)); // Amedo
-        if (!(0.001f < impulse.LengthSquared())) return;
+        if (!(0.001f < GameMath.LengthSquared(impulse))) return;
         Trace($"pair impulse {impulse} -> {other.Entity.Name}");
         other.RecordHit_3C(this, impulse);
         RecordHit_3C(other, -impulse);
@@ -397,9 +387,9 @@ public sealed partial class AgentLabAgent
         float limit = ctrl.ParamBC;
         if ((ctrl.State & ClampImpulse) != 0)
         {
-            if (limit < impulse.Length()) impulse = impulse * InverseLength(impulse) * limit;
+            if (limit < GameMath.Length(impulse)) impulse = impulse * GameMath.InverseLength(impulse) * limit;
         }
-        else if ((ctrl.State & FixedImpulse) != 0) impulse = impulse * InverseLength(impulse) * limit;
+        else if ((ctrl.State & FixedImpulse) != 0) impulse = impulse * GameMath.InverseLength(impulse) * limit;
         else impulse *= limit;
         return impulse;
     }
@@ -419,7 +409,7 @@ public sealed partial class AgentLabAgent
         var rel = _prevVelocity - body.Velocity;
         var relk = rel * k;
         bool approaching = 0f < _prevVelocity.X * relk.X + _prevVelocity.Y * relk.Y + _prevVelocity.Z * relk.Z;
-        if (approaching) body.ApplyImpulse_289CC0(relk, Vector3.Transform(center, CamMath.RigidInverse_18E808(body.World)));
+        if (approaching) body.ApplyImpulse_289CC0(relk, Vector3.Transform(center, GameMath.RigidInverse_18E808(body.World)));
         var impulse = LimitedImpulse(ctrl, relk);
         if (0.01f < impulse.X * impulse.X + impulse.Y * impulse.Y + impulse.Z * impulse.Z)
         {
@@ -439,7 +429,7 @@ public sealed partial class AgentLabAgent
         float k = m / (m + body.Mass);
         var rel = _prevVelocity - body.Velocity;
         var relk = rel * k;
-        body.ApplyImpulse_289CC0(relk, Vector3.Transform(center, CamMath.RigidInverse_18E808(body.World)));
+        body.ApplyImpulse_289CC0(relk, Vector3.Transform(center, GameMath.RigidInverse_18E808(body.World)));
         var impulse = LimitedImpulse(ctrl, relk);
         if (0.001f < impulse.X * impulse.X + impulse.Y * impulse.Y + impulse.Z * impulse.Z)
         {
@@ -464,7 +454,7 @@ public sealed partial class AgentLabAgent
             float q = MathF.Max(d.X * d.X + d.Y * d.Y + d.Z * d.Z - e * e, 0.01f);
             float s = ctrl.Grip * r2 * (1f / q);
             if (r < s) s = r;
-            c += d * InverseLength(d) * s;
+            c += d * GameMath.InverseLength(d) * s;
         }
         foreach (var hit in _pairHits) // Amedo
         {
@@ -508,7 +498,7 @@ public sealed partial class AgentLabAgent
             case 0: d = point - p; break;
             case 1: d = new Vector3(GameMatrix.M31, GameMatrix.M32, GameMatrix.M33); break;
         }
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         ulong strength = (ctrl.State >> 6) & 3;
         return strength is 1 or 2 ? Vector3.Zero : d * ctrl.Magnet_9C;
     }

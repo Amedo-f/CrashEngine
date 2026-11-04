@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -61,7 +62,7 @@ public sealed partial class AgentLabAgent
         int now = World.NowTicks;
         foreach (var s in list)
         {
-            if (!s.Enabled || !(SensorF(s.Args, 11) <= (now - s.Last) * CamMath.TickToSec)) continue;
+            if (!s.Enabled || !(SensorF(s.Args, 11) <= (now - s.Last) * GameMath.TickToSec)) continue;
             s.Last = now;
             switch (SensorArg(s.Args, 0) & 7)
             {
@@ -78,7 +79,7 @@ public sealed partial class AgentLabAgent
     private void Speed_23E730(Sensor_23F718 s)
     {
         var v = OwnCharacter?.Velocity ?? Component5?.Velocity ?? _velocity;
-        s.Value = Clamp_18C2A0(v.Length() * SensorF(s.Args, 14), SensorF(s.Args, 12), SensorF(s.Args, 13));
+        s.Value = Clamp_18C2A0(GameMath.Length(v) * SensorF(s.Args, 14), SensorF(s.Args, 12), SensorF(s.Args, 13));
     }
 
     private void Flee_234338(Sensor_23F718 s)
@@ -94,16 +95,16 @@ public sealed partial class AgentLabAgent
             foreach (var other in near)
             {
                 var q = other.GamePosition;
-                float d2 = Vector3.DistanceSquared(p, q);
+                float d2 = GameMath.DistanceSq(p, q);
                 float w = other.Influence08 + SensorF(a, 15) * Facing_2346E0(other, p, q);
                 w *= 1f - Clamp_18C2A0(d2 / SensorF(a, 9), min, max);
                 var away = p - q;
-                away *= CamMath.InvLengthGuarded_11C030(SensorEps, new Vector4(away, 0f));
+                away *= GameMath.InvLength_11C030(SensorEps, new Vector4(away, 0f));
                 sum += w / SensorF(a, 1);
                 dir += away * w;
             }
             sum = Clamp_18C2A0(sum, min, max);
-            dir *= CamMath.InvLengthGuarded_11C030(SensorEps, new Vector4(dir, 0f));
+            dir *= GameMath.InvLength_11C030(SensorEps, new Vector4(dir, 0f));
         }
         _sensorDir170 = dir;
         s.Value = s.Value <= sum ? sum : Clamp_18C2A0(s.Value + SensorF(a, 10) * 0.3f, min, max);
@@ -134,7 +135,7 @@ public sealed partial class AgentLabAgent
     {
         if (other.FindSensor_23F910(2) is not { } speed) return 0f;
         var d = p - q;
-        d *= CamMath.InvLengthGuarded_11C030(SensorEps, new Vector4(d, 0f));
+        d *= GameMath.InvLength_11C030(SensorEps, new Vector4(d, 0f));
         var m = other.GameMatrix;
         float v = speed.Value * (m.M31 * d.X + m.M32 * d.Y + m.M33 * d.Z);
         return v + v;

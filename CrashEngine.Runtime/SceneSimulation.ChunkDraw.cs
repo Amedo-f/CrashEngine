@@ -1,4 +1,6 @@
+using System.Numerics;
 using CrashEngine.Core;
+using CrashEngine.Renderer;
 using CrashEngine.Runtime.Streaming;
 
 namespace CrashEngine.Runtime;
@@ -62,6 +64,7 @@ public sealed partial class SceneSimulation
             bool shown = _drawn.Contains(r.Name);
             if (s.Entity.Active != shown) s.Entity.Active = shown;
         }
+        if (PortalClip.Enabled) ClipThroughPortals(root);
         foreach (var (r, s) in _sceneryOnly)
         {
             bool shown = _drawn.Contains(r.Name);
@@ -132,6 +135,40 @@ public sealed partial class SceneSimulation
     }
 
     public Func<System.Numerics.Vector3, System.Numerics.Vector3, int>? PortalVisibilityOverride { get; set; } // Amedo
+
+    private void ClipThroughPortals(StreamResource root)
+    {
+        Span<Vector4> planes = stackalloc Vector4[6];
+        Span<Vector4> world = stackalloc Vector4[4];
+        var toWorld = RootToWorld;
+        Matrix4x4.Invert(toWorld, out var toGame);
+        var toWorldPlanes = Matrix4x4.Transpose(toGame);
+        foreach (var (r, s) in _streamed)
+        {
+            var clip = s.Entity.Get<PortalClip>() ?? s.Entity.Add(new PortalClip());
+            var link = root.Links?.FirstOrDefault(l => ReferenceEquals(l.Target, r));
+            if (link is not { Wall: { } wall } || link.RenderMode < 2 || link.Visibility != 1 || GameCamera is not { } cam)
+            {
+                clip.Clear();
+                continue;
+            }
+            PortalPlanes_1EBF38(wall, cam.Pose.Translation, planes);
+            for (int i = 0; i < 4; i++) world[i] = Vector4.Transform(planes[i + 1], toWorldPlanes);
+            clip.Set(world);
+        }
+    }
+
+    private static void PortalPlanes_1EBF38(WallHull wall, Vector3 eye, Span<Vector4> planes)
+    {
+        var c = wall.Corners;
+        var center = c[0];
+        for (int i = 1; i < 4; i++) center = new Vector3(center.X + c[i].X, center.Y + c[i].Y, center.Z + c[i].Z);
+        center = new Vector3(center.X * 0.25f, center.Y * 0.25f, center.Z * 0.25f);
+        planes[0] = GameMath.FacePlaneTowards_200E98(GameMath.PlaneFromTriangle_185DC0(c[0], c[1], c[2]), center);
+        for (int i = 0; i < 4; i++)
+            planes[i + 1] = GameMath.FacePlaneTowards_200E98(GameMath.PlaneFromTriangle_185DC0(eye, c[i], c[(i + 1) % 4]), center);
+        planes[5] = GameMath.PlaneFromTriangle_185DC0(eye, c[3], c[0]);
+    }
 
     public IEnumerable<(string Target, int Mode, int Visibility, bool Present, bool Drawn)> DrawState() // Amedo
     {

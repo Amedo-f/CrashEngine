@@ -1,11 +1,12 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
 // Amedo 2026-09-28
 public sealed partial class GameCamera
 {
-    private static int Wrap(int a) => CamMath.Wrap16(a);
+    private static int Wrap(int a) => GameMath.Wrap16(a);
 
     public void EyeUpdate_2737F0(uint y, uint time, uint x)
     {
@@ -108,14 +109,14 @@ public sealed partial class GameCamera
         {
             uint xs = M.U(y + 0x50);
             var v = new Vector4(M.F(xs + 0x20) - adjusted.X, M.F(xs + 0x24) - adjusted.Y, M.F(xs + 0x28) - adjusted.Z, 1f);
-            int yaw = CamMath.Yaw_18C830(v);
-            var flat = CamMath.Rotate3_18E4B8(CamMath.RotY_18BBC0(-yaw), v);
-            int pitch = Wrap(CamMath.Pitch_18C898(flat));
+            int yaw = GameMath.Yaw_18C830(v);
+            var flat = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(-yaw), v);
+            int pitch = Wrap(GameMath.Pitch_18C898(flat));
             yaw = Wrap(yaw);
             M.I(y + 0x68, pitch);
             M.I(y + 0x108, yaw);
-            M.I(y + 0x6C, CamMath.FromValue_11BFA0(0f, 0));
-            M.I(y + 0x10C, CamMath.FromValue_11BFA0(0f, 0));
+            M.I(y + 0x6C, GameMath.FromValue_11BFA0(0f, 0));
+            M.I(y + 0x10C, GameMath.FromValue_11BFA0(0f, 0));
             M.F(y + 0x15C, 0f);
             EyeFinish_2714A8(y, target, adjusted, true);
         }
@@ -148,9 +149,9 @@ public sealed partial class GameCamera
         int pitch = Wrap(M.I(y + 0x68) + M.I(y + 0x6C));
         int yaw = Wrap(yawSum);
         float dist = M.F(y + 0x158) + M.F(y + 0x15C) + M.F(y + 0x3B8);
-        var m = CamMath.RotXYZ_183220(pitch, yaw, CamMath.FromValue_11BFA0(0f, 0), Missing);
+        var m = GameMath.RotXYZ_183220(pitch, yaw, GameMath.FromValue_11BFA0(0f, 0), Missing);
         m.M41 = target.X; m.M42 = target.Y; m.M43 = target.Z; m.M44 = target.W;
-        var eye = CamMath.Transform_18E4F0(m, new Vector4(0f, 0f, -dist, 1f));
+        var eye = GameMath.Transform_18E4F0(m, new Vector4(0f, 0f, -dist, 1f));
         if ((M.Q(y + 0x40) & 0x2000) != 0) eye.Y = M.F(y + 0x24);
         if (commit)
         {
@@ -170,19 +171,19 @@ public sealed partial class GameCamera
         f40 = M.Q(y + 0x40);
         if ((f40 & 0x4000) != 0)
         {
-            M.V(y + 0x10, ToV(CamMath.MatrixToQuat_186900(CamMath.LookAt_185668(M.V(y + 0x20), target, new Vector4(0f, 1f, 0f, 1f)))));
+            M.V(y + 0x10, ToV(GameMath.MatrixToQuat_186900(GameMath.LookAt_185668(M.V(y + 0x20), target, new Vector4(0f, 1f, 0f, 1f)))));
             return;
         }
         if ((f40 & 0x2000) != 0)
         {
-            M.V(y + 0x10, ToV(CamMath.MatrixToQuat_186900(CamMath.LookAt_185668(M.V(y + 0x20), target, new Vector4(0f, 1f, 0f, 1f)))));
+            M.V(y + 0x10, ToV(GameMath.MatrixToQuat_186900(GameMath.LookAt_185668(M.V(y + 0x20), target, new Vector4(0f, 1f, 0f, 1f)))));
             LerpEye(y, goal, t);
             return;
         }
         int fovPrev = M.I(y + 0xE8), yawPrev = M.I(y + 0x138), pitchPrev = M.I(y + 0x98);
-        int dPitch = CamMath.Trunc(Wrap(M.I(y + 0x68) - pitchPrev) * t);
-        int dYaw = CamMath.Trunc(Wrap(M.I(y + 0x108) - yawPrev) * t);
-        int dFov = CamMath.Trunc(Wrap(M.I(y + 0xB8) - fovPrev) * t);
+        int dPitch = GameMath.Trunc(Wrap(M.I(y + 0x68) - pitchPrev) * t);
+        int dYaw = GameMath.Trunc(Wrap(M.I(y + 0x108) - yawPrev) * t);
+        int dFov = GameMath.Trunc(Wrap(M.I(y + 0xB8) - fovPrev) * t);
         int pitchNew = Wrap(pitchPrev + dPitch);
         int fovNew = Wrap(fovPrev + dFov);
         int yawNew = Wrap(yawPrev + dYaw);
@@ -194,17 +195,17 @@ public sealed partial class GameCamera
             var v = target - M.V(y + 0x20);
             v.W = target.W;
             dist = MathF.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
-            int yaw = CamMath.Yaw_18C830(v);
-            var flat = CamMath.Rotate3_18E4B8(CamMath.RotY_18BBC0(-yaw), v);
-            pitchOut = CamMath.Pitch_18C898(flat);
+            int yaw = GameMath.Yaw_18C830(v);
+            var flat = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(-yaw), v);
+            pitchOut = GameMath.Pitch_18C898(flat);
             yawOut = yaw;
         }
         else
         {
             float keepY = M.F(y + 0x24);
-            var m = CamMath.RotXYZ_183220(pitchNew, yawNew, CamMath.FromValue_11BFA0(0f, 0), Missing);
+            var m = GameMath.RotXYZ_183220(pitchNew, yawNew, GameMath.FromValue_11BFA0(0f, 0), Missing);
             m.M41 = target.X; m.M42 = target.Y; m.M43 = target.Z; m.M44 = target.W;
-            var eye = CamMath.Transform_18E4F0(m, new Vector4(0f, 0f, -dist, 1f));
+            var eye = GameMath.Transform_18E4F0(m, new Vector4(0f, 0f, -dist, 1f));
             M.V(y + 0x20, eye);
             if ((M.Q(y + 0x40) & 0x2000) != 0) M.F(y + 0x24, keepY);
             pitchOut = pitchNew;
@@ -215,10 +216,10 @@ public sealed partial class GameCamera
         var from = new Vector4(0f, 0f, dist, 1f);
         var to = new Vector4(shake.X + 0f, shake.Y + 0f, shake.Z + dist, shake.W);
         var qShake = Quaternion.Identity;
-        if (!CamMath.Parallel_18DE78(0.001f, to, from, out _))
-            qShake = CamMath.Arc_1875E8(from, to, _ => null);
-        var q = CamMath.Mul_18D558(CamMath.Euler_186780(pitchOut, yawOut, M.I(y + 0x3C8), Missing), qShake);
-        var rot = CamMath.Slerp_187100(M.F(y + 0x394), ToQ(M.V(y + 0x10)), q);
+        if (!GameMath.Parallel_18DE78(0.001f, to, from, out _))
+            qShake = GameMath.Arc_1875E8(from, to);
+        var q = GameMath.Mul_18D558(GameMath.Euler_186780(pitchOut, yawOut, M.I(y + 0x3C8), Missing), qShake);
+        var rot = GameMath.Slerp_187100(M.F(y + 0x394), ToQ(M.V(y + 0x10)), q);
         M.V(y + 0x10, ToV(rot));
         EyeLookLag_275120(y, y + 0x10);
         M.I(y + 0x138, yawOut);
@@ -244,14 +245,14 @@ public sealed partial class GameCamera
         if ((M.Q(y + 0x40) & 0x98000) == 0)
         {
             uint x = M.U(y + 0x50);
-            var mTarget = CamMath.QuatToMatrix_18E620(ToQ(M.V(x + 0x10)));
-            var mEye = CamMath.QuatToMatrix_18E620(ToQ(M.V(y + 0x10)));
-            var fwdT = CamMath.Rotate3_18E4B8(mTarget, new Vector4(0f, 0f, 1f, 1f));
-            var fwdE = CamMath.Rotate3_18E4B8(mEye, new Vector4(0f, 0f, 1f, 1f));
+            var mTarget = GameMath.QuatToMatrix_18E620(ToQ(M.V(x + 0x10)));
+            var mEye = GameMath.QuatToMatrix_18E620(ToQ(M.V(y + 0x10)));
+            var fwdT = GameMath.Rotate3_18E4B8(mTarget, new Vector4(0f, 0f, 1f, 1f));
+            var fwdE = GameMath.Rotate3_18E4B8(mEye, new Vector4(0f, 0f, 1f, 1f));
             fwdT.Y = 0f;
             fwdE.Y = 0f;
-            int ang = CamMath.AngleBetween_187EE0(fwdE, fwdT, 1);
-            var (s, c) = CamMath.SinCos(ang * CamMath.UnitToRad);
+            int ang = GameMath.AngleBetween_187EE0(fwdE, fwdT, 1);
+            var (s, c) = GameMath.SinCos(ang * GameMath.UnitToRad);
             cos = c;
             sin = s;
         }
@@ -305,8 +306,8 @@ public sealed partial class GameCamera
             M.U(y + 0x39C, now);
         }
         int held = (int)now - M.I(y + 0x39C);
-        if (CamMath.Trunc(M.F(TicksPerSecond) * 0.7f) < held) M.Q(y + 0x40, M.Q(y + 0x40) | 0x2000000000UL);
-        else if (CamMath.Trunc(M.F(TicksPerSecond) * 0.2f) < held) M.Q(y + 0x40, M.Q(y + 0x40) | 0x800000000UL);
+        if (GameMath.Trunc(M.F(TicksPerSecond) * 0.7f) < held) M.Q(y + 0x40, M.Q(y + 0x40) | 0x2000000000UL);
+        else if (GameMath.Trunc(M.F(TicksPerSecond) * 0.2f) < held) M.Q(y + 0x40, M.Q(y + 0x40) | 0x800000000UL);
     }
 
     public void EyeLookLag_275120(uint y, uint q)
@@ -316,19 +317,19 @@ public sealed partial class GameCamera
         float speed = MathF.Sqrt(M.F(x + 0x50) * M.F(x + 0x50) + M.F(x + 0x58) * M.F(x + 0x58));
         float kPitch = 3f < speed ? 0.2f : 0.05f;
         float kYaw = 3f < speed ? 0.25f : 0.12f;
-        int rate = CamMath.Scale_15DE90(M.F(y + 0x388), M.I(0x30A640));
-        int pitchLag = CamMath.FromValue_11BFA0(-M.F(y + 0x3B0) * kPitch - M.I(y + 0x2E0) * CamMath.UnitToRad, 0);
-        pitchLag = CamMath.Trunc(pitchLag * rate * CamMath.UnitToRad);
+        int rate = GameMath.Scale_15DE90(M.F(y + 0x388), M.I(0x30A640));
+        int pitchLag = GameMath.FromValue_11BFA0(-M.F(y + 0x3B0) * kPitch - M.I(y + 0x2E0) * GameMath.UnitToRad, 0);
+        pitchLag = GameMath.Trunc(pitchLag * rate * GameMath.UnitToRad);
         M.I(y + 0x2E0, M.I(y + 0x2E0) + pitchLag);
-        int yawLag = CamMath.FromValue_11BFA0(M.F(y + 0x3B4) * kYaw - M.I(y + 0x2E4) * CamMath.UnitToRad, 0);
-        rate = CamMath.Scale_15DE90(M.F(y + 0x388), M.I(0x30A640));
-        yawLag = CamMath.Trunc(yawLag * rate * CamMath.UnitToRad);
+        int yawLag = GameMath.FromValue_11BFA0(M.F(y + 0x3B4) * kYaw - M.I(y + 0x2E4) * GameMath.UnitToRad, 0);
+        rate = GameMath.Scale_15DE90(M.F(y + 0x388), M.I(0x30A640));
+        yawLag = GameMath.Trunc(yawLag * rate * GameMath.UnitToRad);
         M.I(y + 0x2E4, M.I(y + 0x2E4) + yawLag);
-        var qYaw = CamMath.Euler_186780(CamMath.FromValue_11BFA0(0f, 0), M.I(y + 0x2E4), CamMath.FromValue_11BFA0(0f, 0), Missing);
-        var r = CamMath.Mul_18D558(qYaw, ToQ(M.V(q)));
+        var qYaw = GameMath.Euler_186780(GameMath.FromValue_11BFA0(0f, 0), M.I(y + 0x2E4), GameMath.FromValue_11BFA0(0f, 0), Missing);
+        var r = GameMath.Mul_18D558(qYaw, ToQ(M.V(q)));
         M.V(q, ToV(NormalizeGuarded(r)));
-        var qPitch = CamMath.Euler_186780(M.I(y + 0x2E0), CamMath.FromValue_11BFA0(0f, 0), CamMath.FromValue_11BFA0(0f, 0), Missing);
-        r = CamMath.Mul_18D558(ToQ(M.V(q)), qPitch);
+        var qPitch = GameMath.Euler_186780(M.I(y + 0x2E0), GameMath.FromValue_11BFA0(0f, 0), GameMath.FromValue_11BFA0(0f, 0), Missing);
+        r = GameMath.Mul_18D558(ToQ(M.V(q)), qPitch);
         M.V(q, ToV(NormalizeGuarded(r)));
     }
 

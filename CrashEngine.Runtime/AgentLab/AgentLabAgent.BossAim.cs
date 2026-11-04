@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -118,20 +119,20 @@ public sealed partial class AgentLabAgent
             if (!_bones.Contains(reactId) || WeaponOn(reactId) is not { } w || Owner is not { } owner) return false;
             var node = owner.GameMatrix;
             var world = model * node;
-            var inv = CamMath.RigidInverse_18E808(node);
+            var inv = GameMath.RigidInverse_18E808(node);
             Vector3 target;
             if (TargetMode == 1) target = TargetPosition;
             else if (TargetMode == 2 && TargetObject is { Destroyed: false } t) target = t.GamePosition;
             else return false;
             var d = new Vector4(target.X - world.M41, target.Y - world.M42, target.Z - world.M43, 1f);
-            float k = CamMath.InvLengthGuarded_11C030(Eps, d);
+            float k = GameMath.InvLength_11C030(Eps, d);
             var look = Along_185A40(new Vector3(d.X * k, d.Y * k, d.Z * k));
             var m = world;
             if (AnimatedObject.InLogicCompose)
             {
                 Blend_116448(w, ref m, look, model);
                 var z = new Vector3(m.M31, m.M32, m.M33);
-                w.AimDot = Vector3.Dot(z / MathF.Max(z.Length(), 1e-20f), new Vector3(look.M31, look.M32, look.M33));
+                w.AimDot = GameMath.Dot(z / MathF.Max(GameMath.Length(z), 1e-20f), new Vector3(look.M31, look.M32, look.M33));
             }
             else Shown_116448(w, ref m, look, model);
             m *= inv;
@@ -142,8 +143,8 @@ public sealed partial class AgentLabAgent
 
         private static Quaternion Unit(Matrix4x4 m)
         {
-            var q = CamMath.MatrixToQuat_186900(m);
-            float k = CamMath.QuatInvLength_11C0B8(q, 0f, QuatEps);
+            var q = GameMath.MatrixToQuat_186900(m);
+            float k = GameMath.QuatInvLength_11C0B8(q, 0f, QuatEps);
             return new Quaternion(q.X * k, q.Y * k, q.Z * k, q.W * k);
         }
 
@@ -153,7 +154,7 @@ public sealed partial class AgentLabAgent
             if (w.Locked) return;
             if (w.NeedsRest)
             {
-                w.InverseRest = CamMath.RigidInverse_18E808(model);
+                w.InverseRest = GameMath.RigidInverse_18E808(model);
                 w.NeedsRest = false;
             }
             if (w.Speed == 0f)
@@ -182,7 +183,7 @@ public sealed partial class AgentLabAgent
             if (w.Returning)
             {
                 to = Unit(m);
-                if (CamMath.QuatNear_1861A0(to, from, NearTolerance))
+                if (GameMath.QuatNear_1861A0(to, from, NearTolerance))
                 {
                     w.Returning = false;
                     w.Locked = true;
@@ -190,14 +191,14 @@ public sealed partial class AgentLabAgent
             }
             else to = Unit(look);
             float dt = (float)_agent.World.Dt;
-            var q = CamMath.Slerp_187100(w.Speed * RateScale * dt, from, to);
-            w.Current = CamMath.WithRotation_18E620(w.Current, q);
+            var q = GameMath.Slerp_187100(w.Speed * RateScale * dt, from, to);
+            w.Current = GameMath.WithRotation_18E620(w.Current, q);
             w.ShownFrom = from;
             w.ShownTo = q;
             w.ShownFrame = frame;
             m = w.Current;
             if (w.Bone == 0) m = delta * m;
-            if (w.Scale != 1f) m = CamMath.ScaleColumns_183DE0(m, new Vector3(w.Scale));
+            if (w.Scale != 1f) m = GameMath.ScaleColumns_183DE0(m, new Vector3(w.Scale));
         }
 
         private void Shown_116448(Weapon w, ref Matrix4x4 m, Matrix4x4 look, Matrix4x4 model)
@@ -215,10 +216,10 @@ public sealed partial class AgentLabAgent
             }
             var q = w.ShownTo;
             if (w.ShownFrame == _agent.World.Frame && SimulationClock.Active)
-                q = CamMath.Slerp_187100(SimulationClock.Alpha, w.ShownFrom, w.ShownTo);
-            m = CamMath.WithRotation_18E620(w.Current, q);
+                q = GameMath.Slerp_187100(SimulationClock.Alpha, w.ShownFrom, w.ShownTo);
+            m = GameMath.WithRotation_18E620(w.Current, q);
             if (w.Bone == 0) m = w.InverseRest * model * m;
-            if (w.Scale != 1f) m = CamMath.ScaleColumns_183DE0(m, new Vector3(w.Scale));
+            if (w.Scale != 1f) m = GameMath.ScaleColumns_183DE0(m, new Vector3(w.Scale));
         }
     }
 

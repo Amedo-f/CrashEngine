@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -34,7 +35,7 @@ public sealed partial class AgentLabAgent
         {
             var p = _keys[i];
             var d = new Vector4(p.X - pos.X, p.Y - pos.Y, p.Z - pos.Z, 1f);
-            float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, d);
+            float k = GameMath.InvLength_11C030(2.4999998e-09f, d);
             float dot = d.X * k * node.M31 + d.Y * k * node.M32 + d.Z * k * node.M33;
             if (bestDot < dot)
             {
@@ -51,11 +52,11 @@ public sealed partial class AgentLabAgent
         _velocity = v;
     }
 
-    internal Quaternion NodeQuat => CamMath.MatrixToQuat_186900(GameMatrix);
+    internal Quaternion NodeQuat => GameMath.MatrixToQuat_186900(GameMatrix);
 
     internal void SetNodeQuat(Quaternion q)
     {
-        var r = CamMath.QuatToMatrix_18E620(q);
+        var r = GameMath.QuatToMatrix_18E620(q);
         r.Translation = GamePosition;
         if (r != GameMatrix) GameMatrix = r;
     }
@@ -98,9 +99,9 @@ public sealed partial class AgentLabAgent
         SetNodePosition(head);
         if (_rope is not { } rope) return;
         rope.Step_162220(World.NowTicks, new Vector4(head, _grapleEnd.W), _grapleStart);
-        var inv = CamMath.RigidInverse_18E808(old);
-        var p1 = CamMath.Transform_18E4F0(inv, rope.Head);
-        var p2 = CamMath.Transform_18E4F0(inv, rope.Start);
+        var inv = GameMath.RigidInverse_18E808(old);
+        var p1 = GameMath.Transform_18E4F0(inv, rope.Head);
+        var p2 = GameMath.Transform_18E4F0(inv, rope.Start);
         var min = new Vector3(1e30f);
         var max = new Vector3(-1e30f);
         foreach (var p in (ReadOnlySpan<Vector4>)[p1, p2])

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -61,10 +62,10 @@ public sealed partial class GameCamera
         TransformPoint_1E9A60(m, y + 0x20, true);
         uint xs = M.U(y + 0x50);
         var v = new Vector4(M.F(xs + 0x20) - M.F(y + 0x20), M.F(xs + 0x24) - M.F(y + 0x24), M.F(xs + 0x28) - M.F(y + 0x28), 1f);
-        int yaw = CamMath.Yaw_18C830(v);
-        var flat = CamMath.Rotate3_18E4B8(CamMath.RotY_18BBC0(-yaw), v);
-        M.I(y + 0x68, CamMath.Wrap16(CamMath.Pitch_18C898(flat)));
-        M.I(y + 0x108, CamMath.Wrap16(yaw));
+        int yaw = GameMath.Yaw_18C830(v);
+        var flat = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(-yaw), v);
+        M.I(y + 0x68, GameMath.Wrap16(GameMath.Pitch_18C898(flat)));
+        M.I(y + 0x108, GameMath.Wrap16(yaw));
     }
 
     public void TransformPoint_1E9A60(Matrix4x4 m, uint v, bool translate)
@@ -75,8 +76,8 @@ public sealed partial class GameCamera
 
     public void TransformQuat_1EFA40(Matrix4x4 m, uint q)
     {
-        var r = CamMath.QuatToMatrix_18E620(ToQ(M.V(q)));
+        var r = GameMath.QuatToMatrix_18E620(ToQ(M.V(q)));
         r.M41 = 0f; r.M42 = 0f; r.M43 = 0f; r.M44 = 1f;
-        M.V(q, ToV(CamMath.MatrixToQuat_186900(r * m)));
+        M.V(q, ToV(GameMath.MatrixToQuat_186900(r * m)));
     }
 }

@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -104,7 +105,7 @@ public sealed class CharacterGun
 
     public bool ShotWithin_15F108(int ticks) => !(ticks < _c.Ticks - LastShot);
 
-    private int Seconds(int param) => CharacterController.Cvt(_c.Param(param) * TicksPerSecond);
+    private int Seconds(int param) => GameMath.Trunc(_c.Param(param) * TicksPerSecond);
 
     public int LockKind_14A7C0()
     {
@@ -137,7 +138,7 @@ public sealed class CharacterGun
         }
         else if (TakeAmmo_15EFE8(1)) { Duration = Seconds(0x35); slot = SlotFire; }
         else { Duration = Seconds(0x37); slot = SlotEmpty; }
-        if (_c.TriggerForced is { } forced) forced(slot);
+        if (_c.TriggerOnChannel is { } onChannel) onChannel(slot, 1);
         else _c.Trigger(slot);
         return 6;
     }

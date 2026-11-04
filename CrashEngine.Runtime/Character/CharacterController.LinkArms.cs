@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -34,7 +35,7 @@ public sealed partial class CharacterController
             rot.M41 = rot.M42 = rot.M43 = 0f;
             rot.M44 = 1f;
             float angle = BackTwist_15FCC0(link, time) * (link.Scale40 * 0.25f);
-            c = CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(angle, 0)) * rot;
+            c = GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(angle, 0)) * rot;
             c.M41 = m.M41;
             c.M42 = m.M42;
             c.M43 = m.M43;
@@ -126,7 +127,7 @@ public sealed partial class CharacterController
     private static Vector3 HandReach(Vector3 f0, Vector3 f100, bool leader)
     {
         var d = f100 - f0;
-        return d * CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(d, 0f)) * (leader ? 0.3f : 0.256f);
+        return d * GameMath.InvLength_11C030(ArmEps, new Vector4(d, 0f)) * (leader ? 0.3f : 0.256f);
     }
 
     private static float BackTwist_15FCC0(CharacterLink link, float time)
@@ -139,11 +140,11 @@ public sealed partial class CharacterController
 
     private Matrix4x4 Aim_14C5C8(Vector3 dir)
     {
-        var a = dir * CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(dir, 0f));
+        var a = dir * GameMath.InvLength_11C030(ArmEps, new Vector4(dir, 0f));
         var c = Vector3.Cross(a, Vector3.UnitX);
-        c *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(c, 0f));
+        c *= GameMath.InvLength_11C030(ArmEps, new Vector4(c, 0f));
         var b = Vector3.Cross(c, a);
-        b *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(b, 0f));
+        b *= GameMath.InvLength_11C030(ArmEps, new Vector4(b, 0f));
         if (Bones.Kind == 0)
         {
             b = -b;
@@ -163,9 +164,9 @@ public sealed partial class CharacterController
         if (link.Hold == 0 || far.Hold == 0) return;
         var wl = GameMatrix;
         var wf = follower.GameMatrix;
-        var il = CamMath.RigidInverse_18E808(wl);
+        var il = GameMath.RigidInverse_18E808(wl);
         il.M44 = 1f;
-        var iff = CamMath.RigidInverse_18E808(wf);
+        var iff = GameMath.RigidInverse_18E808(wf);
         iff.M44 = 1f;
         var pl = Vector3.Transform(link.Point50, wl);
         var pf = Vector3.Transform(far.Point50, wf);
@@ -173,7 +174,7 @@ public sealed partial class CharacterController
         link.Ik110 ??= LinkIk.Create_14D680();
         var pts = link.Points90;
         link.Ik110.Solve(Vector3.Zero, t, pts);
-        link.Length0E0 = t.Length();
+        link.Length0E0 = GameMath.Length(t);
         link.Hold = 2;
         far.Hold = 2;
         var err = t - pts[4];
@@ -208,23 +209,23 @@ public sealed partial class CharacterController
     {
         if (HeldMatrix_11C?.Invoke() is not { } m || SetHeldMatrix_11C is not { } set) return;
         if (!HandPoints_13FC50(out var h1, out var h2)) return;
-        if (!(h1.Length() < 1000f) || !(h2.Length() < 1000f)) return;
+        if (!(GameMath.Length(h1) < 1000f) || !(GameMath.Length(h2) < 1000f)) return;
         if (link.Leader_15FE50() is not { } lead || lead.MotionState is 6 or 10) return;
         var d = h2 - h1;
-        d *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(d, 0f));
+        d *= GameMath.InvLength_11C030(ArmEps, new Vector4(d, 0f));
         var up = new Vector3(m.M21, m.M22, m.M23);
         var axis = Vector3.Cross(up, d);
-        up *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(up, 0f));
-        if (5e-5f < axis.LengthSquared())
+        up *= GameMath.InvLength_11C030(ArmEps, new Vector4(up, 0f));
+        if (5e-5f < GameMath.LengthSquared(axis))
         {
-            axis *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(axis, 0f));
-            int angle = CamMath.Acos_18B738(Vector3.Dot(up, d));
-            if (angle != 0) m *= Matrix4x4.CreateFromAxisAngle(axis, angle * CamMath.UnitToRad);
+            axis *= GameMath.InvLength_11C030(ArmEps, new Vector4(axis, 0f));
+            int angle = GameMath.Acos_18B738(GameMath.Dot(up, d));
+            if (angle != 0) m *= Matrix4x4.CreateFromAxisAngle(axis, angle * GameMath.UnitToRad);
         }
         var r0 = new Vector3(m.M11, m.M12, m.M13);
-        r0 *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(r0, 0f));
+        r0 *= GameMath.InvLength_11C030(ArmEps, new Vector4(r0, 0f));
         var r1 = new Vector3(m.M21, m.M22, m.M23);
-        r1 *= CamMath.InvLengthGuarded_11C030(ArmEps, new Vector4(r1, 0f));
+        r1 *= GameMath.InvLength_11C030(ArmEps, new Vector4(r1, 0f));
         var r2 = Vector3.Cross(r0, r1);
         r0 = Vector3.Cross(r1, r2);
         var mid = (h1 + h2) * 0.5f;

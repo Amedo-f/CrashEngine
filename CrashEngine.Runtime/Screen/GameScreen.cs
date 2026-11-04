@@ -1,5 +1,6 @@
 using CrashEngine.Importer;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen;
 
@@ -197,7 +198,7 @@ public sealed partial class GameScreen // Amedo 2026-10-01
         return written;
     }
 
-    public static int Ticks(float seconds) => Character.CharacterController.Cvt(seconds * TicksPerSecond);
+    public static int Ticks(float seconds) => GameMath.Trunc(seconds * TicksPerSecond);
 
     public static int InstanceLine(uint subtype) => (int)(subtype < 11 ? subtype + 0x1E : subtype + 0x29); // Amedo 2026-10-01
 }

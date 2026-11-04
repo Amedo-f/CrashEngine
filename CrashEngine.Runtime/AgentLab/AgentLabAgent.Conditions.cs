@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -52,7 +53,7 @@ public sealed partial class AgentLabAgent
             case 602: return EdgeHasFlag(0x100) ? 1f : 0f; // Amedo 2026-10-05
             case 619: return PlayerNearerAnotherKey();
             case 517:
-                return World.Player is { } p && p != this ? Vector3.DistanceSquared(WorldPosition, p.WorldPosition) : 0f;
+                return World.Player is { } p && p != this ? GameMath.DistanceSq(WorldPosition, p.WorldPosition) : 0f;
             case 22: return MeFacingFocus(); // Amedo 2026-09-27
             case 24: return ClearLineOfSightToFocus_225E68(); // Amedo 2026-10-06
             case 40: return HeadLookingAtFocus_227758(c.Parameter); // Amedo 2026-10-06
@@ -67,12 +68,12 @@ public sealed partial class AgentLabAgent
             case 46: return FocusObject is { } fa && (fa.Instance.ObjectId & 0x7FFF) == c.Parameter && fa.Instance.ObjectId != 0xFFFF ? 1f : 0f;
             case 52: return ((_keyCurrent + 1) & 0xFF) == c.Parameter ? 1f : 0f;
             case 132: return AtLastKey_22A658 ? 1f : 0f; // Amedo 2026-10-01
-            case 137: return (_controller ?? this)._keys.Count; // Amedo 2026-10-01
+            case 137: return _keys.Count; // Amedo 2026-10-30
             case 66: return FocusObject is { _busy: true } ? 1f : 0f;
             case 68:
             case 69: return MeToKeySqrDist(c.Parameter);
             case 88:
-            case 123: return Alive(ref _slot118) is { } s118 ? Vector3.DistanceSquared(GamePosition, s118.GamePosition) : 1e30f;
+            case 123: return Alive(ref _slot118) is { } s118 ? GameMath.DistanceSq(GamePosition, s118.GamePosition) : 1e30f;
             case 77: return Alive(ref _slot118) is not null ? 1f : 0f;
             case 79: return Alive(ref _slot118) is { } s79 && s79.Instance.ObjectId != 0xFFFF && (s79.Instance.ObjectId & 0x7FFF) == c.Parameter ? 1f : 0f; // Amedo 2026-10-05
             case 122: return Alive(ref _slot118) is not { } b118 || b118._busy ? 1f : 0f; // Amedo 2026-09-30
@@ -90,7 +91,7 @@ public sealed partial class AgentLabAgent
             case 103: return _route is not null ? _routeIndex & 0xFF : 0f; // Amedo
             case 117: return MessageOnce_22A028(c, ctx); // Amedo
             case 131: return Side_2285C0(Alive(ref _slot118)?.GamePosition, 0); // Amedo
-            case 139: return FocusTarget() is { } fromStart ? DistanceSq(_initMatrix.Translation, fromStart) : 0f; // Amedo
+            case 139: return FocusTarget() is { } fromStart ? GameMath.DistanceSq(_initMatrix.Translation, fromStart) : 0f; // Amedo
             case 140: return Alive(ref _slot118) is { } above ? GamePosition.Y - above.GamePosition.Y : 0f; // Amedo
             case 144: return SlotAlongAxisSq_2421D8(0); // Amedo
             case 145: return SlotAlongAxisSq_2421D8(1); // Amedo
@@ -99,7 +100,7 @@ public sealed partial class AgentLabAgent
             case 149: return SlotVisible_226360(c); // Amedo
             case 150: return SlotInViewCone_227C20(c); // Amedo
             case 154: return _keyCurrent == 0xFF || ((_keyCurrent + 1) & 1) == 0 ? 0f : 1f; // Amedo
-            case 155: return FocusTarget() is { } fromExit && JointPosition_22DA00(c.Parameter & 0xFF, out var exitAt) ? DistanceSq(fromExit, exitAt) : 0f; // Amedo
+            case 155: return FocusTarget() is { } fromExit && JointPosition_22DA00(c.Parameter & 0xFF, out var exitAt) ? GameMath.DistanceSq(fromExit, exitAt) : 0f; // Amedo
             case 157: return GameMatrix.M22; // Amedo
             case 158: return (ParamInt_2619D8(0) & 1) != 0 ? 0f : 1f; // Amedo
             case 161: return FocusObject is { } focusOne && ReferenceEquals(focusOne, Alive(ref _slot118)) ? 1f : 0f; // Amedo
@@ -109,7 +110,7 @@ public sealed partial class AgentLabAgent
             case 573: return PadInput_2B19D0(c.Parameter, 6); // Amedo
             case 574: return PadInput_2B19D0(c.Parameter, 7); // Amedo
             case 575: return PadInput_2B19D0(c.Parameter, 4); // Amedo
-            case 616: return World.Player is { } nearPlayer && _hasFocusPosition ? DistanceSq(_focusPosition, nearPlayer.GamePosition) : 1e30f; // Amedo
+            case 616: return World.Player is { } nearPlayer && _hasFocusPosition ? GameMath.DistanceSq(_focusPosition, nearPlayer.GamePosition) : 1e30f; // Amedo
             case 618: return BesidePlayer_125D38(); // Amedo
             case 172: return _timer5C == 0 ? 0f : MathF.Max(0f, (World.NowTicks - _timer5C) * (1f / 9000f)); // Amedo 2026-09-30
             case 153: return RootController().GameObject is { } slots && c.Parameter < slots.BehaviourSlots.Count && slots.BehaviourSlots[c.Parameter] != 0xFFFF ? 1f : 0f; // Amedo 2026-09-30
@@ -151,7 +152,7 @@ public sealed partial class AgentLabAgent
                 if (!inFrustum(center)) return 0f;
                 return Chunk.Collision is { } col && col.SegmentCast(cam.Translation, center, 0x80, out _) ? 0f : 1f;
             }
-            case 89: return _hasStoredPosition ? Vector3.DistanceSquared(GamePosition, _storedPosition) : 1e30f;
+            case 89: return _hasStoredPosition ? GameMath.DistanceSq(GamePosition, _storedPosition) : 1e30f;
             case 82: return _hasStoredPosition ? 1f : 0f; // Amedo 2026-09-28
             case 6: return World.RootLinksLoaded ? 1f : 0f; // Amedo 2026-09-30
             case 12: return World.IsZoneStateSet(this) ? 1f : 0f; // Amedo 2026-09-28
@@ -324,7 +325,7 @@ public sealed partial class AgentLabAgent
         else if (FocusObjectAwake_88() is { } focus) m = focus.LocalMatrix;
         else return 0f;
         var d = GamePosition + new Vector3(0f, 0.8f, 0f) - m.Translation;
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         return m.M31 * d.X + m.M32 * d.Y + m.M33 * d.Z;
     }
 
@@ -334,7 +335,7 @@ public sealed partial class AgentLabAgent
         if (World.Player is not { } player) return 0f;
         var m = LocalMatrix;
         var d = player.GamePosition + new Vector3(0f, 0.5f, 0f) - GamePosition;
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         return m.M31 * d.X + m.M32 * d.Y + m.M33 * d.Z;
     }
 
@@ -352,7 +353,7 @@ public sealed partial class AgentLabAgent
     {
         if (FocusTarget() is not { } target || !ExitPointPlace_23C900(exit, out var position, out var direction)) return 0f; // Amedo
         var d = target + new Vector3(0f, 0.8f, 0f) - position;
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         return direction.X * d.X + direction.Y * d.Y + direction.Z * d.Z;
     }
 
@@ -361,7 +362,7 @@ public sealed partial class AgentLabAgent
     {
         if (FocusTarget() is not { } target) return 0f;
         var d = target - GamePosition;
-        float lenSq = d.LengthSquared();
+        float lenSq = GameMath.LengthSquared(d);
         float inv = lenSq > 2.4999998e-09f ? 1f / MathF.Sqrt(lenSq) : 0f;
         var m = LocalMatrix;
         return m.M31 * d.X * inv + m.M33 * d.Z * inv;
@@ -372,7 +373,7 @@ public sealed partial class AgentLabAgent
     {
         if (target is not { } t) return 0f;
         var d = t - GamePosition;
-        float lenSq = d.LengthSquared();
+        float lenSq = GameMath.LengthSquared(d);
         float inv = lenSq > 2.4999998e-09f ? 1f / MathF.Sqrt(lenSq) : 0f;
         var m = LocalMatrix;
         float r = (m.M11 * d.X + m.M12 * d.Y + m.M13 * d.Z) * inv;
@@ -385,14 +386,14 @@ public sealed partial class AgentLabAgent
     {
         Vector3? focus = _hasFocusObject ? FocusObjectPosition : FocusPosition; // Amedo
         var slot = Alive(ref _slot118);
-        return focus is { } f && slot is not null ? Vector3.DistanceSquared(f, slot.GamePosition) : 0f;
+        return focus is { } f && slot is not null ? GameMath.DistanceSq(f, slot.GamePosition) : 0f;
     }
 
     private float MeToKeySqrDist(int parameter)
     {
         var owner = _controller ?? this;
         Vector3? key = parameter is 0 or 0xFF ? owner.Key(owner._keyCurrent) : owner.Key(parameter - 1);
-        return key is { } k ? Vector3.DistanceSquared(GamePosition, k) : 0f;
+        return key is { } k ? GameMath.DistanceSq(GamePosition, k) : 0f;
     }
 
     private int Var(int index)
@@ -411,11 +412,6 @@ public sealed partial class AgentLabAgent
     }
 
     // Amedo
-    private static float DistanceSq(Vector3 a, Vector3 b)
-    {
-        float x = a.X - b.X, y = a.Y - b.Y, z = a.Z - b.Z;
-        return x * x + y * y + z * z;
-    }
 
     // Amedo
     private static float Dot3(Vector3 a, Vector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
@@ -455,7 +451,7 @@ public sealed partial class AgentLabAgent
         var d = slot.GamePosition - me;
         float along = Dot3(axis, d);
         var at = me + axis * along;
-        return DistanceSq(me, at);
+        return GameMath.DistanceSq(me, at);
     }
 
     // Amedo
@@ -465,7 +461,7 @@ public sealed partial class AgentLabAgent
         var s = slot.GamePosition;
         var me = GamePosition;
         var d = new Vector3(s.X - me.X, s.Y + 0.8f - me.Y, s.Z - me.Z);
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         var m = GameMatrix;
         return m.M31 * d.X + m.M32 * d.Y + m.M33 * d.Z;
     }
@@ -490,7 +486,7 @@ public sealed partial class AgentLabAgent
         if (!ExitPointPlace_23C900(c.Parameter & 0xFF, out var pos, out var dir)) return 0f;
         target.Y += 0.8f;
         var n = target - pos;
-        n *= InverseLength(n);
+        n *= GameMath.InverseLength(n);
         if (!(c.ReturnCheck < Dot3(dir, n))) return 0f;
         if (Chunk.Collision is { } world && world.SegmentCast(pos, target, 0x80, out _)) return 0f;
         return c.ReturnCheck + c.ReturnCheck;
@@ -503,10 +499,10 @@ public sealed partial class AgentLabAgent
         if (slotIndex == 6 || World.PlayerSlot_570(slotIndex) is not { } player) return 0f;
         if (!ExitPointPlace_23C900(c.Parameter & 0xFF, out var pos, out var dir)) return 0f;
         var p = player.GamePosition;
-        if (!(DistanceSq(pos, p) < 1600f) || player.OwnCharacter is not { } pc) return 0f;
+        if (!(GameMath.DistanceSq(pos, p) < 1600f) || player.OwnCharacter is not { } pc) return 0f;
         float height = (pc.MotionFlagsHigh & 1u) == 0 ? pc.StandHeight_C0 : pc.LowHeight_C0;
         var move = new Vector3(p.X - pos.X, p.Y + height - pos.Y, p.Z - pos.Z);
-        var n = move * InverseLength(move);
+        var n = move * GameMath.InverseLength(move);
         if (!(c.ReturnCheck < Dot3(dir, n))) return 0f;
         bool hit = LineOfSight_280958(pos, ref move, 0x80, 0x15B010, Parent28, out var other); // Amedo
         return !hit || ReferenceEquals(other, player) ? c.ReturnCheck + c.ReturnCheck : 0f;
@@ -521,7 +517,7 @@ public sealed partial class AgentLabAgent
         var pm = player.GameMatrix;
         var me = GamePosition;
         var d = new Vector3(me.X - p.X, me.Y + 0.5f - p.Y, me.Z - p.Z);
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         return pm.M11 * d.X + pm.M12 * d.Y + pm.M13 * d.Z;
     }
 

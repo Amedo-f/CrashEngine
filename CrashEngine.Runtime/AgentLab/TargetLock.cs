@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -146,7 +147,7 @@ public sealed class TargetLock
     public void Search_15D250(int now, AgentLabAgent self, AgentLabAgent? weapon)
     {
         var m = self.GameMatrix;
-        var off = CamMath.Rotate3_18E4B8(m, Offset);
+        var off = GameMath.Rotate3_18E4B8(m, Offset);
         m.M41 += off.X;
         m.M42 += off.Y;
         m.M43 += off.Z;
@@ -155,7 +156,7 @@ public sealed class TargetLock
         Results.Clear();
         var current = Target;
         bool listed = false;
-        foreach (var o in self.World.QueryOverlap(Hull, m, QueryMask, 1, self, 0x40))
+        foreach (var o in self.World.QueryOverlap(Hull, m, QueryMask, 1, self, 0x40, points: true)) // Amedo
         {
             if (o is not AgentLabAgent a) continue;
             if (!CanTarget_15C978(a) && (a.ComponentMask & Mask) == 0) continue;
@@ -165,9 +166,9 @@ public sealed class TargetLock
             int priority = Priority(a);
             var d = new Vector4(center.X - origin.X, center.Y - origin.Y, center.Z - origin.Z, 1f);
             float dist2 = d.X * d.X + d.Y * d.Y + d.Z * d.Z;
-            float inv = CamMath.InvLengthGuarded_11C030(Eps, d);
+            float inv = GameMath.InvLength_11C030(Eps, d);
             float lateral = MathF.Abs(d.X * inv * m.M11 + d.Y * inv * m.M12 + d.Z * inv * m.M13) * 100f;
-            Results.Add((a, unchecked(priority + CamMath.Trunc(lateral * dist2))));
+            Results.Add((a, unchecked(priority + GameMath.Trunc(lateral * dist2))));
             if (ReferenceEquals(Target, a)) listed = true;
         }
         AgentLabAgent? best = null;
@@ -180,7 +181,7 @@ public sealed class TargetLock
             best = null;
         }
         if (ReferenceEquals(current, best)) Confirmed = now;
-        else if (!(unchecked(now - Confirmed) < CamMath.Trunc(CamMath.SecToTick * 0.25f))) _target = best;
+        else if (!(unchecked(now - Confirmed) < GameMath.Trunc(GameMath.SecToTick * 0.25f))) _target = best;
         else if (listed || best is not null)
         {
             if (!CanTarget_15C978(current))

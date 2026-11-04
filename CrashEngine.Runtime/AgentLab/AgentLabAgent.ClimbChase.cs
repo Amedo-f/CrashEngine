@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -32,7 +33,7 @@ public sealed partial class AgentLabAgent
                 return;
             }
             var n = ctrl.GroundNormal;
-            n *= InverseLength(n);
+            n *= GameMath.InverseLength(n);
             var (bmin, bmax) = CommittedBox;
             var foot = (bmax - bmin) * 0.5f + bmin - n * _logicalRadius;
             float w = -(n.X * foot.X + n.Y * foot.Y + n.Z * foot.Z);
@@ -40,9 +41,9 @@ public sealed partial class AgentLabAgent
             if ((ctrl.Flags & PhysicsController.TouchedTerrain) != 0)
                 aim -= n * (n.X * aim.X + n.Y * aim.Y + n.Z * aim.Z + w);
             var dir = aim - foot;
-            dir *= InverseLength(dir);
+            dir *= GameMath.InverseLength(dir);
             var right = Vector3.Cross(n, dir);
-            right *= InverseLength(right);
+            right *= GameMath.InverseLength(right);
             var up = dir;
             if (_moveTarget.Y - here.Y < 0f)
             {
@@ -54,9 +55,9 @@ public sealed partial class AgentLabAgent
                                        -n.X, -n.Y, -n.Z, 1f,
                                        0f, 0f, 0f, 1f);
             float t = MathF.Min(_homePower * dt, 1f);
-            var from = NormalizedQuat(CamMath.MatrixToQuat_186900(LocalMatrix));
-            var to = NormalizedQuat(CamMath.MatrixToQuat_186900(facing));
-            SetLocalRotation(CamMath.Slerp_187100(t * dt, from, to));
+            var from = NormalizedQuat(GameMath.MatrixToQuat_186900(LocalMatrix));
+            var to = NormalizedQuat(GameMath.MatrixToQuat_186900(facing));
+            SetLocalRotation(GameMath.Slerp_187100(t * dt, from, to));
 
             speed = ChaseSpeed_20F1C0(0f);
             if (dir.Y < 0f)
@@ -85,7 +86,7 @@ public sealed partial class AgentLabAgent
 
     private static Quaternion NormalizedQuat(Quaternion q)
     {
-        float k = CamMath.QuatInvLength_11C0B8(q, 0f, 1e-10f);
+        float k = GameMath.QuatInvLength_11C0B8(q, 0f, 1e-10f);
         return new Quaternion(q.X * k, q.Y * k, q.Z * k, q.W * k);
     }
 }

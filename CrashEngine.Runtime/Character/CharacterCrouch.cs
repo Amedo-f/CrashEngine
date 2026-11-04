@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -79,7 +80,7 @@ public sealed class CharacterCrouch
                     if (!on && _c.Fits(0, touchUp: true)) // Amedo 2026-10-06
                     {
                         _c.Trigger(0x31);
-                        Duration = CharacterController.Cvt(_c.Param(42) * TickRate);
+                        Duration = GameMath.Trunc(_c.Param(42) * TickRate);
                         next = 4;
                         Cooldown = 0.2f;
                     }
@@ -93,7 +94,7 @@ public sealed class CharacterCrouch
                     if (!on && _c.Fits(0, touchUp: true)) // Amedo 2026-10-06
                     {
                         _c.Trigger(0x32);
-                        Duration = CharacterController.Cvt(_c.Param(43) * TickRate);
+                        Duration = GameMath.Trunc(_c.Param(43) * TickRate);
                         next = 4;
                     }
                     else if (len <= 0.6f)
@@ -106,7 +107,7 @@ public sealed class CharacterCrouch
                     if (on && Cooldown == 0f)
                     {
                         _c.Trigger(0x2E);
-                        Duration = CharacterController.Cvt(_c.Param(41) * TickRate);
+                        Duration = GameMath.Trunc(_c.Param(41) * TickRate);
                         next = 1;
                     }
                     else if (Ends(now))
@@ -132,7 +133,7 @@ public sealed class CharacterCrouch
             {
                 _c.SetOverride(CharacterController.ForwardOverride, ref _c.Forward, _c.Param(40));
                 _c.SetOverride(CharacterController.SideOverride, ref _c.Side, 0f);
-                _c.SetTurn(CharacterController.Mul(_c.IntParam(4), turn));
+                _c.SetTurn(GameMath.Scale_15DE90(turn, _c.IntParam(4)));
             }
             else
             {
@@ -150,15 +151,15 @@ public sealed class CharacterCrouch
         }
     }
 
-    private bool Ends(int now) => CharacterController.Cvt((PhaseTime * TickTime + Duration * TickTime) * TickRate) <= now;
+    private bool Ends(int now) => GameMath.Trunc((PhaseTime * TickTime + Duration * TickTime) * TickRate) <= now;
 
     private void Start(bool on, ref int next)
     {
         if (!on || Cooldown != 0f || !_c.Fits(3, push: true)) return; // Amedo 2026-10-06
         bool slide = false;
-        if ((_c.MotionFlagsHigh & (1u << 11)) != 0 && 1f < _c.Velocity.LengthSquared())
+        if ((_c.MotionFlagsHigh & (1u << 11)) != 0 && 1f < GameMath.LengthSquared(_c.Velocity))
         {
-            Duration = CharacterController.Cvt((_c.Param(45) + _c.Param(46) - _c.Param(47)) * TickRate);
+            Duration = GameMath.Trunc((_c.Param(45) + _c.Param(46) - _c.Param(47)) * TickRate);
             slide = Duration != 0;
         }
         if (slide)
@@ -167,11 +168,11 @@ public sealed class CharacterCrouch
             Friction = 1f;
             Flags &= ~(0x200u | 0x400u);
             SlideScale = 1f;
-            Direction = _c.Move * CharacterController.InverseLength(_c.Move);
+            Direction = _c.Move * GameMath.InverseLength(_c.Move);
             _c.Trigger(0x33);
             return;
         }
-        Duration = CharacterController.Cvt(_c.Param(41) * TickRate);
+        Duration = GameMath.Trunc(_c.Param(41) * TickRate);
         if (Duration == 0) return;
         _c.Trigger(0x2E);
         next = 1;
@@ -180,7 +181,7 @@ public sealed class CharacterCrouch
     private void Slide(float turn, int now, ref int next)
     {
         int elapsed = now - PhaseTime;
-        int early = CharacterController.Cvt(_c.Param(45) * TickRate);
+        int early = GameMath.Trunc(_c.Param(45) * TickRate);
         bool late = !(elapsed < early);
         Flags = (Flags & ~0x400u) | (late ? 0x400u : 0u);
         int rate;
@@ -190,7 +191,7 @@ public sealed class CharacterCrouch
             rate = 0;
             _c.Trigger(0x36);
             speed = 0f;
-            Duration = CharacterController.Cvt(_c.Param(49) * TickRate);
+            Duration = GameMath.Trunc(_c.Param(49) * TickRate);
             next = 6;
             Cooldown = 0f;
             Flags |= 0x400;
@@ -199,19 +200,19 @@ public sealed class CharacterCrouch
         {
             if (Duration <= elapsed)
             {
-                Duration = CharacterController.Cvt(_c.Param(47) * TickRate);
+                Duration = GameMath.Trunc(_c.Param(47) * TickRate);
                 next = 6;
             }
             if (!late && !(MathF.Abs(Direction.X) <= 5e-5f && MathF.Abs(Direction.Y) <= 5e-5f && MathF.Abs(Direction.Z) <= 5e-5f))
             {
                 float remain = early * TickTime - elapsed * TickTime;
                 int angle = CharacterLocomotion.SignedAngle(Direction, _c.ForwardAxis);
-                rate = Math.Abs(CharacterController.Cvt(angle / remain));
+                rate = Math.Abs(GameMath.Trunc(angle / remain));
             }
             else rate = _c.IntParam(5);
             speed = _c.Param(44);
         }
-        Drive(speed, CharacterController.Mul(rate, turn));
+        Drive(speed, GameMath.Scale_15DE90(turn, rate));
     }
 
     private void SlideEnd(float turn, int now, bool on, ref int next)
@@ -220,16 +221,16 @@ public sealed class CharacterCrouch
         if (elapsed < Duration)
         {
             SlideScale = 1f - elapsed * TickTime / (Duration * TickTime);
-            Drive(_c.Param(44), CharacterController.Mul(_c.IntParam(5), turn));
+            Drive(_c.Param(44), GameMath.Scale_15DE90(turn, _c.IntParam(5)));
             return;
         }
-        int d = CharacterController.Cvt(_c.Param(48) * TickRate);
+        int d = GameMath.Trunc(_c.Param(48) * TickRate);
         Flags &= ~0x200u;
         Duration = d;
         if ((!on || d == 0) && _c.Fits(0, touchUp: true)) // Amedo 2026-10-06
         {
             _c.Trigger(0x36);
-            Duration = CharacterController.Cvt(_c.Param(49) * TickRate);
+            Duration = GameMath.Trunc(_c.Param(49) * TickRate);
             next = 4;
             Cooldown = 0.2f;
         }
@@ -247,6 +248,6 @@ public sealed class CharacterCrouch
         Friction *= _c.Efficiency;
         _c.SetOverride(CharacterController.ForwardOverride, ref _c.Forward, speed * SlideScale);
         _c.SetOverride(CharacterController.SideOverride, ref _c.Side, 0f);
-        _c.SetTurn(CharacterController.Mul(turnRate, SlideScale));
+        _c.SetTurn(GameMath.Scale_15DE90(SlideScale, turnRate));
     }
 }

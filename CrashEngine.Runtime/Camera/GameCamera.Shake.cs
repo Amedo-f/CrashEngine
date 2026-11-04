@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -49,7 +50,7 @@ public sealed partial class GameCamera
         uint node = M.U(obj + 8);
         NodeSyncPosition(node);
         NodeRefresh_18AFA8(node);
-        M.M(s + 0x40, CamMath.RigidInverse_18E808(M.M(node)));
+        M.M(s + 0x40, GameMath.RigidInverse_18E808(M.M(node)));
         var p = M.V(s);
         var add = M.V(s + 0x20);
         p = new Vector4(p.X + add.X, p.Y + add.Y, p.Z + add.Z, p.W);
@@ -81,17 +82,18 @@ public sealed partial class GameCamera
         uint node = M.U(Handle(s + 0x30) + 8);
         NodeSyncPosition(node);
         var e = M.V(node + 0x40);
-        return CamMath.Rotate3_18E4B8(M.M(s + 0x40), new Vector4(e.X - source.X, e.Y - source.Y, e.Z - source.Z, e.W));
+        return GameMath.Rotate3_18E4B8(M.M(s + 0x40), new Vector4(e.X - source.X, e.Y - source.Y, e.Z - source.Z, e.W));
     }
 
     public void Impulse_26F5E8(float strength, float falloff, uint s, Vector4 source)
     {
         if (Handle(s + 0x30) == 0) return;
         var v = ShakeLocal(s, source);
-        if (0.0001f < falloff) strength /= CamMath.LengthSq3(v) * falloff + 1f;
-        float inv = CamMath.InvLengthGuarded_11C030(ShakeEps, v);
+        if (0.0001f < falloff) strength /= GameMath.LengthSq3(v) * falloff + 1f;
+        float inv = GameMath.InvLength_11C030(ShakeEps, v);
         v = new Vector4(v.X * inv, v.Y * inv, v.Z * inv, v.W);
-        v = Jitter_23C848(0.2f, 1f, 1f, 1f, v);
+        var jittered = Rng.JitterVector_23C848(new Vector3(v.X, v.Y, v.Z), 0.2f, 1f, 1f, 1f);
+        v = new Vector4(jittered, v.W);
         float ix = v.X * strength, iy = v.Y * strength, iz = v.Z * strength;
         M.F(s + 0x20, M.F(s + 0x20) + ix);
         M.F(s + 0x24, M.F(s + 0x24) + iy);
@@ -106,7 +108,7 @@ public sealed partial class GameCamera
         float ox, oy, oz, peak;
         if (0.0001f < falloff)
         {
-            float k = 1f / (CamMath.LengthSq3(v) * falloff + 1f);
+            float k = 1f / (GameMath.LengthSq3(v) * falloff + 1f);
             float kz = az * k, kx = ax * k, ky = ay * k;
             ox = 0f < v.X ? kx : -kx;
             oy = 0f < v.Y ? ky : -ky;
@@ -117,7 +119,7 @@ public sealed partial class GameCamera
         }
         else
         {
-            float inv = CamMath.InvLengthGuarded_11C030(ShakeEps, v);
+            float inv = GameMath.InvLength_11C030(ShakeEps, v);
             ox = v.X * inv * ax;
             oy = v.Y * inv * ay;
             oz = v.Z * inv * az;
@@ -131,19 +133,9 @@ public sealed partial class GameCamera
         Rumble_27B4F0(peak);
     }
 
-    public Vector4 Jitter_23C848(float scale, float ax, float ay, float az, Vector4 v)
-    {
-        float jx = Random_18C0F0() * (scale * ax);
-        float jy = Random_18C0F0() * (scale * ay);
-        float jz = Random_18C0F0() * (scale * az);
-        return new Vector4(v.X + jx, v.Y + jy, v.Z + jz, v.W);
-    }
-
-    public float Random_18C0F0() => Rng.RandomSigned_18C0F0(); // Amedo
-
     public void Rumble_27B4F0(float strength)
     {
-        int level = CamMath.Trunc(strength * 1024f);
+        int level = GameMath.Trunc(strength * 1024f);
         if (!(level < 0x100)) level = 0xFF;
         if (!(0x13 < level)) level = 0x14;
         RumbleSet_2B36D0(0x21u | ((uint)(level & 0xFF) << 7), 0.4f);

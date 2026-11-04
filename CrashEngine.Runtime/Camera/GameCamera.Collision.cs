@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -78,17 +79,17 @@ public sealed partial class GameCamera
         int yawAlt = (M.I(y + 0x108) & 0xFFFF) - 0x8000;
         if (!ok)
         {
-            var m = CamMath.RotXY_182AD0(M.I(0x30A658), yawAlt);
+            var m = GameMath.RotXY_182AD0(M.I(0x30A658), yawAlt);
             m.M41 = target.X; m.M42 = target.Y; m.M43 = target.Z; m.M44 = target.W;
-            var cand = CamMath.Transform_18E4F0(m, new Vector4(0f, 0f, -10f, 1f));
+            var cand = GameMath.Transform_18E4F0(m, new Vector4(0f, 0f, -10f, 1f));
             if (!LineOfSight_275F80(y, target, cand, objects, false, out h)) { result = cand; ok = true; }
             else if (TryPull(target, h, 4f, lim2, 0.2f, far, out var pulled)) { result = pulled; ok = true; }
         }
         if (!ok)
         {
-            var m = CamMath.RotXY_182AD0(M.I(y + 0x68), yawAlt);
+            var m = GameMath.RotXY_182AD0(M.I(y + 0x68), yawAlt);
             m.M41 = target.X; m.M42 = target.Y; m.M43 = target.Z; m.M44 = target.W;
-            var cand = CamMath.Transform_18E4F0(m, new Vector4(0f, 0f, -10f, 1f));
+            var cand = GameMath.Transform_18E4F0(m, new Vector4(0f, 0f, -10f, 1f));
             if (!LineOfSight_275F80(y, target, cand, objects, false, out h)) { result = cand; ok = true; }
             else if (TryPull(target, h, 4f, far, 0.2f, lim2, out var pulled))
             {
@@ -101,14 +102,14 @@ public sealed partial class GameCamera
         return true;
     }
 
-    private static bool TryPull(Vector4 target, Vector4 hit, float min2, float near2, float nearPull, float farPull, out Vector4 result)
+    private static bool TryPull(in Vector4 target, in Vector4 hit, float min2, float near2, float nearPull, float farPull, out Vector4 result)
     {
         var d = new Vector4(hit.X - target.X, hit.Y - target.Y, hit.Z - target.Z, 1f);
         float d2 = d.X * d.X + d.Y * d.Y + d.Z * d.Z;
         result = hit;
         if (!(min2 < d2)) return false;
         float pull = d2 <= near2 ? nearPull : farPull;
-        float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, d);
+        float k = GameMath.InvLength_11C030(2.4999998e-09f, d);
         result = new Vector4(target.X + (d.X - d.X * k * pull), target.Y + (d.Y - d.Y * k * pull), target.Z + (d.Z - d.Z * k * pull), 1f);
         return true;
     }
@@ -121,7 +122,7 @@ public sealed partial class GameCamera
         float k = M.F(y + 0x64);
         var dir = target - eye;
         dir.W = 1f;
-        float inv = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, dir);
+        float inv = GameMath.InvLength_11C030(2.4999998e-09f, dir);
         dir = new Vector4(dir.X * inv, dir.Y * inv, dir.Z * inv, 1f);
         var right = new Vector4(-dir.Z, 0f, dir.X, 1f);
         var up = new Vector4(right.Y * dir.Z - right.Z * dir.Y, right.Z * dir.X - right.X * dir.Z, right.X * dir.Y - right.Y * dir.X, 1f);
@@ -222,13 +223,13 @@ public sealed partial class GameCamera
         return bits;
     }
 
-    private static Vector4 Lerp3(Vector4 a, Vector4 b, float k) =>
+    private static Vector4 Lerp3(in Vector4 a, in Vector4 b, float k) =>
         new(a.X + (b.X - a.X) * k, a.Y + (b.Y - a.Y) * k, a.Z + (b.Z - a.Z) * k, 1f);
 
-    private static Vector4 RotateRows(Vector4 r, Vector4 u, Vector4 f, Vector4 v) =>
+    private static Vector4 RotateRows(in Vector4 r, in Vector4 u, in Vector4 f, in Vector4 v) =>
         new(r.X * v.X + u.X * v.Y + f.X * v.Z, r.Y * v.X + u.Y * v.Y + f.Y * v.Z, r.Z * v.X + u.Z * v.Y + f.Z * v.Z, v.W);
 
-    private static Vector4 Place(Vector4 r, Vector4 u, Vector4 f, Vector4 origin, Vector4 v)
+    private static Vector4 Place(in Vector4 r, in Vector4 u, in Vector4 f, in Vector4 origin, in Vector4 v)
     {
         var p = RotateRows(r, u, f, v);
         return new Vector4(p.X + origin.X, p.Y + origin.Y, p.Z + origin.Z, 1f);
@@ -244,7 +245,7 @@ public sealed partial class GameCamera
             if (Segment_281ED8(old, eye, 0x20, out var h))
             {
                 var back = new Vector4(old.X - h.X, old.Y - h.Y, old.Z - h.Z, 1f);
-                float k = CamMath.InvLengthGuarded_11C030(2.4999998e-09f, back);
+                float k = GameMath.InvLength_11C030(2.4999998e-09f, back);
                 pos = new Vector4(h.X + back.X * k * 0.01f, h.Y + back.Y * k * 0.01f, h.Z + back.Z * k * 0.01f, 1f);
             }
         }

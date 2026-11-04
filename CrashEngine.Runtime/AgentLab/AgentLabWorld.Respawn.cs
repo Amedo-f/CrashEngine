@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Screen.Oleg;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -24,6 +25,14 @@ public sealed partial class AgentLabWorld
     public int ResetKind { get; private set; }
     public bool ResetPending => _sceneResetPending; // Amedo
     public int RestartKind => (int)((Word_00 >> 23) & 0xF); // Amedo
+
+    // Amedo
+    public void MoveRespawn(Matrix4x4 move, string? anchor)
+    {
+        foreach (var cp in new[] { Temp_588, Level_590 })
+            if (cp.Set_00 && cp.Chunk_04 != anchor) cp.ToAnchor *= move;
+        if (RespawnChunkName is { } name && name != anchor) RespawnToAnchor *= move;
+    }
 
     // Amedo
     public bool RestartFromCheckpoint_17B6C0()
@@ -96,7 +105,7 @@ public sealed partial class AgentLabWorld
         {
             float r = Rng.GetRandFloat_18C0B8();
             int picture = 3;
-            if (r < 1f) picture = Character.CharacterController.Cvt(r * 3f) + 1;
+            if (r < 1f) picture = GameMath.Trunc(r * 3f) + 1;
             uint high = (uint)(Oleg.Picture_318 >> 32);
             high = (high & 0xFFFE01FFu) | (((uint)picture & 0xFF) << 9);
             Oleg.Picture_318 = (Oleg.Picture_318 & 0xFFFFFFFFul) | ((ulong)high << 32);
@@ -194,6 +203,12 @@ public sealed partial class AgentLabWorld
         if (clear) Forget(cp);
         cp.Restored_02 = false;
         return other;
+    }
+
+    internal void ForgetCheckpointAgent(AgentLabAgent agent)
+    {
+        foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590])
+            if (ReferenceEquals(cp.Agent, agent)) cp.Agent = null;
     }
 
     // Amedo

@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -35,11 +36,36 @@ public sealed class CharacterCollision
     public Vector3 BoxMin, BoxMax;
 
     private readonly List<int> _query = new();
+    private readonly List<Record> _pool = new();
+    private int _rented;
+    private readonly List<ConvexHull.Axis> _axes = new();
+    private readonly List<Vector3> _hullAxes = new();
+    private Vector3[] _hullWorld = [], _hullDiffs = [];
 
     public void Begin()
     {
         Solids.Clear();
         Others.Clear();
+        _rented = 0;
+    }
+
+    private Record Rent(int planes)
+    {
+        Record r;
+        if (_rented < _pool.Count) r = _pool[_rented];
+        else _pool.Add(r = new Record());
+        _rented++;
+        if (r.Planes.Length != planes) r.Planes = planes == 0 ? [] : new Vector4[planes];
+        r.Flags = 0;
+        r.LastPlane = -1;
+        r.Push = default;
+        r.Special = 0f;
+        r.Sphere = default;
+        r.Triangle = default;
+        r.Owner = null;
+        r.Part = 0;
+        r.NonSolid = false;
+        return r;
     }
 
     // Amedo 2026-09-29
@@ -89,27 +115,27 @@ public sealed class CharacterCollision
         point = default;
         var d = to - from;
         var n = Vector3.Cross(b - a, c - a);
-        if (-1e-4f < Vector3.Dot(from - a, n) * Vector3.Dot(to - a, n)) return 1e30f;
+        if (-1e-4f < GameMath.Dot(from - a, n) * GameMath.Dot(to - a, n)) return 1e30f;
         var e0 = Vector3.Cross(d, b - a);
         var e1 = Vector3.Cross(d, c - b);
         var e2 = Vector3.Cross(d, a - c);
-        if (SameSide(Vector3.Dot(a - from, e0), Vector3.Dot(c - from, e0)) ||
-            SameSide(Vector3.Dot(b - from, e1), Vector3.Dot(a - from, e1)) ||
-            SameSide(Vector3.Dot(c - from, e2), Vector3.Dot(b - from, e2))) return 1e30f;
+        if (SameSide(GameMath.Dot(a - from, e0), GameMath.Dot(c - from, e0)) ||
+            SameSide(GameMath.Dot(b - from, e1), GameMath.Dot(a - from, e1)) ||
+            SameSide(GameMath.Dot(c - from, e2), GameMath.Dot(b - from, e2))) return 1e30f;
         TrianglePlane(a, b, c, out var pn, out float pd);
-        float t = -(Vector3.Dot(pn, from) + pd) / Vector3.Dot(pn, d);
+        float t = -(GameMath.Dot(pn, from) + pd) / GameMath.Dot(pn, d);
         point = from + d * t;
         return t;
     }
 
     private static bool SameSide(float x, float y) => (1e-4f < x && 1e-4f < y) || (x < -1e-4f && y < -1e-4f);
 
-    internal static bool TrianglePlane(Vector3 a, Vector3 b, Vector3 c, out Vector3 n, out float d)
+    internal static bool TrianglePlane(in Vector3 a, in Vector3 b, in Vector3 c, out Vector3 n, out float d)
     {
         n = Vector3.Cross(b - a, c - a);
-        float len = MathF.Sqrt(Vector3.Dot(n, n));
+        float len = MathF.Sqrt(GameMath.Dot(n, n));
         n *= 1f / len;
-        d = -Vector3.Dot(n, a);
+        d = -GameMath.Dot(n, a);
         return 5e-5f < len;
     }
 
@@ -184,7 +210,7 @@ public sealed class CharacterCollision
         foreach (var r in Others) r.Flags &= 0x873;
     }
 
-    private static Record Build(in CollisionWorld.Triangle tri, ConvexHull hull)
+    private Record Build(in CollisionWorld.Triangle tri, ConvexHull hull)
     {
         var pts = hull.Points;
         Span<Vector3> diffs = stackalloc Vector3[3 * 8];
@@ -192,23 +218,27 @@ public sealed class CharacterCollision
         for (int j = 0; j < 8; j++) diffs[k++] = tri.A - pts[j];
         for (int j = 0; j < 8; j++) diffs[k++] = tri.B - pts[j];
         for (int j = 0; j < 8; j++) diffs[k++] = tri.C - pts[j];
-        var axes = hull.Axes(tri, Matrix4x4.Identity);
+        var axes = _axes;
+        hull.Axes(tri, Matrix4x4.Identity, axes);
         if (axes.Count > 32) axes.RemoveRange(32, axes.Count - 32);
-        var planes = new Vector4[axes.Count * 2];
+        var rec = Rent(axes.Count * 2);
+        var planes = rec.Planes;
         for (int a = 0; a < axes.Count; a++)
         {
             var d = axes[a].Dir;
-            float lo = Dot(diffs[0], d), hi = lo;
+            float lo = GameMath.Dot(diffs[0], d), hi = lo;
             for (int i = 1; i < diffs.Length; i++)
             {
-                float v = Dot(diffs[i], d);
+                float v = GameMath.Dot(diffs[i], d);
                 if (v < lo) lo = v;
                 if (hi < v) hi = v;
             }
             planes[2 * a]     = new Vector4(-d.X, -d.Y, -d.Z, lo);
             planes[2 * a + 1] = new Vector4(d.X, d.Y, d.Z, -hi);
         }
-        return new Record { Planes = planes, Flags = Static, Triangle = tri };
+        rec.Flags = Static;
+        rec.Triangle = tri;
+        return rec;
     }
 
     // Amedo 2026-09-27
@@ -219,7 +249,11 @@ public sealed class CharacterCollision
             if (body.Sphere is { } sphere) // Amedo 2026-09-30
             {
                 if (32 <= Solids.Count) return;
-                Solids.Add(new Record { Flags = Dynamic | 0x800, Owner = body.Owner, Sphere = sphere });
+                var ball = Rent(0);
+                ball.Flags = Dynamic | 0x800;
+                ball.Owner = body.Owner;
+                ball.Sphere = sphere;
+                Solids.Add(ball);
                 continue;
             }
             for (int k = 0; k < body.Parts.Count; k++)
@@ -264,16 +298,20 @@ public sealed class CharacterCollision
     }
 
     // Amedo 2026-09-27
-    private static Record BuildHull(ConvexHull hull, Matrix4x4 m, ConvexHull shape, object owner, int part)
+    private Record BuildHull(ConvexHull hull, Matrix4x4 m, ConvexHull shape, object owner, int part)
     {
-        var world = new Vector3[hull.Points.Length];
+        int worldCount = hull.Points.Length, diffCount = worldCount * shape.Points.Length;
+        if (_hullWorld.Length < worldCount) _hullWorld = new Vector3[worldCount];
+        if (_hullDiffs.Length < diffCount) _hullDiffs = new Vector3[diffCount];
+        var world = _hullWorld.AsSpan(0, worldCount);
         for (int i = 0; i < world.Length; i++) world[i] = Vector3.Transform(hull.Points[i], m);
-        var diffs = new Vector3[world.Length * shape.Points.Length];
+        var diffs = _hullDiffs.AsSpan(0, diffCount);
         int k = 0;
         foreach (var a in world)
             foreach (var b in shape.Points)
                 diffs[k++] = a - b;
-        var axes = new List<Vector3>();
+        var axes = _hullAxes;
+        axes.Clear();
         foreach (var n in hull.Normals) axes.Add(Vector3.TransformNormal(n, m));
         foreach (var n in shape.Normals) axes.Add(n);
         foreach (var ea in hull.EdgeDirs)
@@ -283,25 +321,29 @@ public sealed class CharacterCollision
             {
                 var c = new Vector3(da.Y * eb.Z - da.Z * eb.Y, da.Z * eb.X - da.X * eb.Z, da.X * eb.Y - da.Y * eb.X);
                 if (!(1e-8f < c.X * c.X + c.Y * c.Y + c.Z * c.Z)) continue;
-                axes.Add(c * InverseLength(c));
+                axes.Add(c * GameMath.InverseLength(c));
             }
         }
         if (axes.Count > 0x100) axes.RemoveRange(0x100, axes.Count - 0x100);
-        var planes = new Vector4[axes.Count * 2];
+        var rec = Rent(axes.Count * 2);
+        var planes = rec.Planes;
         for (int a = 0; a < axes.Count; a++)
         {
             var d = axes[a];
-            float lo = Dot(diffs[0], d), hi = lo;
+            float lo = GameMath.Dot(diffs[0], d), hi = lo;
             for (int i = 1; i < diffs.Length; i++)
             {
-                float v = Dot(diffs[i], d);
+                float v = GameMath.Dot(diffs[i], d);
                 if (v < lo) lo = v;
                 if (hi < v) hi = v;
             }
             planes[2 * a]     = new Vector4(-d.X, -d.Y, -d.Z, lo);
             planes[2 * a + 1] = new Vector4(d.X, d.Y, d.Z, -hi);
         }
-        return new Record { Planes = planes, Flags = Dynamic, Owner = owner, Part = part };
+        rec.Flags = Dynamic;
+        rec.Owner = owner;
+        rec.Part = part;
+        return rec;
     }
 
     // Amedo 2026-09-27
@@ -352,8 +394,6 @@ public sealed class CharacterCollision
         }
     }
 
-    private static float Dot(Vector3 a, Vector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
-
     private static float Side(Vector4 q, Vector3 p) => q.X * p.X + q.Y * p.Y + q.Z * p.Z + q.W;
 
     private static bool Inside(Record r, Vector3 p, float threshold)
@@ -391,7 +431,7 @@ public sealed class CharacterCollision
             if (Penetration(r, p, out var d)) push += d;
             if ((r.Flags & Dynamic) != 0 && touched is { Count: < 16 } && r.Owner is { } owner) touched.Add(owner);
         }
-        push *= CrashEngine.Runtime.Camera.CamMath.InvLengthGuarded_11C030(2.4999998e-09f, new Vector4(push, 0f));
+        push *= GameMath.InvLength_11C030(2.4999998e-09f, new Vector4(push, 0f));
         return hit;
     }
 
@@ -456,6 +496,14 @@ public sealed class CharacterCollision
 
     private static Vector3 Xyz(Vector4 q) => new(q.X, q.Y, q.Z);
 
+    private static Vector3 SlideAlong(Vector3 step, Vector3 n)
+    {
+        float s = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(step.X, n.X), GameMath.Ps2Mul(step.Y, n.Y)), GameMath.Ps2Mul(step.Z, n.Z));
+        return new Vector3(GameMath.Ps2Add(GameMath.Ps2Sub(step.X, GameMath.Ps2Mul(n.X, s)), GameMath.Ps2Mul(n.X, 2e-5f)),
+                           GameMath.Ps2Add(GameMath.Ps2Sub(step.Y, GameMath.Ps2Mul(n.Y, s)), GameMath.Ps2Mul(n.Y, 2e-5f)),
+                           GameMath.Ps2Add(GameMath.Ps2Sub(step.Z, GameMath.Ps2Mul(n.Z, s)), GameMath.Ps2Mul(n.Z, 2e-5f)));
+    }
+
     private bool SubStep(Vector3 cur, Vector3 step, out Vector3 result, bool grounded)
     {
         Span<Vector4> planes = stackalloc Vector4[4];
@@ -472,13 +520,11 @@ public sealed class CharacterCollision
         for (int k = 0; k < n; k++)
         {
             Solids[recs[k]].Flags |= Touched;
-            var nrm = Xyz(planes[k]);
-            float s = step.X * nrm.X + step.Y * nrm.Y + step.Z * nrm.Z;
-            var slide = step - nrm * s + nrm * 2e-5f;
-            if (grounded && MathF.Sqrt(slide.X * slide.X + slide.Z * slide.Z) < slide.Y) continue;
-            var cand = cur + slide;
+            var slide = SlideAlong(step, Xyz(planes[k]));
+            if (grounded && GameMath.Ps2Sqrt(GameMath.Ps2Add(GameMath.Ps2Mul(slide.X, slide.X), GameMath.Ps2Mul(slide.Z, slide.Z))) < slide.Y) continue;
+            var cand = GameMath.Ps2Add(cur, slide);
             if (PointTest(cand, 0x88C, 0f)) continue;
-            float d = (cand - slide).Length();
+            float d = GameMath.Ps2Distance(cand, slide);
             if (!(d < bestDist)) continue;
             bestDist = d;
             bestPos = cand;
@@ -491,21 +537,25 @@ public sealed class CharacterCollision
             for (int k = 0; k < n; k++)
             {
                 var n1 = Xyz(planes[k]);
-                float s1 = step.X * n1.X + step.Y * n1.Y + step.Z * n1.Z;
-                var slide1 = step - n1 * s1 + n1 * 2e-5f;
+                var slide1 = SlideAlong(step, n1);
                 int m = Crossed(cur, slide1, planes2, recs2, ref last);
                 for (int j = 0; j < m; j++)
                 {
                     Solids[recs2[j]].Flags |= Touched;
                     var n2 = Xyz(planes2[j]);
-                    var e = new Vector3(n1.Y * n2.Z - n1.Z * n2.Y, n1.Z * n2.X - n1.X * n2.Z, n1.X * n2.Y - n1.Y * n2.X);
-                    float es = e.X * step.X + e.Y * step.Y + e.Z * step.Z;
-                    var crease = e * es + (n1 + n2) * 2e-5f;
-                    if (crease.X * crease.X + crease.Y * crease.Y + crease.Z * crease.Z < CreaseEps) continue; // Amedo: 0x358637BE
-                    if (grounded && MathF.Sqrt(crease.X * crease.X + crease.Z * crease.Z) < crease.Y) continue;
-                    var cand = cur + crease;
+                    var e = new Vector3(GameMath.Ps2Sub(GameMath.Ps2Mul(n1.Y, n2.Z), GameMath.Ps2Mul(n1.Z, n2.Y)),
+                                        GameMath.Ps2Sub(GameMath.Ps2Mul(n1.Z, n2.X), GameMath.Ps2Mul(n1.X, n2.Z)),
+                                        GameMath.Ps2Sub(GameMath.Ps2Mul(n1.X, n2.Y), GameMath.Ps2Mul(n1.Y, n2.X)));
+                    float es = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(e.X, step.X), GameMath.Ps2Mul(e.Y, step.Y)), GameMath.Ps2Mul(e.Z, step.Z));
+                    var crease = new Vector3(GameMath.Ps2Add(GameMath.Ps2Mul(e.X, es), GameMath.Ps2Mul(GameMath.Ps2Add(n1.X, n2.X), 2e-5f)),
+                                             GameMath.Ps2Add(GameMath.Ps2Mul(e.Y, es), GameMath.Ps2Mul(GameMath.Ps2Add(n1.Y, n2.Y), 2e-5f)),
+                                             GameMath.Ps2Add(GameMath.Ps2Mul(e.Z, es), GameMath.Ps2Mul(GameMath.Ps2Add(n1.Z, n2.Z), 2e-5f)));
+                    float cx2 = GameMath.Ps2Mul(crease.X, crease.X), cz2 = GameMath.Ps2Mul(crease.Z, crease.Z);
+                    if (GameMath.Ps2Add(GameMath.Ps2Add(cx2, GameMath.Ps2Mul(crease.Y, crease.Y)), cz2) < CreaseEps) continue; // Amedo
+                    if (grounded && GameMath.Ps2Sqrt(GameMath.Ps2Add(cx2, cz2)) < crease.Y) continue;
+                    var cand = GameMath.Ps2Add(cur, crease);
                     if (PointTest(cand, 0x88C, 0f)) continue;
-                    float d = (cand - crease).Length();
+                    float d = GameMath.Ps2Distance(cand, crease);
                     if (!(d < bestDist)) continue;
                     bestDist = d;
                     bestPos = cand;
@@ -525,7 +575,7 @@ public sealed class CharacterCollision
         return true;
     }
 
-    private void Contact(int index, Vector3 step, Vector3 cur, Vector3 pos)
+    private void Contact(int index, in Vector3 step, in Vector3 cur, in Vector3 pos)
     {
         if (index < 0 || index >= Solids.Count) return;
         var r = Solids[index];
@@ -546,20 +596,14 @@ public sealed class CharacterCollision
             var r = Solids[i];
             if ((r.Flags & 0x880) != 0) continue;
             if (!Inside(r, p, 0f)) continue;
-            Penetration(r, p, out var dir); // Amedo: FindGround 0x285FA0 ignores the result (push = 0 when near a face)
+            Penetration(r, p, out var dir); // Amedo
             float h = MathF.Sqrt(dir.X * dir.X + dir.Z * dir.Z);
             if (!(h == 0f || h < dir.Y)) continue;
             r.Flags |= Support;
-            normal = dir * InverseLength(dir);
+            normal = dir * GameMath.InverseLength(dir);
             return i;
         }
         return -1;
-    }
-
-    private static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return 2.4999998e-09f < lenSq ? 1f / MathF.Sqrt(lenSq) : 0f;
     }
 
     public int Probe(Vector3 start, Vector3 vec, out Vector3 hitPos, out Vector3 normal)
@@ -576,7 +620,7 @@ public sealed class CharacterCollision
         var lastInside = start;
         var step = vec;
         int hit = -1;
-        while (1e-4f < step.Length())
+        while (1e-4f < GameMath.Length(step))
         {
             var test = cur + step;
             int r = PointCount(test, Excluded, 0f);
@@ -617,14 +661,14 @@ public sealed class CharacterCollision
         int steps = (int)(len / stepLen) + 1;
         if (!(steps < 7)) steps = 6;
         float seg = len / steps;
-        var stepVec = mv * InverseLength(mv) * seg;
+        var stepVec = mv * GameMath.InverseLength(mv) * seg;
         bool stuck = false;
         if (2.5e-5f < mv.X * mv.X + mv.Y * mv.Y + mv.Z * mv.Z)
         {
             for (int s = 0; s < steps; s++)
             {
                 SubStep(cur, stepVec, out var next, grounded);
-                if ((next - cur).Length() < 0.001f) { stuck = true; break; }
+                if (GameMath.Length((next - cur)) < 0.001f) { stuck = true; break; }
                 cur = next;
             }
         }
@@ -652,7 +696,7 @@ public sealed class CharacterCollision
                 for (int k = 0; k < 9; k++)
                 {
                     var v = new Vector3(tbl[k % 3], -d, tbl[k / 3]);
-                    v = v * InverseLength(v) * d;
+                    v = v * GameMath.InverseLength(v) * d;
                     r = Probe(cur, v, out hp, out hn);
                     if (r < 0) continue;
                     support = r;
@@ -665,8 +709,8 @@ public sealed class CharacterCollision
             if (mv.Y < 0.001f && found)
             {
                 var diff = hitPos - cur;
-                float dist = diff.Length();
-                if (0.05f < dist) cur += diff * InverseLength(diff) * (dist - 0.05f);
+                float dist = GameMath.Length(diff);
+                if (0.05f < dist) cur += diff * GameMath.InverseLength(diff) * (dist - 0.05f);
             }
         }
         result = cur;
@@ -703,13 +747,13 @@ public sealed class CharacterCollision
         for (int i = 0; i < Solids.Count; i++)
         {
             var rec = Solids[i];
-            if (rec.NonSolid || (rec.Flags & 0x800) != 0) continue; // Amedo: MoveCharacter 0x2866F0 walks the solid list only
+            if (rec.NonSolid || (rec.Flags & 0x800) != 0) continue; // Amedo
             if (!Inside(rec, test, 0f)) continue;
             if ((rec.Flags & Dynamic) != 0) rec.Flags |= Support;
             normal = Vector3.UnitY;
             found = i;
         }
-        return found != -2 ? found : 0; // Amedo: MoveCharacter 0x2866F0
+        return found != -2 ? found : 0; // Amedo
     }
 
     public bool StepUp(Vector3 newPos, Vector3 mv, ref Vector3 moved, bool grounded)
@@ -718,16 +762,16 @@ public sealed class CharacterCollision
         var hMoved = new Vector3(moved.X, 0f, moved.Z);
         float lenMv = MathF.Sqrt(mv.X * mv.X + mv.Y * mv.Y + mv.Z * mv.Z);
         float lenMoved = MathF.Sqrt(moved.X * moved.X + moved.Y * moved.Y + moved.Z * moved.Z);
-        if (1e-4f < hMv.Length()) hMv *= InverseLength(hMv);
-        if (1e-4f < hMoved.Length()) hMoved *= InverseLength(hMoved);
+        if (1e-4f < GameMath.Length(hMv)) hMv *= GameMath.InverseLength(hMv);
+        if (1e-4f < GameMath.Length(hMoved)) hMoved *= GameMath.InverseLength(hMoved);
         if (!grounded) return false;
         float hLen = MathF.Sqrt(mv.X * mv.X + mv.Z * mv.Z);
         if (!(0.01f < hLen) || !(lenMoved < 0.2f) || !(lenMoved < lenMv)) return false;
-        if (!(Dot(hMoved, hMv) < 0.866f)) return false;
+        if (!(GameMath.Dot(hMoved, hMv) < 0.866f)) return false;
         var rem = new Vector3(mv.X - moved.X, 0f, mv.Z - moved.Z);
-        float remLen = rem.Length();
+        float remLen = GameMath.Length(rem);
         var dir = new Vector3(mv.X, 0f, mv.Z);
-        dir *= InverseLength(dir);
+        dir *= GameMath.InverseLength(dir);
         float up = hLen * 3f;
         if (0.2f < up) up = 0.2f;
         var stepV = new Vector3(dir.X * remLen, up, dir.Z * remLen);
@@ -814,7 +858,7 @@ public sealed class CharacterCollision
         return 0f < s ? 1 : 3;
     }
 
-    private static Vector3 Intersect(Vector4 q, Vector3 a, Vector3 b)
+    private static Vector3 Intersect(in Vector4 q, in Vector3 a, in Vector3 b)
     {
         var d = b - a;
         float t = -(q.X * a.X + q.Y * a.Y + q.Z * a.Z + q.W) / (q.X * d.X + q.Y * d.Y + q.Z * d.Z);

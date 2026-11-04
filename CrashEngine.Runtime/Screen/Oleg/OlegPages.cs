@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Game;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -48,7 +49,7 @@ public class OlegPage : MenuPage
         Parent_18 = parent;
     }
 
-    protected static int HalfSecond => CharacterController.Cvt(Widget.TicksPerSecond * 0.5f);
+    protected static int HalfSecond => GameMath.Trunc(Widget.TicksPerSecond * 0.5f);
 
     // Amedo
     protected void ShowPauseMenu()
@@ -75,7 +76,7 @@ public sealed class ActionItem : LinkItem
     public override MenuPage? Activate(int col, MenuPage page)
     {
         var oleg = Oleg_3095C8;
-        int half = CharacterController.Cvt(Widget.TicksPerSecond * 0.5f);
+        int half = GameMath.Trunc(Widget.TicksPerSecond * 0.5f);
         switch (Action_14)
         {
             case 0: ShowGroup(oleg, Oleg.ScreenPositionGroup, half); break;
@@ -390,8 +391,8 @@ public sealed class SoundOptionsPage : OlegPage
     {
         var game = Oleg_3095C8.Game_3095C8;
         float effects = game?.SoundLevel_1E60A8(0) ?? 1f, music = game?.SoundLevel_1E60A8(2) ?? 1f;
-        Find_2573E0(EffectsItem)!.SetInt(col, CharacterController.Cvt(effects * 10f + 0.5f));
-        Find_2573E0(MusicItem)!.SetInt(col, CharacterController.Cvt(music * 10f + 0.5f));
+        Find_2573E0(EffectsItem)!.SetInt(col, GameMath.Trunc(effects * 10f + 0.5f));
+        Find_2573E0(MusicItem)!.SetInt(col, GameMath.Trunc(music * 10f + 0.5f));
         Find_2573E0(OutputItem)!.SetInt(col, game?.OutputMode_309AC8 ?? 1);
     }
 
@@ -540,7 +541,7 @@ public sealed class MovieItem : LinkItem
     // Amedo
     public override MenuPage? Activate(int col, MenuPage page)
     {
-        Oleg_3095C8.Game_3095C8?.RequestMovie_17B868(CharacterController.Cvt(Widget.TicksPerSecond * 0.5f), Movie_14);
+        Oleg_3095C8.Game_3095C8?.RequestMovie_17B868(GameMath.Trunc(Widget.TicksPerSecond * 0.5f), Movie_14);
         return null;
     }
 }
@@ -573,7 +574,7 @@ public sealed class PictureItem : LinkItem
     // Amedo
     public override MenuPage? Activate(int col, MenuPage page)
     {
-        Oleg_3095C8.Game_3095C8?.RequestGallery_17BBD0(CharacterController.Cvt(Widget.TicksPerSecond * 0.5f), Path_18, First_14, Last_15);
+        Oleg_3095C8.Game_3095C8?.RequestGallery_17BBD0(GameMath.Trunc(Widget.TicksPerSecond * 0.5f), Path_18, First_14, Last_15);
         return null;
     }
 }

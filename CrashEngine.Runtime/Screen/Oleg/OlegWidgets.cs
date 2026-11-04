@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Game;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -222,7 +223,7 @@ public sealed class SaveSlotWidget : ItemWidget
         _crystals = " " + Summary_94.Crystals.ToString(inv);
         _name = (Oleg_90.CodeTexts_309770?[slot + FirstLevelName] ?? "").Replace(' ', '~');
         _lives = "  " + (Summary_94.Lives - 1).ToString(inv);
-        int minutes = CrashEngine.Runtime.Character.CharacterController.Cvt(_time * Widget.SecondsPerTick * BitConverter.Int32BitsToSingle(0x3C888889));
+        int minutes = GameMath.Trunc(_time * Widget.SecondsPerTick * BitConverter.Int32BitsToSingle(0x3C888889));
         int hours = minutes / 60;
         minutes -= hours * 60;
         _clock = hours.ToString(inv) + (minutes < 10 ? ":0" : ":") + minutes.ToString(inv);

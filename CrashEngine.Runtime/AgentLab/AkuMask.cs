@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -108,7 +109,7 @@ internal sealed class AkuMask
         }
         float r = _distance * Smooth(_t * 0.5f + 0.5f);
         var d = m - t;
-        float k = Character.CharacterController.InverseLength(d);
+        float k = GameMath.InverseLength(d);
         SetPosition(new Vector3(d.X * k * r + t.X, d.Y * k * r + t.Y, d.Z * k * r + t.Z));
         CopyRotation();
     }
@@ -188,7 +189,7 @@ internal sealed class AkuMask
         }
         float r = _distance * (1f - Smooth(_t * 0.5f));
         var d = m - dest;
-        float k = Character.CharacterController.InverseLength(d);
+        float k = GameMath.InverseLength(d);
         SetPosition(new Vector3(d.X * k * r + dest.X, d.Y * k * r + dest.Y, d.Z * k * r + dest.Z));
         CopyRotation();
     }
@@ -242,7 +243,7 @@ internal sealed class AkuMask
         _faceChunk = Target!.Chunk;
         _t = 0f;
         _faceTarget = FaceTarget(0.15f, 0f);
-        _distance = Vector3.Distance(_owner.GamePosition, _faceTarget.Translation);
+        _distance = GameMath.Distance(_owner.GamePosition, _faceTarget.Translation);
     }
 
     // Amedo 2026-10-04
@@ -289,7 +290,7 @@ internal sealed class AkuMask
         var t = _faceTarget.Translation;
         float r = _distance * Smooth(_t * 0.5f + 0.5f);
         var d = p - t;
-        float k = Character.CharacterController.InverseLength(d);
+        float k = GameMath.InverseLength(d);
         SetPosition(new Vector3(d.X * k * r + t.X, d.Y * k * r + t.Y, d.Z * k * r + t.Z));
         SetRotationFrom(_faceTarget);
         if (_t < 1f) return;
@@ -322,7 +323,7 @@ internal sealed class AkuMask
     // Amedo 2026-10-04
     private void SetRotationFrom(Matrix4x4 source)
     {
-        var m = Camera.CamMath.QuatToMatrix_18E620(Camera.CamMath.MatrixToQuat_186900(source));
+        var m = GameMath.QuatToMatrix_18E620(GameMath.MatrixToQuat_186900(source));
         m.Translation = _owner.GamePosition;
         _owner.GameMatrix = m;
     }
@@ -368,15 +369,15 @@ internal sealed class AkuMask
         var node = _owner.GameMatrix;
         var pos = node.Translation;
         var d = new Vector3(target.X - pos.X, 0f, target.Z - pos.Z);
-        d *= Character.CharacterController.InverseLength(d);
+        d *= GameMath.InverseLength(d);
         if (d.X == 0f && d.Z == 0f) return;
         var fwd = new Vector3(node.M31, 0f, node.M33);
         if (0.99999f < fwd.X * d.X + fwd.Y * d.Y + fwd.Z * d.Z) return;
-        var f = Camera.CamMath.Slerp_188300(t, fwd, d);
-        f *= Character.CharacterController.InverseLength(f);
-        Camera.CamMath.Frame_1879D0(f, out var right, out var up);
+        var f = GameMath.Slerp_188300(t, fwd, d);
+        f *= GameMath.InverseLength(f);
+        GameMath.Frame_1879D0(f, out var right, out var up);
         var rows = new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, f.X, f.Y, f.Z, 0f, 0f, 0f, 1f, 1f);
-        var m = Camera.CamMath.QuatToMatrix_18E620(Camera.CamMath.MatrixToQuat_186900(rows));
+        var m = GameMath.QuatToMatrix_18E620(GameMath.MatrixToQuat_186900(rows));
         m.Translation = pos;
         _owner.GameMatrix = m;
     }

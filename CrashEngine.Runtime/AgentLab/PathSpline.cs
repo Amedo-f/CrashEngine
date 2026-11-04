@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 
 namespace CrashEngine.Runtime.AgentLab;
@@ -16,7 +17,6 @@ public sealed class PathSpline
     private static readonly float LengthStep = BitConverter.Int32BitsToSingle(0x3C23D70A);
     private static readonly float Refine    = BitConverter.Int32BitsToSingle(0x3F7F7CEE);
     private static readonly float BrentTol  = BitConverter.Int32BitsToSingle(0x3851B717);
-    private static readonly float Golden    = BitConverter.Int32BitsToSingle(0x3EC3910C);
     private const float Far = 1e30f;
     private const float TinySq = 2.4999998e-09f;
 
@@ -83,22 +83,16 @@ public sealed class PathSpline
         return lenSq > TinySq ? d * (1f / MathF.Sqrt(lenSq)) : Vector3.Zero;
     }
 
-    private static float DistSq(Vector3 a, Vector3 b)
-    {
-        float dx = a.X - b.X, dy = a.Y - b.Y, dz = a.Z - b.Z;
-        return dx * dx + dy * dy + dz * dz;
-    }
-
     public float SegmentLength(int seg, float tEnd)
     {
         float length = 0f;
         if (!(0f <= tEnd)) return length;
         bool first = true;
         var prev = Vector3.Zero;
-        for (float t = 0f; t <= tEnd; t += LengthStep)
+        for (float t = 0f; t <= tEnd; t = GameMath.Ps2Add(t, LengthStep))
         {
             var p = PointAt(seg, t);
-            if (!first) length += MathF.Sqrt(DistSq(p, prev));
+            if (!first) length += MathF.Sqrt(GameMath.DistanceSq(p, prev));
             first = false;
             prev  = p;
         }
@@ -115,7 +109,7 @@ public sealed class PathSpline
             var p = PointAt(seg, t);
             if (!first)
             {
-                travelled += MathF.Sqrt(DistSq(p, prev));
+                travelled += MathF.Sqrt(GameMath.DistanceSq(p, prev));
                 if (target <= travelled) break;
             }
             first = false;
@@ -144,7 +138,7 @@ public sealed class PathSpline
             p = PointAt(s, t);
             if (!first)
             {
-                travelled += MathF.Sqrt(DistSq(p, output));
+                travelled += MathF.Sqrt(GameMath.DistanceSq(p, output));
                 if (into <= travelled) break;
             }
             first = false;
@@ -188,10 +182,10 @@ public sealed class PathSpline
         int bestSeg = -1;
 
         int near = 0;
-        float nearD = DistSq(Points[0], p);
+        float nearD = GameMath.DistanceSq(Points[0], p);
         for (int i = 1; i < Count; i++)
         {
-            float d = DistSq(Points[i], p);
+            float d = GameMath.DistanceSq(Points[i], p);
             if (d < nearD) { nearD = d; near = i; }
         }
         int first = near - 3, n = 4;
@@ -215,25 +209,26 @@ public sealed class PathSpline
         _segment = seg;
 
         var start = PointAt(seg, 0f);
-        float segBest = DistSq(p, start);
+        float segBest = GameMath.DistanceSq(p, start);
         var c1 = Points[seg + 1];
         var c2 = Points[seg + 2];
         var c3 = Points[seg + 3];
         var end = new Vector3(((c1.X + c2.X * 4f) + c3.X) * EndSixth,
                               ((c1.Y + c2.Y * 4f) + c3.Y) * EndSixth,
                               ((c1.Z + c2.Z * 4f) + c3.Z) * EndSixth);
-        float endD = DistSq(p, end);
+        float endD = GameMath.DistanceSq(p, end);
         if (endD < segBest) segBest = endD;
 
         float t = 0f;
         do
         {
             var s = PointAt(seg, t);
-            float d = DistSq(p, s);
+            float d = GameMath.DistanceSq(p, s);
             if (0f < t && d < segBest * Refine)
             {
                 float x = t, fx = d;
-                Brent(ref x, ref fx);
+                var distance = new DistanceAt { Spline = this };
+                GameMath.FindMinimum_18EC40(ref distance, 4, BrentTol, BrentTol, 0f, 1f, ref x, ref fx, true);
                 var q = PointAt(seg, x);
                 if (fx < resD)
                 {
@@ -251,73 +246,16 @@ public sealed class PathSpline
                 resP  = s;
                 resT  = t;
             }
-            t += step;
+            t = GameMath.Ps2Add(t, step);
         } while (t < 1f);
         return found;
     }
 
-    private float Eval(float u) => DistSq(_query, PointAt(_segment, u));
+    private float Eval(float u) => GameMath.DistanceSq(_query, PointAt(_segment, u));
 
-    private void Brent(ref float x, ref float fx)
+    private struct DistanceAt : GameMath.IScalarFunction
     {
-        float a = 0f, b = 1f;
-        float v = x, w = x, fv = fx, fw = fx;
-        float d = 0f, e = 0f;
-        for (int iter = 1; iter <= 4; iter++)
-        {
-            float xm = (a + b) * 0.5f;
-            float tol2 = BrentTol * MathF.Abs(x);
-            if (tol2 < BrentTol) tol2 = BrentTol;
-            float tol1 = tol2 * 0.5f;
-            if (MathF.Abs(x - xm) < tol2 - (b - a) * 0.5f) return;
-
-            float p = 0f, q = 0f, etemp = 0f;
-            if (tol1 < MathF.Abs(e))
-            {
-                float r = (x - w) * (fx - fv);
-                q = (x - v) * (fx - fw);
-                p = (x - v) * q - (x - w) * r;
-                q = (q - r) + (q - r);
-                if (0f < q) p = -p;
-                q = MathF.Abs(q);
-                etemp = e;
-                e = d;
-            }
-
-            if (MathF.Abs(p) < MathF.Abs(q * etemp * 0.5f) && q * (a - x) < p && p < q * (b - x))
-            {
-                d = p / q;
-                float u0 = x + d;
-                if (u0 - a < tol2 || b - u0 < tol2) d = xm <= x ? -tol1 : tol1;
-            }
-            else
-            {
-                e = x < xm ? b - x : a - x;
-                d = e * Golden;
-            }
-
-            float u = tol1 <= MathF.Abs(d) ? x + d : d < 0f ? x - tol1 : x + tol1;
-            float fu = Eval(u);
-            if (fu <= fx)
-            {
-                if (u < x) b = x; else a = x;
-                v = w; fv = fw;
-                w = x; fw = fx;
-                x = u; fx = fu;
-            }
-            else
-            {
-                if (u < x) a = u; else b = u;
-                if (fu <= fw || w == x)
-                {
-                    v = w; fv = fw;
-                    w = u; fw = fu;
-                }
-                else if (fu <= fv || v == x || v == w)
-                {
-                    v = u; fv = fw;
-                }
-            }
-        }
+        public PathSpline Spline;
+        public readonly float At(float u) => Spline.Eval(u);
     }
 }

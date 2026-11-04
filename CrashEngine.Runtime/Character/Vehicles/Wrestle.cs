@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -52,7 +53,7 @@ public sealed class Wrestle : Vehicle
     public override void SetVelocity(Vector3 velocity)
     {
         if (Body is not { } body) return;
-        var v = velocity * RigidBody.InverseLength(velocity) * 32f;
+        var v = velocity * GameMath.InverseLength(velocity) * 32f;
         body.SetVelocity_2915D0(Vector3.Zero);
         body.ApplyImpulse_289CC0(Vector3.Zero, v);
     }
@@ -90,9 +91,9 @@ public sealed class Wrestle : Vehicle
         Heading = new Vector3(node.M31, node.M32, node.M33);
         Radius = 0.8f;
         UpProbe = new Vector3(-1.1f, 1f, 0.4f);
-        UpProbe *= RigidBody.InverseLength(UpProbe);
+        UpProbe *= GameMath.InverseLength(UpProbe);
         DownProbe = new Vector3(1.1f, -1f, -0.4f);
-        DownProbe *= RigidBody.InverseLength(DownProbe);
+        DownProbe *= GameMath.InverseLength(DownProbe);
         Start_14EF90();
         var body = Body!;
         Radius = 0.8f;
@@ -158,10 +159,10 @@ public sealed class Wrestle : Vehicle
         CrashMatrix = deformed;
         var p = new Vector3(m.M41, m.M42 + (0.05f - Radius), m.M43);
         var fwd = new Vector3(Heading.X, 0f, Heading.Z);
-        fwd *= RigidBody.InverseLength(fwd);
+        fwd *= GameMath.InverseLength(fwd);
         var up = Vector3.UnitY;
         var right = new Vector3(fwd.Z, up.Z * fwd.X - up.X * fwd.Z, up.X * fwd.Y - up.Y * fwd.X);
-        right *= RigidBody.InverseLength(right);
+        right *= GameMath.InverseLength(right);
         Frame = new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, fwd.X, fwd.Y, fwd.Z, 0f, p.X, p.Y, p.Z, 1f);
         return true;
     }
@@ -183,8 +184,8 @@ public sealed class Wrestle : Vehicle
         float struggle = 0f;
         if (1e-4f < la && 1e-4f < lb)
         {
-            if (1f < la) CrashPush *= RigidBody.InverseLength(CrashPush);
-            if (1f < lb) CreaturePushVector *= RigidBody.InverseLength(CreaturePushVector);
+            if (1f < la) CrashPush *= GameMath.InverseLength(CrashPush);
+            if (1f < lb) CreaturePushVector *= GameMath.InverseLength(CreaturePushVector);
             var a = CrashPush;
             var b = CreaturePushVector;
             float d = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
@@ -213,7 +214,7 @@ public sealed class Wrestle : Vehicle
         float t = Timer * 1.4285715f;
         if (1f < t) t = 1f;
         float s = t * (t * 3f) - (t + t) * t * t;
-        var m = CamMath.QuatToMatrix_18E620(CamMath.Slerp_187100(s, PinFrom, PinTo));
+        var m = GameMath.QuatToMatrix_18E620(GameMath.Slerp_187100(s, PinFrom, PinTo));
         m.Translation = PinPosition;
         Body!.InitFromTransform(m);
         UpdateFrames();
@@ -233,7 +234,7 @@ public sealed class Wrestle : Vehicle
         var force = new Vector3(0f, -(MathF.Sqrt(s.X * s.X + s.Y * s.Y + s.Z * s.Z) * 10f), 0f);
         CrashPush = s;
         var flat = new Vector3(body.Velocity.X, 0f, body.Velocity.Z);
-        flat *= RigidBody.InverseLength(flat);
+        flat *= GameMath.InverseLength(flat);
         float along = (1f - (s.X * flat.X + s.Y * flat.Y + s.Z * flat.Z)) * 0.5f;
         if (along < 0f) along = 0f;
         if (1f < along) along = 1f;
@@ -280,7 +281,7 @@ public sealed class Wrestle : Vehicle
         float len = MathF.Sqrt(dv.X * dv.X + dv.Y * dv.Y + dv.Z * dv.Z);
         if (43f < len)
         {
-            var d = dv * RigidBody.InverseLength(dv);
+            var d = dv * GameMath.InverseLength(dv);
             WobbleAxis = Vector3.TransformNormal(d, body.Inverse);
         }
         else if (15f < len && Wobble < len)
@@ -289,14 +290,14 @@ public sealed class Wrestle : Vehicle
             Wobble = amp;
             if (0.5f < amp) Wobble = 0.5f;
             else if (amp < -0.5f) Wobble = -0.5f;
-            var d = dv * RigidBody.InverseLength(dv);
+            var d = dv * GameMath.InverseLength(dv);
             WobbleAxis = Vector3.TransformNormal(d, body.Inverse);
             float a = MathF.Abs(Wobble);
             Owner.CameraImpulse?.Invoke(a + a, 0.01f, body.Position);
             WobblePhase = 0f;
         }
         if (Wobble == 0f) return;
-        float c = MathF.Cos(CamMath.FromValue_11BFA0(WobblePhase, 0) * CamMath.UnitToRad);
+        float c = MathF.Cos(GameMath.FromValue_11BFA0(WobblePhase, 0) * GameMath.UnitToRad);
         float w = Wobble;
         WobblePhase += dt * 21f;
         Wobble = w * (1f - dt * 1.5f);
@@ -346,7 +347,7 @@ public sealed class Wrestle : Vehicle
     {
         var node = Owner.GameMatrix;
         PinPosition = node.Translation;
-        PinFrom = CamMath.MatrixToQuat_186900(node);
+        PinFrom = GameMath.MatrixToQuat_186900(node);
         var u = Vector3.TransformNormal(Vector3.UnitY, node);
         var axis = new Vector3(u.Y * dir.Z - u.Z * dir.Y, u.Z * dir.X - u.X * dir.Z, u.X * dir.Y - u.Y * dir.X);
         if (!(5e-5f < axis.X * axis.X + axis.Y * axis.Y + axis.Z * axis.Z))
@@ -354,9 +355,9 @@ public sealed class Wrestle : Vehicle
             PinTo = PinFrom;
             return;
         }
-        axis *= RigidBody.InverseLength(axis);
-        int angle = CamMath.Acos_18B738(u.X * dir.X + u.Y * dir.Y + u.Z * dir.Z);
-        PinTo = CamMath.Mul_18D558(CamMath.AxisAngle_18D798(axis, angle), PinFrom);
+        axis *= GameMath.InverseLength(axis);
+        int angle = GameMath.Acos_18B738(u.X * dir.X + u.Y * dir.Y + u.Z * dir.Z);
+        PinTo = GameMath.Mul_18D558(GameMath.AxisAngle_18D798(axis, angle), PinFrom);
     }
 
     private void StepTactic_154890()
@@ -376,7 +377,7 @@ public sealed class Wrestle : Vehicle
                 var d = Home - Body!.Velocity;
                 if (2f < MathF.Sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z))
                 {
-                    d *= RigidBody.InverseLength(d);
+                    d *= GameMath.InverseLength(d);
                     d += d;
                 }
                 CreaturePush_1534F8(d);
@@ -403,11 +404,11 @@ public sealed class Wrestle : Vehicle
         }
         var d = Home - body.Position;
         var flat = new Vector3(d.X, 0f, d.Z);
-        var n = flat * RigidBody.InverseLength(flat);
+        var n = flat * GameMath.InverseLength(flat);
         var v = n * 6f - body.Velocity;
         if (2f < MathF.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z))
         {
-            v *= RigidBody.InverseLength(v);
+            v *= GameMath.InverseLength(v);
             v += v;
         }
         CreaturePush_1534F8(v);
@@ -473,12 +474,12 @@ public sealed class Wrestle : Vehicle
         var s = WorldOf(UpProbe);
         float len = MathF.Sqrt(s.X * s.X + s.Y * s.Y + s.Z * s.Z);
         s.Y = 0f;
-        s *= RigidBody.InverseLength(s);
+        s *= GameMath.InverseLength(s);
         float reach = len * 5f + 2f;
         float cap = Timer2 * 0.3f + 0.4f;
         if (1.3f < cap) cap = 1.3f;
         var v = (s * reach - body.Velocity) * 0.25f;
-        if (cap < MathF.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)) v = v * RigidBody.InverseLength(v) * cap;
+        if (cap < MathF.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)) v = v * GameMath.InverseLength(v) * cap;
         CreaturePush_1534F8(v);
         var d = Home - body.Position;
         if (9f < MathF.Sqrt(d.X * d.X + d.Z * d.Z))

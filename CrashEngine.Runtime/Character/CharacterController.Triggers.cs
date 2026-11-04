@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -15,7 +16,7 @@ public sealed partial class CharacterController
     {
         if (InstanceInt_2619D8?.Invoke(0) == 5) return;
         var node = _getMatrix();
-        var inv = Camera.CamMath.RigidInverse_18E808(node);
+        var inv = GameMath.RigidInverse_18E808(node);
         var min = new Vector3(Far);
         var max = new Vector3(-Far);
         bool any = false;

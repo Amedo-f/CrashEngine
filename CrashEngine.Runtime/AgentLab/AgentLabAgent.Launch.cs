@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -23,7 +24,7 @@ public sealed partial class AgentLabAgent
         int participant = (int)((flags >> 12) & 0xFF), key = (int)((flags >> 20) & 0xFF);
         Vector3? offset = (flags & (1UL << 33)) != 0 ? new Vector3(F(1), F(2), F(3)) : null;
         var target = SourcePosition(participant, key, space, offset);
-        if ((flags & (1UL << 34)) != 0) target = Jitter_23C848(target, F(42), 1f, 1f, 1f); // Amedo
+        if ((flags & (1UL << 34)) != 0) target = World.Rng.JitterVector_23C848(target, F(42), 1f, 1f, 1f); // Amedo
 
         var d = target - bomb.GamePosition;
         float hd = MathF.Sqrt(d.X * d.X + d.Z * d.Z);
@@ -42,15 +43,6 @@ public sealed partial class AgentLabAgent
         ctrl.Flags |= PhysicsController.LaunchTimed;
         ctrl.ParamC4 = time;
         ctrl.AirTime = 0f;
-    }
-
-    // Amedo
-    private Vector3 Jitter_23C848(Vector3 v, float scale, float y, float x, float z)
-    {
-        float dx = RandomSigned() * (scale * x);
-        float dy = RandomSigned() * (scale * y);
-        float dz = RandomSigned() * (scale * z);
-        return new Vector3(v.X + dx, v.Y + dy, v.Z + dz);
     }
 
     private void Launch_2331F8(List<uint> block, Vector3 v, float spinY, float spinX)
@@ -161,7 +153,7 @@ public sealed partial class AgentLabAgent
         float dy = target.Y - p.Y;
         float dx = target.X - p.X, dz = target.Z - p.Z;
         float speed = MathF.Sqrt(dx * dx + dz * dz) / ((MathF.Sqrt(MathF.Abs((g + g) * (h - dy))) + vy) / g);
-        float inv = InverseLength(new Vector3(dx, 0f, dz));
+        float inv = GameMath.InverseLength(new Vector3(dx, 0f, dz));
         return new Vector3(dx * inv * speed, vy, dz * inv * speed);
     }
 
@@ -195,7 +187,7 @@ public sealed partial class AgentLabAgent
             {
                 var m = LocalMatrix;
                 var z = new Vector3(m.M31, m.M32, m.M33);
-                body.SetOrientation_291588(Along_185A40(z * InverseLength(z)));
+                body.SetOrientation_291588(Along_185A40(z * GameMath.InverseLength(z)));
             }
             else
             {
@@ -259,9 +251,9 @@ public sealed partial class AgentLabAgent
         else
         {
             up = new Vector3(-d.X * d.Y, k, -d.Y * d.Z);
-            up *= InverseLength(up);
+            up *= GameMath.InverseLength(up);
             side = new Vector3(up.Y * d.Z - up.Z * d.Y, up.Z * d.X - up.X * d.Z, up.X * d.Y - up.Y * d.X);
-            side *= InverseLength(side);
+            side *= GameMath.InverseLength(side);
         }
         m.M11 = side.X; m.M12 = side.Y; m.M13 = side.Z;
         m.M21 = up.X; m.M22 = up.Y; m.M23 = up.Z;

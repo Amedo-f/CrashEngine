@@ -1,5 +1,6 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -68,7 +69,7 @@ public sealed partial class AgentLabAgent
                 continue;
             }
             pickup.Launch(offset * 2f, -1f);
-            pickup.Delay(Character.CharacterController.Cvt(delay * 9000f));
+            pickup.Delay(GameMath.Trunc(delay * 9000f));
         }
         Trace($"crate contents: {count} x object 0x{first & 0x7FFF:X4}");
     }

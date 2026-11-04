@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -27,6 +28,13 @@ public sealed partial class GameCamera
         M.U(G + 0x200, HandleOf(cameraObj));
         CutDirectorCtor_27A4F8(G + 0x210);
         return G;
+    }
+
+    // Amedo 2026-10-30
+    public void SetActiveCamera_177A90(uint cameraObj)
+    {
+        if (Handle(G + 0x200) == cameraObj) return;
+        M.U(G + 0x200, cameraObj == 0 ? 0u : HandleOf(cameraObj));
     }
 
     public uint Component_192118(uint obj, int id) => obj != 0 ? M.U(obj + 0xD8 + (uint)(id & 0xFF) * 4) : 0u;
@@ -258,8 +266,8 @@ public sealed partial class GameCamera
     {
         float spt = M.F(SecondsPerTick), tps = M.F(TicksPerSecond);
         float whole = M.I(y + 0x7C) * spt;
-        int el = now - CamMath.Trunc(M.I(y + 0x78) * spt * tps);
-        float k = CamMath.Trunc(el * spt / whole * tps) * spt;
+        int el = now - GameMath.Trunc(M.I(y + 0x78) * spt * tps);
+        float k = GameMath.Trunc(el * spt / whole * tps) * spt;
         return ((M.Q(y + 0x40) >> 2) & 7) == 2 ? Smooth(k) : k;
     }
 
@@ -267,8 +275,8 @@ public sealed partial class GameCamera
     {
         float spt = M.F(SecondsPerTick), tps = M.F(TicksPerSecond);
         float whole = M.I(y + 0x84) * spt;
-        int el = now - CamMath.Trunc(M.I(y + 0x80) * spt * tps);
-        float k = CamMath.Trunc(el * spt / whole * tps) * spt;
+        int el = now - GameMath.Trunc(M.I(y + 0x80) * spt * tps);
+        float k = GameMath.Trunc(el * spt / whole * tps) * spt;
         if (((M.Q(y + 0x40) >> 2) & 7) == 2)
         {
             k = Smooth(k);
@@ -288,7 +296,7 @@ public sealed partial class GameCamera
             M.Copy16(y + 0x50, y + 0x20);
             M.U(y + 0x70, M.U(y + 4));
         }
-        int start = CamMath.Trunc(M.I(y + 0x78) * spt * tps);
+        int start = GameMath.Trunc(M.I(y + 0x78) * spt * tps);
         if (M.I(y + 0x7C) >= now - start)
         {
             ulong fl = M.Q(y + 0x40);
@@ -298,11 +306,11 @@ public sealed partial class GameCamera
                 if (M.I(y + 0x80) == 0) M.I(y + 0x80, now);
                 float edge = CutEyeRatio2_2788C0(y, now);
                 float whole = M.I(y + 0x7C) * spt;
-                float part = CamMath.Trunc(M.I(y + 0x84) * spt / whole * tps) * spt;
+                float part = GameMath.Trunc(M.I(y + 0x84) * spt / whole * tps) * spt;
                 if ((fl & 1) == 0)
                 {
-                    int rest = M.I(y + 0x7C) - CamMath.Trunc(M.I(y + 0x84) * spt * tps);
-                    k = CamMath.Trunc(rest * spt / whole * tps) * spt + edge * part;
+                    int rest = M.I(y + 0x7C) - GameMath.Trunc(M.I(y + 0x84) * spt * tps);
+                    k = GameMath.Trunc(rest * spt / whole * tps) * spt + edge * part;
                 }
                 else k = edge * part;
                 if (edge == 1f)
@@ -353,21 +361,21 @@ public sealed partial class GameCamera
                     else M.V(y + 0x20, PathPosition_188CB0(path, k));
                     int from = M.I(y + 0x70);
                     int diff = M.I(y + 0x74) - from;
-                    M.I(y + 4, from + CamMath.Trunc(k * diff * CamMath.UnitToRad * CamMath.RadToUnit));
+                    M.I(y + 4, from + GameMath.Trunc(k * diff * GameMath.UnitToRad * GameMath.RadToUnit));
                     if ((M.Q(y + 0x40) & 0x20) != 0)
                     {
                         var a = M.V(y + 0x50) - t;
                         var b = M.V(y + 0x60) - t;
                         float dist = (1f - k) * MathF.Sqrt(a.X * a.X + a.Y * a.Y + a.Z * a.Z) + k * MathF.Sqrt(b.X * b.X + b.Y * b.Y + b.Z * b.Z);
                         var v = new Vector4(M.F(y + 0x20) - t.X, M.F(y + 0x24) - t.Y, M.F(y + 0x28) - t.Z, 1f);
-                        float inv = CamMath.InvLengthGuarded_11C030(Tiny, v);
+                        float inv = GameMath.InvLength_11C030(Tiny, v);
                         M.V(y + 0x20, new Vector4(t.X + v.X * inv * dist, t.Y + v.Y * inv * dist, t.Z + v.Z * inv * dist, 1f));
                     }
                 }
                 if (k == 1f) M.I(y + 0x7C, 0);
             }
         }
-        M.V(y + 0x10, ToV(CamMath.MatrixToQuat_186900(CamMath.LookAt_185668(M.V(y + 0x20), t, UpAxis))));
+        M.V(y + 0x10, ToV(GameMath.MatrixToQuat_186900(GameMath.LookAt_185668(M.V(y + 0x20), t, UpAxis))));
     }
 
     public void CutTargetTransform_27AF40(uint x, Matrix4x4 m)
@@ -404,17 +412,17 @@ public sealed partial class GameCamera
             }
         }
         var z = new Vector4(M.F(d + 0x60) - M.F(d + 0x50), M.F(d + 0x64) - M.F(d + 0x54), M.F(d + 0x68) - M.F(d + 0x58), 1f);
-        float k = CamMath.InvLengthGuarded_11C030(Tiny, z);
+        float k = GameMath.InvLength_11C030(Tiny, z);
         z = new Vector4(z.X * k, z.Y * k, z.Z * k, 1f);
         var up = UpAxis;
         var ax = new Vector4(z.Y * up.Z - z.Z * up.Y, z.Z * up.X - z.X * up.Z, z.X * up.Y - z.Y * up.X, 1f);
-        k = CamMath.InvLengthGuarded_11C030(Tiny, ax);
+        k = GameMath.InvLength_11C030(Tiny, ax);
         ax = new Vector4(ax.X * k, ax.Y * k, ax.Z * k, 1f);
         var ay = up;
         if ((M.Q(d + 0x40) & 0x100) == 0)
         {
             ay = new Vector4(ax.Y * z.Z - ax.Z * z.Y, ax.Z * z.X - ax.X * z.Z, ax.X * z.Y - ax.Y * z.X, 1f);
-            k = CamMath.InvLengthGuarded_11C030(Tiny, ay);
+            k = GameMath.InvLength_11C030(Tiny, ay);
             ay = new Vector4(ay.X * k, ay.Y * k, ay.Z * k, 1f);
         }
         M.M(d + 0x70, new Matrix4x4(ax.X, ay.X, z.X, 0f, ax.Y, ay.Y, z.Y, 0f, ax.Z, ay.Z, z.Z, 0f, 0f, 0f, 0f, 1f));
@@ -435,12 +443,12 @@ public sealed partial class GameCamera
         switch (w & 7)
         {
             case 1:
-                if (0f < t) TransitionCamera_175CE0(3, CamMath.Trunc(t * tps), false, (w >> 5) & 7);
+                if (0f < t) TransitionCamera_175CE0(3, GameMath.Trunc(t * tps), false, (w >> 5) & 7);
                 else SwitchCamera_1759B0(3, true);
                 return;
             case 0:
                 bool snap = (((int)w >> 4) & 1) != 0;
-                if (0f < t) TransitionCamera_175CE0(0, CamMath.Trunc(t * tps), snap, (w >> 5) & 7);
+                if (0f < t) TransitionCamera_175CE0(0, GameMath.Trunc(t * tps), snap, (w >> 5) & 7);
                 else SwitchCamera_1759B0(0, snap);
                 if ((M.U(cmd + 0xC) & 8) == 0) return;
                 uint comp = Component_192118(PlayerObject(), 0x16);
@@ -540,9 +548,9 @@ public sealed partial class GameCamera
         CutEyeReset_27C2F0(y);
         CutTargetReset_27C498(x);
         float tps = M.F(TicksPerSecond);
-        M.I(x + 0xA4, CamMath.Trunc(targetSeconds * tps));
-        M.I(y + 0x84, CamMath.Trunc(tps * 0.5f));
-        M.I(y + 0x7C, CamMath.Trunc(eyeSeconds * tps));
+        M.I(x + 0xA4, GameMath.Trunc(targetSeconds * tps));
+        M.I(y + 0x84, GameMath.Trunc(tps * 0.5f));
+        M.I(y + 0x7C, GameMath.Trunc(eyeSeconds * tps));
         M.U(y + 0x44, M.U(cmd + 0x2C));
         ulong fl = M.Q(y + 0x40);
         ulong b0 = (ulong)(M.S(cmd + 0xE) & 1);
@@ -579,11 +587,11 @@ public sealed partial class GameCamera
         switch ((M.U(cmd + 0xC) >> 6) & 7)
         {
             case 0: a = 0; b = 0; c = 1f; break;
-            case 1: a = CamMath.Divide_11C008(6f, fov); b = CamMath.Divide_11C008(2f, fov); c = 1f / CamMath.Cos_18B8E8(a); break;
-            case 2: a = CamMath.Divide_11C008(3f, fov); b = CamMath.Divide_11C008(2f, fov); c = 1f / CamMath.Cos_18B8E8(a); break;
-            case 3: a = CamMath.Divide_11C008(2f, fov); b = CamMath.Divide_11C008(1.5f, fov); c = 1f / CamMath.Cos_18B8E8(a); break;
+            case 1: a = GameMath.Divide_11C008(6f, fov); b = GameMath.Divide_11C008(2f, fov); c = 1f / GameMath.Cos_18B8E8(a); break;
+            case 2: a = GameMath.Divide_11C008(3f, fov); b = GameMath.Divide_11C008(2f, fov); c = 1f / GameMath.Cos_18B8E8(a); break;
+            case 3: a = GameMath.Divide_11C008(2f, fov); b = GameMath.Divide_11C008(1.5f, fov); c = 1f / GameMath.Cos_18B8E8(a); break;
         }
-        a = CamMath.Trunc(a * (((M.Q(d + 0x40) >> 3) & 1) != 0 ? -1f : 1f));
+        a = GameMath.Trunc(a * (((M.Q(d + 0x40) >> 3) & 1) != 0 ? -1f : 1f));
     }
 
     private void ShotTable_11FE28(uint cmd, ref float size, ref float spread)
@@ -636,12 +644,12 @@ public sealed partial class GameCamera
         if ((w & 0x7000) == 0x3000)
         {
             float t = (w & 7) switch { 0 => -145f, 1 => -15f, 2 => -180f, 3 => -90f, _ => 0f };
-            yaw = CamMath.Trunc((t + M.F(cmd + 0x24)) * 182.04445f);
+            yaw = GameMath.Trunc((t + M.F(cmd + 0x24)) * 182.04445f);
         }
         else
         {
-            int e = Asin_18B7F8(dist * CamMath.Sin_18B8C0(b) / r);
-            yaw = -(CamMath.FromValue_11BFA0(M.F(cmd + 0x24), 1) + e + b);
+            int e = GameMath.Asin16_18B7F8(dist * GameMath.Sin_18B8C0(b) / r);
+            yaw = -(GameMath.FromValue_11BFA0(M.F(cmd + 0x24), 1) + e + b);
         }
         return ((M.Q(d + 0x40) >> 3) & 1) == 0 ? yaw : -yaw;
     }
@@ -705,12 +713,12 @@ public sealed partial class GameCamera
         float dist = ShotDistance_11FFD0(s, c, spread, width) + M.F(cmd + 0x14);
         float r = ShotRadius_110AF0(cmd, d, c0);
         int yaw = ShotYaw_111038(dist, r, cmd, d, b);
-        int pitch = CamMath.FromValue_11BFA0(M.F(cmd + 0x10), 1);
-        var rot = CamMath.RotXYZ_183220(pitch, yaw, CamMath.FromValue_11BFA0(0f, 0), Missing);
-        var off = CamMath.Rotate3_18E4B8(rot, new Vector4(0f, 0f, -dist, 1f));
+        int pitch = GameMath.FromValue_11BFA0(M.F(cmd + 0x10), 1);
+        var rot = GameMath.RotXYZ_183220(pitch, yaw, GameMath.FromValue_11BFA0(0f, 0), Missing);
+        var off = GameMath.Rotate3_18E4B8(rot, new Vector4(0f, 0f, -dist, 1f));
         CutFrame_27A720(d);
-        off = CamMath.Rotate3_18E4B8(M.M(d + 0x70), off);
-        var back = CamMath.RotateAxis_18DE00(new Vector4(-off.X, -off.Y, -off.Z, 1f), UpAxis, -a, true);
+        off = GameMath.Rotate3_18E4B8(M.M(d + 0x70), off);
+        var back = GameMath.RotateAxis_18DE00(new Vector4(-off.X, -off.Y, -off.Z, 1f), UpAxis, -a, true);
         var eye = new Vector4(c0.X + vert.X + off.X, c0.Y + vert.Y + off.Y, c0.Z + vert.Z + off.Z, 1f);
         M.V(x + 0x90, new Vector4(eye.X + back.X, eye.Y + back.Y, eye.Z + back.Z, 1f));
         M.V(y + 0x60, eye);
@@ -720,10 +728,8 @@ public sealed partial class GameCamera
 
     private static float Tan_18B968(int angle)
     {
-        var (s, c) = CamMath.SinCos(angle * CamMath.UnitToRad);
+        var (s, c) = GameMath.SinCos(angle * GameMath.UnitToRad);
         if (c == 0f) return s <= 0f ? -1e30f : 1e30f;
         return s / c;
     }
-
-    private static int Asin_18B7F8(float v) => CrashEngine.Core.GameMath.Asin16_18B7F8(v); // Amedo
 }

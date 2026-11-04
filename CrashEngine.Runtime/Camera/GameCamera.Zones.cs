@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -133,11 +134,11 @@ public sealed partial class GameCamera
     {
         if ((M.Q(y + 0x48) & 1) != 0) return;
         float seconds = (M.Q(y + 0x48) & 0x100) != 0 ? 2f : M.F(zd + 0x10);
-        M.I(y + 0x1C4, CamMath.Trunc(seconds * M.F(TicksPerSecond)));
+        M.I(y + 0x1C4, GameMath.Trunc(seconds * M.F(TicksPerSecond)));
     }
 
     private int Mix(int a, int b, float k) =>
-        CamMath.Trunc((b * CamMath.UnitToRad * k + a * CamMath.UnitToRad * (1f - k)) * CamMath.RadToUnit);
+        GameMath.Trunc((b * GameMath.UnitToRad * k + a * GameMath.UnitToRad * (1f - k)) * GameMath.RadToUnit);
 
     public void EyeZoneApply_2745B0(float u, uint y, uint zd, uint x)
     {
@@ -308,7 +309,7 @@ public sealed partial class GameCamera
         }
         if (((zf >> 2) & 1) != 0 || sub2 != 0)
         {
-            int pitch = CamMath.FromValue_11BFA0(0f, 1);
+            int pitch = GameMath.FromValue_11BFA0(0f, 1);
             if ((M.Q(y + 0x40) & 0x100) != 0) pitch = M.I(0x30A658);
             if (active && idle()) ZoneRate_270BD8(y + 0x54, y + 0x1C4, pitch, pitch);
         }
@@ -319,7 +320,7 @@ public sealed partial class GameCamera
         }
         if ((((zf >> 6) & 1) != 0 || sub2 != 0) && active && idle())
         {
-            int yaw = CamMath.FromValue_11BFA0(10f, 0);
+            int yaw = GameMath.FromValue_11BFA0(10f, 0);
             ZoneRate_270BD8(y + 0xF4, y + 0x1C4, yaw, yaw);
         }
         if (mark && active && idle()) M.Q(y + 0x48, M.Q(y + 0x48) | 0x200);
@@ -328,20 +329,20 @@ public sealed partial class GameCamera
     public void ZoneRate_270BD8(uint c, uint ticks, int a, int b)
     {
         int cur = M.I(c + 0x14);
-        int db = CamMath.Wrap16(b - cur);
-        int da = CamMath.Wrap16(a - cur);
+        int db = GameMath.Wrap16(b - cur);
+        int da = GameMath.Wrap16(a - cur);
         if (da < db) db = da;
         M.U(c + 0x2C, M.U(c + 0x24));
         int t = M.I(ticks);
-        int rate = t == 0 ? db : CamMath.Divide_11C008(t * M.F(SecondsPerTick), db);
+        int rate = t == 0 ? db : GameMath.Divide_11C008(t * M.F(SecondsPerTick), db);
         M.I(c + 0x24, Math.Abs(rate));
     }
 
     public static bool ZoneAltYaw_278F30(uint zd, int yaw, CamMemory m)
     {
-        int w = CamMath.Wrap16(yaw);
-        int toMain = Math.Abs(CamMath.Wrap16(w - m.I(zd + 0x58)));
-        int toAlt = Math.Abs(CamMath.Wrap16(w - m.I(zd + 0x74)));
+        int w = GameMath.Wrap16(yaw);
+        int toMain = Math.Abs(GameMath.Wrap16(w - m.I(zd + 0x58)));
+        int toAlt = Math.Abs(GameMath.Wrap16(w - m.I(zd + 0x74)));
         return toAlt <= toMain;
     }
 

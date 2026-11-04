@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character.Vehicles;
 
@@ -148,7 +149,7 @@ public sealed class Humiliskate : Vehicle
                 if (!Contact)
                 {
                     TargetUp.Y += q * 2.5f;
-                    float k = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(TargetUp, 1f));
+                    float k = GameMath.InvLength_11C030(Eps, new Vector4(TargetUp, 1f));
                     TargetUp = new Vector3(TargetUp.X * k, TargetUp.Y * k, TargetUp.Z * k);
                 }
                 if (Grounded)
@@ -208,7 +209,7 @@ public sealed class Humiliskate : Vehicle
             rate = turn * (Crouch ? 1.3f : 4f);
         }
         else rate = turn * 2f;
-        var r = CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(rate * dt, 0));
+        var r = GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(rate * dt, 0));
         var t = Board.Translation;
         Board = r * Board;
         Board.Translation = t;
@@ -273,7 +274,7 @@ public sealed class Humiliskate : Vehicle
         if (Grinding)
         {
             var d = RailEnd - RailStart;
-            float kd = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(d, 1f));
+            float kd = GameMath.InvLength_11C030(Eps, new Vector4(d, 1f));
             d = new Vector3(d.X * kd, d.Y * kd, d.Z * kd);
             float t = d.X * pos.X + d.Y * pos.Y + d.Z * pos.Z - (d.X * RailStart.X + d.Y * RailStart.Y + d.Z * RailStart.Z);
             var onRail = new Vector3(RailStart.X + d.X * t, RailStart.Y + d.Y * t, RailStart.Z + d.Z * t);
@@ -281,7 +282,7 @@ public sealed class Humiliskate : Vehicle
             var pull = new Vector3(onRail.X - pos.X, onRail.Y + 0.4f - pos.Y, onRail.Z - pos.Z);
             if (limit < MathF.Sqrt(pull.X * pull.X + pull.Y * pull.Y + pull.Z * pull.Z))
             {
-                float kp = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(pull, 1f));
+                float kp = GameMath.InvLength_11C030(Eps, new Vector4(pull, 1f));
                 pull = new Vector3(pull.X * kp * limit, pull.Y * kp * limit, pull.Z * kp * limit);
             }
             Board.M41 += pull.X;
@@ -293,7 +294,7 @@ public sealed class Humiliskate : Vehicle
             Board.M42 += slide.Y;
             Board.M43 += slide.Z;
             var e = RailEnd - RailStart;
-            float ke = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(e, 1f));
+            float ke = GameMath.InvLength_11C030(Eps, new Vector4(e, 1f));
             float slope = e.Y * ke * 3.5f;
             if (1f < slope) slope = 1f;
             else if (slope < -1f) slope = -1f;
@@ -314,15 +315,15 @@ public sealed class Humiliskate : Vehicle
             }
             var up = new Vector3(0f, 1f, 0f);
             var right = new Vector3(d.Y * up.Z - d.Z * up.Y, d.Z * up.X - d.X * up.Z, d.X * up.Y - d.Y * up.X);
-            float kr = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(right, 1f));
+            float kr = GameMath.InvLength_11C030(Eps, new Vector4(right, 1f));
             right = new Vector3(right.X * kr, right.Y * kr, right.Z * kr);
             var n = new Vector3(right.Y * d.Z - right.Z * d.Y, right.Z * d.X - right.X * d.Z, right.X * d.Y - right.Y * d.X);
-            float kn = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(n, 1f));
+            float kn = GameMath.InvLength_11C030(Eps, new Vector4(n, 1f));
             n = new Vector3(n.X * kn, n.Y * kn, n.Z * kn);
             NormalSum = n;
             TargetUp = n;
             var e2 = RailEnd - RailStart;
-            float ke2 = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(e2, 1f));
+            float ke2 = GameMath.InvLength_11C030(Eps, new Vector4(e2, 1f));
             e2 = new Vector3(e2.X * ke2, e2.Y * ke2, e2.Z * ke2);
             var fwd = new Vector3(Board.M31, Board.M32, Board.M33);
             var c = new Vector3(fwd.Y * e2.Z - fwd.Z * e2.Y, fwd.Z * e2.X - fwd.X * e2.Z, fwd.X * e2.Y - fwd.Y * e2.X);
@@ -424,7 +425,7 @@ public sealed class Humiliskate : Vehicle
     private void TurnAboutUp(float radians)
     {
         var up = new Vector3(Board.M21, Board.M22, Board.M23);
-        var r = AxisAngle_18CEA8(up, CamMath.FromValue_11BFA0(radians, 0));
+        var r = AxisAngle_18CEA8(up, GameMath.FromValue_11BFA0(radians, 0));
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();
@@ -433,11 +434,11 @@ public sealed class Humiliskate : Vehicle
 
     private void NormalizeRows()
     {
-        float k0 = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Board.M11, Board.M12, Board.M13, 1f));
+        float k0 = GameMath.InvLength_11C030(Eps, new Vector4(Board.M11, Board.M12, Board.M13, 1f));
         Board.M11 *= k0; Board.M12 *= k0; Board.M13 *= k0;
-        float k1 = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Board.M21, Board.M22, Board.M23, 1f));
+        float k1 = GameMath.InvLength_11C030(Eps, new Vector4(Board.M21, Board.M22, Board.M23, 1f));
         Board.M21 *= k1; Board.M22 *= k1; Board.M23 *= k1;
-        float k2 = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Board.M31, Board.M32, Board.M33, 1f));
+        float k2 = GameMath.InvLength_11C030(Eps, new Vector4(Board.M31, Board.M32, Board.M33, 1f));
         Board.M31 *= k2; Board.M32 *= k2; Board.M33 *= k2;
     }
 
@@ -457,7 +458,7 @@ public sealed class Humiliskate : Vehicle
             var down = new Vector3(-plane.X, -plane.Y, -plane.Z);
             var frame = Board;
             frame.Translation = cur;
-            var local = Local(Local(tri, CamMath.RigidInverse_18E808(frame)), scale);
+            var local = Local(Local(tri, GameMath.RigidInverse_18E808(frame)), scale);
             if (!CollisionWorld.SphereTriangle(local, Vector3.Zero, 1f, out var pushed)) continue;
             if (solid)
             {
@@ -486,9 +487,9 @@ public sealed class Humiliskate : Vehicle
 
     private static CollisionWorld.Triangle Local(in CollisionWorld.Triangle tri, Matrix4x4 m)
     {
-        var a = CamMath.Transform_18E4F0(m, new Vector4(tri.A, 1f));
-        var b = CamMath.Transform_18E4F0(m, new Vector4(tri.B, 1f));
-        var c = CamMath.Transform_18E4F0(m, new Vector4(tri.C, 1f));
+        var a = GameMath.Transform_18E4F0(m, new Vector4(tri.A, 1f));
+        var b = GameMath.Transform_18E4F0(m, new Vector4(tri.B, 1f));
+        var c = GameMath.Transform_18E4F0(m, new Vector4(tri.C, 1f));
         return new CollisionWorld.Triangle(new Vector3(a.X, a.Y, a.Z), new Vector3(b.X, b.Y, b.Z), new Vector3(c.X, c.Y, c.Z), b.W, c.W, a.W, tri.Surface);
     }
 
@@ -499,7 +500,7 @@ public sealed class Humiliskate : Vehicle
         _candidates.Clear();
         _candidateBoxes.Clear();
         var world = Owner.CollisionWorld;
-        var inverse = CamMath.RigidInverse_18E808(Board);
+        var inverse = GameMath.RigidInverse_18E808(Board);
         var scale = new Matrix4x4(1f / Radii.X, 0f, 0f, 0f, 0f, 1f / Radii.Y, 0f, 0f, 0f, 0f, 1f / Radii.Z, 0f, 0f, 0f, 0f, 1f);
         for (int i = 0; i < tris.Count; i++)
         {
@@ -592,8 +593,8 @@ public sealed class Humiliskate : Vehicle
         normal = default;
         if (!CollisionWorld.Overlap(new Vector3(p.X - r, p.Y - r, p.Z - r), new Vector3(p.X + r, p.Y + r, p.Z + r), hmin, hmax)) return false;
         if (!HullQueries.EllipsoidHull_1FD178(hull, frame, radii, hullWorld, out push, out normal)) return false;
-        var local = Vector3.TransformNormal(push, CamMath.RigidInverse_18E808(frame));
-        local *= CamMath.InvLengthGuarded_11C030(Eps, new Vector4(local, 1f));
+        var local = Vector3.TransformNormal(push, GameMath.RigidInverse_18E808(frame));
+        local *= GameMath.InvLength_11C030(Eps, new Vector4(local, 1f));
         local *= -radii.X;
         local *= -radii.Y;
         local *= -radii.Z;
@@ -601,9 +602,9 @@ public sealed class Humiliskate : Vehicle
         return true;
     }
 
-    private void TouchedHull_157B18(Vector3 contact, Vector3 push, Vector3 normal, float dt, object target, bool respond)
+    private void TouchedHull_157B18(in Vector3 contact, in Vector3 push, in Vector3 normal, float dt, object target, bool respond)
     {
-        var point = CamMath.Transform_18E4F0(Board, new Vector4(contact, 1f));
+        var point = GameMath.Transform_18E4F0(Board, new Vector4(contact, 1f));
         var at = new Vector3(point.X, point.Y, point.Z);
         bool hit = Owner.BodyHit_23D1E0?.Invoke(target, Owner.Self, at, Vel) ?? true;
         if (Owner.Self is { } self)
@@ -621,10 +622,10 @@ public sealed class Humiliskate : Vehicle
 
     private void GroundResponse_1572A0(Vector3 sum, float grip, float dt)
     {
-        float kn = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(sum, 1f));
+        float kn = GameMath.InvLength_11C030(Eps, new Vector4(sum, 1f));
         var n = new Vector3(sum.X * kn, sum.Y * kn, sum.Z * kn);
         TargetUp += new Vector3(n.X * 0.04f, n.Y * 0.04f, n.Z * 0.04f);
-        float ku = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(TargetUp, 1f));
+        float ku = GameMath.InvLength_11C030(Eps, new Vector4(TargetUp, 1f));
         TargetUp = new Vector3(TargetUp.X * ku, TargetUp.Y * ku, TargetUp.Z * ku);
         Contact = true;
         float into = n.X * Vel.X + n.Y * Vel.Y + n.Z * Vel.Z;
@@ -633,7 +634,7 @@ public sealed class Humiliskate : Vehicle
             var half = new Vector3(n.X * into * 0.5f, n.Y * into * 0.5f, n.Z * into * 0.5f);
             float hard = MathF.Sqrt(half.X * half.X + half.Y * half.Y + half.Z * half.Z);
             var flat = new Vector3(Vel.X, 0f, Vel.Z);
-            float kf = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(flat, 1f));
+            float kf = GameMath.InvLength_11C030(Eps, new Vector4(flat, 1f));
             flat = new Vector3(flat.X * kf, flat.Y * kf, flat.Z * kf);
             float facing = n.X * flat.X + n.Y * flat.Y + n.Z * flat.Z;
             if (3f < hard && facing < -0.5f)
@@ -645,7 +646,7 @@ public sealed class Humiliskate : Vehicle
             else Vel -= half;
         }
         float lateral = Board.M11 * Vel.X + Board.M12 * Vel.Y + Board.M13 * Vel.Z;
-        float kv = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Vel, 1f));
+        float kv = GameMath.InvLength_11C030(Eps, new Vector4(Vel, 1f));
         var heading = new Vector3(Vel.X * kv, Vel.Y * kv, Vel.Z * kv);
         float cos = Board.M31 * heading.X + Board.M32 * heading.Y + Board.M33 * heading.Z;
         float soft = 4f - cos * 3.2f;
@@ -669,7 +670,7 @@ public sealed class Humiliskate : Vehicle
         float limit = Crouch ? CrouchSpeed : MaxSpeed;
         if (limit < speed)
         {
-            float k = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Vel, 1f));
+            float k = GameMath.InvLength_11C030(Eps, new Vector4(Vel, 1f));
             Vel = new Vector3(Vel.X * k, Vel.Y * k, Vel.Z * k);
             Vel = new Vector3(Vel.X * limit, Vel.Y * limit, Vel.Z * limit);
         }
@@ -677,7 +678,7 @@ public sealed class Humiliskate : Vehicle
         if (!(0f < Vel.X * Board.M31 + Vel.Y * Board.M32 + Vel.Z * Board.M33)) return;
         if (!(0.866f < TargetUp.Y)) return;
         float push = speed + dt * 10f;
-        float kp = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Vel, 1f));
+        float kp = GameMath.InvLength_11C030(Eps, new Vector4(Vel, 1f));
         Vel = new Vector3(Vel.X * kp, Vel.Y * kp, Vel.Z * kp);
         Vel = new Vector3(Vel.X * push, Vel.Y * push, Vel.Z * push);
     }
@@ -685,16 +686,16 @@ public sealed class Humiliskate : Vehicle
     private void AlignUp_156DB0(Vector3 target)
     {
         var a = new Vector3(Board.M21, Board.M22, Board.M23);
-        float ka = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(a, 1f));
+        float ka = GameMath.InvLength_11C030(Eps, new Vector4(a, 1f));
         a = new Vector3(a.X * ka, a.Y * ka, a.Z * ka);
-        float kb = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(target, 1f));
+        float kb = GameMath.InvLength_11C030(Eps, new Vector4(target, 1f));
         var b = new Vector3(target.X * kb, target.Y * kb, target.Z * kb);
         var c = new Vector3(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
         if (!(1e-4f < MathF.Sqrt(c.X * c.X + c.Y * c.Y + c.Z * c.Z))) return;
-        float kc = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(c, 1f));
+        float kc = GameMath.InvLength_11C030(Eps, new Vector4(c, 1f));
         float dot = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
         c = new Vector3(c.X * kc, c.Y * kc, c.Z * kc);
-        var r = AxisAngle_18CEA8(c, CamMath.Acos_18B738(dot));
+        var r = AxisAngle_18CEA8(c, GameMath.Acos_18B738(dot));
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();
@@ -704,7 +705,7 @@ public sealed class Humiliskate : Vehicle
     internal static Matrix4x4 AxisAngle_18CEA8(Vector3 axis, int angle) // Amedo
     {
         if (angle == 0) return Matrix4x4.Identity;
-        var (s, c) = CamMath.SinCos(angle * CamMath.UnitToRad);
+        var (s, c) = GameMath.SinCos(angle * GameMath.UnitToRad);
         float x = axis.X, y = axis.Y, z = axis.Z;
         float t = 1f - c;
         float tx = t * x, tz = t * z, ty = t * y;
@@ -814,8 +815,8 @@ public sealed class Humiliskate : Vehicle
             }
             else Spin = next;
         }
-        SpinTarget = CamMath.Trunc(SpinTarget * 0.31830987f + 0.5f) * 3.1415927f;
-        FlipTarget = CamMath.Trunc(FlipTarget * 0.15915494f + 0.5f) * 6.2831855f;
+        SpinTarget = GameMath.Trunc(SpinTarget * 0.31830987f + 0.5f) * 3.1415927f;
+        FlipTarget = GameMath.Trunc(FlipTarget * 0.15915494f + 0.5f) * 6.2831855f;
     }
 
     private void SendEvents_158F88(float dt)
@@ -869,10 +870,10 @@ public sealed class Humiliskate : Vehicle
             if (0.1f < MathF.Sqrt(Vel.X * Vel.X + Vel.Z * Vel.Z))
             {
                 var flat = new Vector4(Vel.X, 0f, Vel.Z, 0f);
-                float k = CamMath.InvLengthGuarded_11C030(Eps, flat);
+                float k = GameMath.InvLength_11C030(Eps, flat);
                 var dir = new Vector4(flat.X * k, flat.Y * k, flat.Z * k, 0f);
                 var side = new Vector4(dir.Y * 0f - dir.Z * 1f, dir.Z * 0f - dir.X * 0f, dir.X * 1f - dir.Y * 0f, 1f);
-                float kv = CamMath.InvLengthGuarded_11C030(Eps, new Vector4(Vel, 0f));
+                float kv = GameMath.InvLength_11C030(Eps, new Vector4(Vel, 0f));
                 float along = Vel.X * kv * Board.M31 + Vel.Y * kv * Board.M32 + Vel.Z * kv * Board.M33;
                 p.X -= TargetUp.X * 0.5f;
                 p.Z -= TargetUp.Z * 0.5f;
@@ -889,7 +890,7 @@ public sealed class Humiliskate : Vehicle
 
     private bool Place_159AB8()
     {
-        var b = CamMath.RotXY_182AD0(CamMath.FromValue_11BFA0(-Flip, 0), 0) * Board;
+        var b = GameMath.RotXY_182AD0(GameMath.FromValue_11BFA0(-Flip, 0), 0) * Board;
         var up = new Vector3(b.M21 * Seat, b.M22 * Seat, b.M23 * Seat);
         b.M41 -= up.X;
         b.M42 -= up.Y;
@@ -904,7 +905,7 @@ public sealed class Humiliskate : Vehicle
         squash.M33 = s * 0.4f + 1f;
         squash.M11 = s * 0.4f + 1f;
         PartnerMatrix = squash * PartnerMatrix;
-        PartnerMatrix = CamMath.RotY_18BBC0(CamMath.FromValue_11BFA0(Spin, 0)) * PartnerMatrix;
+        PartnerMatrix = GameMath.RotY_18BBC0(GameMath.FromValue_11BFA0(Spin, 0)) * PartnerMatrix;
         CrashMatrix.M42 += Squash * 0.6f;
         var fwd = new Vector3(Board.M31, Board.M32, Board.M33);
         var u = new Vector3(0f, 1f, 0f);

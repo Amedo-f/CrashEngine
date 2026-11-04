@@ -2,6 +2,7 @@ using System.Numerics;
 using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -42,7 +43,7 @@ public sealed partial class AgentLabAgent
     private void UpdateChase(float dt)
     {
         var here = LocalMatrix.Translation;
-        if (_sqrTolerance != 0f && Vector3.DistanceSquared(here, _moveTarget) < _sqrTolerance)
+        if (_sqrTolerance != 0f && GameMath.DistanceSq(here, _moveTarget) < _sqrTolerance)
         {
             _translationDone = _rotationDone = true;
             return;
@@ -94,20 +95,20 @@ public sealed partial class AgentLabAgent
         _velocity.Y += oldY;
     }
 
-    private void GroundTrack(PhysicsController ctrl, float dt) // Amedo 2026-09-27 = RightRigidBody 0x24B078
+    private void GroundTrack(PhysicsController ctrl, float dt) // Amedo 2026-09-27
     {
         if ((ctrl.Flags & (PhysicsController.TouchedAgent | PhysicsController.TouchedTerrain)) == 0 && 0.2f < ctrl.AirTime)
         {
             float t = (ctrl.Has(PhysicsController.TiltPowerSet) ? ctrl.ParamB4 * 1.5f : 21f) * dt;
             var relaxed = ctrl.GroundNormal + (Vector3.UnitY - ctrl.GroundNormal) * t;
-            ctrl.GroundNormal = relaxed * InverseLength(relaxed);
+            ctrl.GroundNormal = relaxed * GameMath.InverseLength(relaxed);
         }
         var n = ctrl.GroundNormal;
         var m = LocalMatrix;
         var right = new Vector3(m.M11, m.M12, m.M13);
         var forward = Vector3.Cross(right, n);
         var side = Vector3.Cross(n, forward);
-        var q = CamMath.MatrixToQuat_186900(new Matrix4x4(side.X, side.Y, side.Z, 0f,
+        var q = GameMath.MatrixToQuat_186900(new Matrix4x4(side.X, side.Y, side.Z, 0f,
                                                           n.X, n.Y, n.Z, 0f,
                                                           forward.X, forward.Y, forward.Z, 0f,
                                                           0f, 0f, 0f, 1f)); // Amedo
@@ -126,12 +127,12 @@ public sealed partial class AgentLabAgent
         float pull = -(_homePower * dt * (body.Mass * 60f));
         var d = _moveTarget - m.Translation;
         if (d.X == 0f && d.Z == 0f) d.X = 0.01f;
-        float inv = InverseLength(d);
+        float inv = GameMath.InverseLength(d);
         d = new Vector3(d.X * inv, d.Y * inv, d.Z * inv);
-        int yaw = CamMath.AngleBetween_187EE0(new Vector4(bodyForward, 1f), new Vector4(d, 1f), 1);
+        int yaw = GameMath.AngleBetween_187EE0(new Vector4(bodyForward, 1f), new Vector4(d, 1f), 1);
         body.Torque += new Vector3(0f, yaw * 9.58738e-5f * pull, 0f);
         var w = Vector3.Cross(Vector3.Cross(Vector3.UnitY, d), d);
-        float iw = InverseLength(w);
+        float iw = GameMath.InverseLength(w);
         w = new Vector3(-(w.X * iw), -(w.Y * iw), -(w.Z * iw));
         var level = Vector3.Cross(new Vector3(body.World.M21, body.World.M22, body.World.M23), w);
         body.Torque += new Vector3(level.X * pull, level.Y * pull, level.Z * pull);
@@ -144,7 +145,7 @@ public sealed partial class AgentLabAgent
     {
         var m = LocalMatrix;
         var d = target - m.Translation;
-        float inv = InverseLength(d);
+        float inv = GameMath.InverseLength(d);
         var dir = new Vector3(d.X * inv, d.Y * inv, d.Z * inv);
         float t = MathF.Min(rate, 1f);
         var forward = new Vector3(m.M31, m.M32, m.M33);
@@ -154,11 +155,11 @@ public sealed partial class AgentLabAgent
         {
             wanted = new Vector3(dir.X * banking, dir.Y * banking + 1.5f, dir.Z * banking);
             wanted = new Vector3(wanted.X + up.X * 1.25f, wanted.Y + up.Y * 1.25f, wanted.Z + up.Z * 1.25f);
-            float iw = InverseLength(wanted);
+            float iw = GameMath.InverseLength(wanted);
             wanted = new Vector3(wanted.X * iw, wanted.Y * iw, wanted.Z * iw);
         }
-        var next = CamMath.Slerp_188300(t, forward, dir);
-        float k = InverseLength(next);
+        var next = GameMath.Slerp_188300(t, forward, dir);
+        float k = GameMath.InverseLength(next);
         next = new Vector3(next.X * k, next.Y * k, next.Z * k);
         float turn = 1f - (forward.X * next.X + forward.Y * next.Y + forward.Z * next.Z);
         Matrix4x4 rot;
@@ -172,7 +173,7 @@ public sealed partial class AgentLabAgent
                                 next.X, next.Y, next.Z, 0f,
                                 0f, 0f, 0f, 1f);
         }
-        var q = CamMath.MatrixToQuat_186900(rot);
+        var q = GameMath.MatrixToQuat_186900(rot);
         if (q != LocalRotation) SetLocalRotation(q);
         return turn;
     }
@@ -185,19 +186,19 @@ public sealed partial class AgentLabAgent
         var m = LocalMatrix;
         var d = target - m.Translation;
         d.Y = 0f;
-        float id = InverseLength(d); // Amedo
+        float id = GameMath.InverseLength(d); // Amedo
         var dir = new Vector3(d.X * id, d.Y * id, d.Z * id);
         if (dir.X == 0f && dir.Z == 0f) return 0f;
         var forward = new Vector3(m.M31, 0f, m.M33);
         if (0.99999f < forward.X * dir.X + forward.Y * dir.Y + forward.Z * dir.Z) return 0f;
-        var next = CamMath.Slerp_188300(t, forward, dir);
-        float inext = InverseLength(next); // Amedo
+        var next = GameMath.Slerp_188300(t, forward, dir);
+        float inext = GameMath.InverseLength(next); // Amedo
         next = new Vector3(next.X * inext, next.Y * inext, next.Z * inext);
         float turn = 1f - (forward.X * next.X + forward.Y * next.Y + forward.Z * next.Z);
         float side = 1f;
         if (rolls && 0f < next.Z * dir.X - next.X * dir.Z) side = -1f;
-        CamMath.Frame_1879D0(next, out var right, out var up);
-        SetLocalRotation(CamMath.MatrixToQuat_186900(new Matrix4x4(right.X, right.Y, right.Z, 0f,
+        GameMath.Frame_1879D0(next, out var right, out var up);
+        SetLocalRotation(GameMath.MatrixToQuat_186900(new Matrix4x4(right.X, right.Y, right.Z, 0f,
                                                                     up.X, up.Y, up.Z, 0f,
                                                                     next.X, next.Y, next.Z, 0f,
                                                                     0f, 0f, 1f, 1f)));
@@ -205,8 +206,8 @@ public sealed partial class AgentLabAgent
         float angle = turn * side * roll;
         if (maxRoll < angle) angle = maxRoll;
         else if (angle < -maxRoll) angle = -maxRoll;
-        int units = CamMath.FromValue_11BFA0(angle, 1);
-        if (units != 0) SetLocalRotation(CamMath.Mul_18D558(LocalRotation, CamMath.RotationZ_18D6B0(units)));
+        int units = GameMath.FromValue_11BFA0(angle, 1);
+        if (units != 0) SetLocalRotation(GameMath.Mul_18D558(LocalRotation, GameMath.RotationZ_18D6B0(units)));
         return turn;
     }
 
@@ -234,7 +235,7 @@ public sealed partial class AgentLabAgent
 
     private static Vector3 Unit(Vector3 v)
     {
-        float lenSq = v.LengthSquared();
+        float lenSq = GameMath.LengthSquared(v);
         return lenSq > 2.4999998e-09f ? v / MathF.Sqrt(lenSq) : Vector3.Zero;
     }
 }

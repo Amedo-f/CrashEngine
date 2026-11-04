@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 
@@ -65,17 +66,6 @@ public abstract class WidgetEffect
     }
 
     // Amedo
-    public static int AngleFrom_11BFA0(float radians) => CrashEngine.Runtime.Character.CharacterController.Cvt(radians * BitConverter.Int32BitsToSingle(0x4622F983));
-
-    // Amedo
-    public static int AngleFrom_11BFA0(float value, int unit) => CrashEngine.Runtime.Character.CharacterController.Cvt(value * unit switch
-    {
-        1 => BitConverter.Int32BitsToSingle(0x43360B61),
-        2 => BitConverter.Int32BitsToSingle(0x47800000),
-        _ => BitConverter.Int32BitsToSingle(0x4622F983),
-    });
-
-    // Amedo
     public static Matrix3x2 Rotation_18BC98(int angle)
     {
         if (angle == 0) return Matrix3x2.Identity;
@@ -83,7 +73,7 @@ public abstract class WidgetEffect
         return new Matrix3x2(c, s, -s, c, 0f, 0f);
     }
 
-    public static Matrix3x2 Rotation_18BC98(float radians) => Rotation_18BC98(AngleFrom_11BFA0(radians));
+    public static Matrix3x2 Rotation_18BC98(float radians) => Rotation_18BC98(GameMath.FromValue_11BFA0(radians, 0));
 
     public static float SlideOffset(bool widescreen) => widescreen ? BitConverter.Int32BitsToSingle(0x3EE147AE) : BitConverter.Int32BitsToSingle(0x3EB851EC);
 }
@@ -98,7 +88,7 @@ public sealed class Vector2Curve(params Vector2[] keys)
     {
         if (1f <= p) return Keys_04[^1];
         float t = (Keys_04.Length - 1) * p;
-        int i = CrashEngine.Runtime.Character.CharacterController.Cvt(t);
+        int i = GameMath.Trunc(t);
         return Keys_04[i] + (Keys_04[i + 1] - Keys_04[i]) * (t - i);
     }
 }

@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -170,7 +171,7 @@ public sealed partial class AgentLabAgent
         var n = d * (1f / len);
         var c = Vector3.Cross(n, new Vector3(anchor.M11, anchor.M12, anchor.M13));
         if (MathF.Sqrt(c.X * c.X + c.Y * c.Y + c.Z * c.Z) <= 5e-5f) return;
-        c *= InverseLength(c);
+        c *= GameMath.InverseLength(c);
         var b = Vector3.Cross(n, c);
         beam.GameMatrix = new Matrix4x4(b.X, b.Y, b.Z, 0f, c.X, c.Y, c.Z, 0f, n.X * stretch, n.Y * stretch, n.Z * stretch, 0f, own.X, own.Y, own.Z, 1f);
     }

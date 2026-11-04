@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Camera;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -50,9 +51,9 @@ public sealed partial class AgentLabAgent
                 A0 = (A0 & ~0xFFFFFFUL) | (c & 0xFFFFFF);
                 Rate = BitConverter.UInt32BitsToSingle(Arg(2));
                 A0 &= ~Returning;
-                PitchMax = (int)Arg(4) * CamMath.UnitToRad;
-                YawMax = (int)Arg(5) * CamMath.UnitToRad;
-                PitchMin = -((int)Arg(3) * CamMath.UnitToRad);
+                PitchMax = (int)Arg(4) * GameMath.UnitToRad;
+                YawMax = (int)Arg(5) * GameMath.UnitToRad;
+                PitchMin = -((int)Arg(3) * GameMath.UnitToRad);
                 Damping = BitConverter.UInt32BitsToSingle(Arg(16));
             }
             HeardAt_C0 = _owner.World.NowTicks; // Amedo
@@ -203,7 +204,7 @@ public sealed partial class AgentLabAgent
                 var d = new Vector4(pos.X - Basis.M41, pos.Y - Basis.M42, pos.Z - Basis.M43, 1f);
                 float k1 = Rate * 2000f;
                 float k2 = Rate * Damping * 166f;
-                float inv = CamMath.InvLengthGuarded_11C030(Eps, d);
+                float inv = GameMath.InvLength_11C030(Eps, d);
                 float dx = d.X * inv, dy = d.Y * inv, dz = d.Z * inv;
                 PitchSpeed += ((Basis.M21 * dx + Basis.M22 * dy + Basis.M23 * dz) * -k1 - PitchSpeed * k2) * dt;
                 YawSpeed += ((Basis.M11 * dx + Basis.M12 * dy + Basis.M13 * dz) * k1 - YawSpeed * k2) * dt;
@@ -237,8 +238,8 @@ public sealed partial class AgentLabAgent
                 Yaw = YawMax;
                 A0 |= YawHigh | Limited;
             }
-            PitchUnits = CamMath.Trunc(Pitch * CamMath.RadToUnit);
-            YawUnits = CamMath.Trunc(Yaw * CamMath.RadToUnit);
+            PitchUnits = GameMath.Trunc(Pitch * GameMath.RadToUnit);
+            YawUnits = GameMath.Trunc(Yaw * GameMath.RadToUnit);
         }
 
         private bool Mine(int reactId) => (A0 & Attached) != 0 && (reactId == Joint || (Joint2 != 0xFF && reactId == Joint2));
@@ -254,7 +255,7 @@ public sealed partial class AgentLabAgent
                 pitch = (int)MathF.Round(_prevPitchUnits + (PitchUnits - _prevPitchUnits) * a);
                 yaw = (int)MathF.Round(_prevYawUnits + (YawUnits - _prevYawUnits) * a);
             }
-            var q = CamMath.EulerXY_1862A8(pitch, yaw);
+            var q = GameMath.EulerXY_1862A8(pitch, yaw);
             rot = hasRotation ? Quaternion.Multiply(q, rot) : q;
             if (AnimatedObject.InLogicCompose && Ref != 0xFF) Basis = _owner.ExitAnchor_293B70(Ref); // Amedo
         }
