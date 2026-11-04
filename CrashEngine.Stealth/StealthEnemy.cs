@@ -41,7 +41,7 @@ public sealed class StealthEnemy : Component
         var playerPos = Player!.Transform.Position;
         var myPos     = Transform.Position;
         var delta     = playerPos - myPos;
-        sqrDist = delta.LengthSquared();
+        sqrDist = GameMath.LengthSquared(delta);
 
         if (sqrDist > DetectionRange * DetectionRange) return false;
 
@@ -50,7 +50,7 @@ public sealed class StealthEnemy : Component
         if (Player.IsRunning)   halfFov += 30f;
         halfFov = Math.Clamp(halfFov, 10f, 180f);
 
-        float angleDeg = Vector3.Dot(Vector3.Normalize(delta), _facingDir)
+        float angleDeg = GameMath.Dot(GameMath.Normalize(delta), _facingDir)
                          is float cosA
                        ? MathF.Acos(Math.Clamp(cosA, -1f, 1f)) * 180f / MathF.PI
                        : 180f;
@@ -113,14 +113,14 @@ public sealed class StealthEnemy : Component
         if (Patrol is null || Patrol.Count == 0) return;
         var target = Patrol.Get(_waypointIdx);
         MoveToward(target, WalkSpeed);
-        if ((target - Transform.Position).LengthSquared() < 0.5f * 0.5f)
+        if (GameMath.LengthSquared((target - Transform.Position)) < 0.5f * 0.5f)
             _waypointIdx = (_waypointIdx + 1) % Patrol.Count;
     }
 
     private void FacePlayer()
     {
         var delta = Player!.Transform.Position - Transform.Position;
-        if (delta != Vector3.Zero) _facingDir = Vector3.Normalize(delta);
+        if (delta != Vector3.Zero) _facingDir = GameMath.Normalize(delta);
     }
 
     private void DoChase(float sqrDist)
@@ -150,7 +150,7 @@ public sealed class StealthEnemy : Component
         if (Patrol is null || Patrol.Count == 0) { EnterPatrol(); return; }
         var home = Patrol.Get(_waypointIdx);
         MoveToward(home, WalkSpeed);
-        if ((home - Transform.Position).LengthSquared() < 1f)
+        if (GameMath.LengthSquared((home - Transform.Position)) < 1f)
             EnterPatrol();
     }
 
@@ -174,9 +174,9 @@ public sealed class StealthEnemy : Component
         var delta = target - Transform.Position;
         delta.Y = 0f;
         if (delta == Vector3.Zero) return;
-        _facingDir             = Vector3.Normalize(delta);
+        _facingDir             = GameMath.Normalize(delta);
         float step             = speed * EngineTime.FixedDelta;
-        float dist             = delta.Length();
+        float dist             = GameMath.Length(delta);
         Transform.Position    += _facingDir * Math.Min(step, dist);
     }
 }

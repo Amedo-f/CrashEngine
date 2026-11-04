@@ -33,7 +33,7 @@ public class Transform
         }
     }
 
-    // Amedo: while a scene renders nothing moves, so each world matrix is computed once per render (main thread only)
+    // Amedo
     private static int _cacheEpoch, _nextEpoch, _cacheThread;
     private int _worldEpoch;
     private Matrix4x4 _world;
@@ -50,13 +50,13 @@ public class Transform
 
     internal static void EndRenderCache() => _cacheEpoch = 0; // Amedo
 
-    public Vector3 Forward => Vector3.Normalize(Vector3.Transform(-Vector3.UnitZ, Rotation));
-    public Vector3 Right   => Vector3.Normalize(Vector3.Transform( Vector3.UnitX, Rotation));
-    public Vector3 Up      => Vector3.Normalize(Vector3.Transform( Vector3.UnitY, Rotation));
+    public Vector3 Forward => GameMath.Normalize(Vector3.Transform(-Vector3.UnitZ, Rotation));
+    public Vector3 Right   => GameMath.Normalize(Vector3.Transform( Vector3.UnitX, Rotation));
+    public Vector3 Up      => GameMath.Normalize(Vector3.Transform( Vector3.UnitY, Rotation));
 
     public void LookAt(Vector3 target)
     {
-        var dir = Vector3.Normalize(target - Position);
+        var dir = GameMath.Normalize(target - Position);
         if (dir == Vector3.Zero) return;
         Rotation = Quaternion.CreateFromRotationMatrix(
             Matrix4x4.CreateLookAt(Position, Position + dir, Vector3.UnitY) is var m

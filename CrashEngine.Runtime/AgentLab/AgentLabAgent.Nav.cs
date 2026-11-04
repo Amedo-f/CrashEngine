@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -13,7 +14,7 @@ public sealed partial class AgentLabAgent
         var pos = target.GamePosition;
         var node = target.Chunk.Nav.Nearest_23BC80(pos, 0, 0x10);
         if (node is null) pos.Z += 0.1f;
-        else if ((node.Flags & 4) != 0 || Vector3.Distance(node.Position, pos) < 30f) pos = node.Position + new Vector3(0f, 0.5f, 0f);
+        else if ((node.Flags & 4) != 0 || GameMath.Distance(node.Position, pos) < 30f) pos = node.Position + new Vector3(0f, 0.5f, 0f);
         FocusAt(pos);
     }
 
@@ -27,7 +28,7 @@ public sealed partial class AgentLabAgent
         if (CodeObject(to) is { } toObj) b = toObj.GamePosition;
         else CodePosition(to, out b);
         var d = b - a;
-        var p = a + d * (InverseLength(d) * distance);
+        var p = a + d * (GameMath.InverseLength(d) * distance);
         Trace($"point toward 0x{to:X2} from 0x{from:X2}: {a} -> {p} into 0x{dst:X2}");
         SetCodePosition(dst, p);
     }
@@ -36,7 +37,7 @@ public sealed partial class AgentLabAgent
     {
         var pos = GamePosition;
         if (Chunk.Nav.Nearest_23BAF8(pos) is not { } node) return 1e30f;
-        float d = Vector3.Distance(pos, node.Position) - node.Radius;
+        float d = GameMath.Distance(pos, node.Position) - node.Radius;
         Trace($"nav distance² {d * d:0.##} (node {node.Id} at {node.Position} r {node.Radius:0.##}, {Chunk.Nav.Nodes.Count} nodes)");
         return d * d;
     }

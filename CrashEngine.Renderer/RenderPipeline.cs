@@ -90,6 +90,8 @@ public sealed class RenderPipeline : Component
     public static Matrix4x4 ViewProjection { get; private set; }
     public static bool ViewProjectionValid { get; private set; }
     public static bool Culling { get; set; } = true;
+    public static bool SkyAfterOpaque { get; set; } // Amedo 2026-10-27
+    private bool _skyPending, _skyHooked;
 
     // Amedo 2026-09-29
     public static bool Outside(Matrix4x4 world, Vector3 min, Vector3 max)
@@ -101,7 +103,7 @@ public sealed class RenderPipeline : Component
         var ax = new Vector4(m.M11, m.M12, m.M13, m.M14) * d.X;
         var ay = new Vector4(m.M21, m.M22, m.M23, m.M24) * d.Y;
         var az = new Vector4(m.M31, m.M32, m.M33, m.M34) * d.Z;
-        static bool Behind(Vector4 plane, Vector4 b, Vector4 ax, Vector4 ay, Vector4 az) =>
+        static bool Behind(in Vector4 plane, in Vector4 b, in Vector4 ax, in Vector4 ay, in Vector4 az) =>
             Vector4.Dot(plane, b) + MathF.Max(0f, Vector4.Dot(plane, ax)) + MathF.Max(0f, Vector4.Dot(plane, ay))
                                   + MathF.Max(0f, Vector4.Dot(plane, az)) < 0f;
         return Behind(new Vector4(1f, 0f, 0f, 1f), b, ax, ay, az) || Behind(new Vector4(-1f, 0f, 0f, 1f), b, ax, ay, az)
@@ -156,7 +158,7 @@ public sealed class RenderPipeline : Component
             }
             _fogShownColor = fogColor;
             _fogPalette!.Bind(7);
-            gl.ActiveTexture(TextureUnit.Texture0);
+            GlState.ActiveTexture(gl, 0);
         }
         var clear = fogIndex >= 0 && _fogShown is { } shown ? GameFog.ClearUnderFog_19F1C8(shown) : fogColor; // Amedo
         gl.ClearColor(clear.X, clear.Y, clear.Z, 1f);
@@ -170,7 +172,7 @@ public sealed class RenderPipeline : Component
         if (GameShadowPass.MarkingReceivers)
         {
             gl.Enable(EnableCap.StencilTest);
-            gl.StencilFunc(StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
+            GlState.StencilFunc(gl, StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
             gl.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Replace);
             gl.StencilMask(GameShadowPass.ReceiverBit);
         }
@@ -217,13 +219,42 @@ public sealed class RenderPipeline : Component
         Shader.Set("FlipY",       0f);
         Shader.Set("DiffuseOnly", DebugRed ? 1f : 0f);
 
-        DrawSkydome(gl);
+        if (SkyAfterOpaque) DeferSkydome(); // Amedo 2026-10-27
+        else DrawSkydome(gl);
         SunShadowPass.EnableSampling(Shader, true); // Amedo
 
-        gl.PolygonMode(GLEnum.FrontAndBack, Wireframe ? GLEnum.Line : GLEnum.Fill);
+        if (GlCaps.PolygonMode) gl.PolygonMode(GLEnum.FrontAndBack, Wireframe ? GLEnum.Line : GLEnum.Fill);
     }
 
-    private void DrawSkydome(GL gl)
+    // Amedo 2026-10-27
+    private void DeferSkydome()
+    {
+        _skyPending = true;
+        if (_skyHooked) return;
+        Scene.AfterOpaque += DrawDeferredSkydome;
+        _skyHooked = true;
+    }
+
+    // Amedo 2026-10-27
+    private void DrawDeferredSkydome(GL gl)
+    {
+        if (!_skyPending || Camera is null) return;
+        _skyPending = false;
+        Shader.Use();
+        SunShadowPass.EnableSampling(Shader, false);
+        Shader.Set("ObjLit", 0);
+        Shader.SetMatrixArray("BoneMatrices", IdentityBones);
+        Shader.Set("Diffuse",     Vector4.One);
+        Shader.Set("Opacity",     1f);
+        Shader.Set("FlipY",       0f);
+        Shader.Set("DiffuseOnly", DebugRed ? 1f : 0f);
+        gl.DepthRange(1f, 1f);
+        DrawSkydome(gl, behindScene: true);
+        gl.DepthRange(0f, 1f);
+        SunShadowPass.EnableSampling(Shader, true);
+    }
+
+    private void DrawSkydome(GL gl, bool behindScene = false)
     {
         var draws = SkydomeOverride ?? SkydomeDraws; // Amedo 2026-09-29
         if (draws.Count == 0) return;
@@ -234,11 +265,16 @@ public sealed class RenderPipeline : Component
         Shader.Set("StartModel", model);
         Shader.Set("StartProjection", Camera.SkyProjection); // Amedo 2026-09-29
 
-        GlState.DepthTest(gl, false); // Amedo 2026-10-01
+        GlState.DepthTest(gl, behindScene); // Amedo 2026-10-01
         GlState.Culling(gl, false);
         foreach (var (mesh, mat) in draws) // Amedo 2026-09-29
         {
             mat.Apply(gl, Shader);
+            if (behindScene) // Amedo 2026-10-27
+            {
+                GlState.DepthTest(gl, true);
+                GlState.DepthMask(gl, false);
+            }
             mesh.Draw(gl);
             mat.Restore(gl, Shader);
         }
@@ -250,5 +286,6 @@ public sealed class RenderPipeline : Component
     {
         Shader?.Dispose();
         _fogPalette?.Dispose(); // Amedo 2026-09-26
+        if (_skyHooked) Scene.AfterOpaque -= DrawDeferredSkydome; // Amedo 2026-10-27
     }
 }

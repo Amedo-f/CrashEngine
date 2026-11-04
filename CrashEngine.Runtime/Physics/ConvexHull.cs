@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 using TwinBoundingBoxBuilder = Twinsanity.TwinsanityInterchange.Common.TwinBoundingBoxBuilder;
 
 namespace CrashEngine.Runtime.Physics;
@@ -44,6 +45,14 @@ public sealed class ConvexHull
         Normals  = [new(0f, -1f, 0f), new(0f, 0f, -1f), new(1f, 0f, 0f)],
     };
 
+    public void SetBox(Vector3 min, Vector3 max)
+    {
+        Points[0] = new(min.X, min.Y, min.Z); Points[1] = new(max.X, min.Y, min.Z); Points[2] = new(max.X, min.Y, max.Z); Points[3] = new(min.X, min.Y, max.Z);
+        Points[4] = new(min.X, max.Y, min.Z); Points[5] = new(max.X, max.Y, min.Z); Points[6] = new(max.X, max.Y, max.Z); Points[7] = new(min.X, max.Y, max.Z);
+        Faces[0] = new(0f, -1f, 0f, min.Y); Faces[1] = new(0f, 0f, -1f, min.Z); Faces[2] = new(1f, 0f, 0f, -max.X);
+        Faces[3] = new(0f, 0f, 1f, -max.Z); Faces[4] = new(-1f, 0f, 0f, min.X); Faces[5] = new(0f, 1f, 0f, -max.Y);
+    }
+
     public void Transform(Matrix4x4 m)
     {
         for (int i = 0; i < Points.Length; i++) Points[i] = Vector3.Transform(Points[i], m);
@@ -66,6 +75,15 @@ public sealed class ConvexHull
             max = Vector3.Max(max, p);
         }
         return (min, max);
+    }
+
+    // Amedo
+    public bool IsPointInsideAt_200598(Vector3 point, Matrix4x4 toLocal)
+    {
+        var p = Vector3.Transform(point, toLocal);
+        foreach (var f in Faces)
+            if (f.X * p.X + f.Y * p.Y + f.Z * p.Z + f.W > 5e-05f) return false;
+        return true;
     }
 
     public int Side(Matrix4x4 m, Vector3 n, float w)
@@ -102,7 +120,7 @@ public sealed class ConvexHull
                 var db = Vector3.TransformNormal(eb, mb);
                 var c = new Vector3(da.Y * db.Z - da.Z * db.Y, da.Z * db.X - da.X * db.Z, da.X * db.Y - da.Y * db.X);
                 if (!(1e-8f < c.X * c.X + c.Y * c.Y + c.Z * c.Z)) continue;
-                if (Separated(pa, pb, c * InverseLength(c))) return false;
+                if (Separated(pa, pb, c * GameMath.InverseLength(c))) return false;
             }
         }
         return true;
@@ -113,7 +131,7 @@ public sealed class ConvexHull
 
     // Amedo
     public static bool Overlaps_200370(ConvexHull a, Matrix4x4 ma, ConvexHull b, Matrix4x4 mb) =>
-        Test_1FC0B0(a, b, mb * Camera.CamMath.RigidInverse_18E808(ma));
+        Test_1FC0B0(a, b, mb * GameMath.RigidInverse_18E808(ma));
 
     private static bool Test_1FC0B0(ConvexHull a, ConvexHull b, Matrix4x4 rel)
     {
@@ -157,27 +175,21 @@ public sealed class ConvexHull
     private static bool Separated(Vector3[] pa, Vector3[] pb, Vector3 axis)
     {
         float aMin = float.MaxValue, aMax = float.MinValue, bMin = float.MaxValue, bMax = float.MinValue;
-        foreach (var p in pa) { float v = Dot(p, axis); if (v < aMin) aMin = v; if (aMax < v) aMax = v; }
-        foreach (var p in pb) { float v = Dot(p, axis); if (v < bMin) bMin = v; if (bMax < v) bMax = v; }
+        foreach (var p in pa) { float v = GameMath.Dot(p, axis); if (v < aMin) aMin = v; if (aMax < v) aMax = v; }
+        foreach (var p in pb) { float v = GameMath.Dot(p, axis); if (v < bMin) bMin = v; if (bMax < v) bMax = v; }
         return aMax < bMin || bMax < aMin;
     }
 
-    private static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return lenSq > 2.4999998e-09f ? 1f / MathF.Sqrt(lenSq) : 0f;
-    }
+    [ThreadStatic] private static List<Axis>? _collideAxes;
 
-    private static float Dot(Vector3 a, Vector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
-
-    internal List<Axis> Axes(in CollisionWorld.Triangle tri, Matrix4x4 m)
+    internal void Axes(in CollisionWorld.Triangle tri, Matrix4x4 m, List<Axis> axes)
     {
-        var axes = new List<Axis>();
+        axes.Clear();
         var e1 = tri.B - tri.A;
         var e2 = tri.C - tri.B;
         var e3 = tri.A - tri.C;
         var n = Vector3.Cross(e1, e2);
-        axes.Add(new Axis(n * InverseLength(n), 0));
+        axes.Add(new Axis(n * GameMath.InverseLength(n), 0));
         foreach (var normal in Normals) axes.Add(new Axis(Vector3.TransformNormal(normal, m), 1));
         Span<Vector3> edges = [e1, e2, e3];
         foreach (var dir in EdgeDirs)
@@ -187,10 +199,9 @@ public sealed class ConvexHull
             {
                 var c = Vector3.Cross(e, d);
                 if (!(9.999999e-09f < c.X * c.X + c.Y * c.Y + c.Z * c.Z)) continue; // Amedo
-                axes.Add(new Axis(c * InverseLength(c), 2));
+                axes.Add(new Axis(c * GameMath.InverseLength(c), 2));
             }
         }
-        return axes;
     }
 
     public bool Collide(in CollisionWorld.Triangle tri, Matrix4x4 m, out Vector3 push, out Vector3 contact)
@@ -209,7 +220,8 @@ public sealed class ConvexHull
             for (int j = 0; j < world.Length && k < count; j++, k++)
                 diffs[k] = corners[i] - world[j];
 
-        var axes = Axes(tri, m);
+        var axes = _collideAxes ??= new List<Axis>();
+        Axes(tri, m, axes);
         float best = -Far;
         int bestIndex = -1;
         var bestDir = Vector3.Zero;
@@ -219,7 +231,7 @@ public sealed class ConvexHull
             float lo = 3.689349e19f, hi = -3.689349e19f;
             foreach (var d in diffs)
             {
-                float v = Dot(d, dir);
+                float v = GameMath.Dot(d, dir);
                 if (v < lo) lo = v;
                 if (hi < v) hi = v;
             }
@@ -239,7 +251,7 @@ public sealed class ConvexHull
                 foreach (var point in Points)
                 {
                     var p = Vector3.Transform(point, moved);
-                    float d = Dot(p, plane);
+                    float d = GameMath.Dot(p, plane);
                     if (deepest < d) { deepest = d; contact = p; }
                 }
                 break;
@@ -248,14 +260,14 @@ public sealed class ConvexHull
                 if (Faces.Length > 0)
                 {
                     contact = tri.A;
-                    float d = Dot(tri.A, bestDir);
-                    if (d < Dot(tri.B, bestDir)) { contact = tri.B; d = Dot(tri.B, bestDir); }
-                    if (d < Dot(tri.C, bestDir)) contact = tri.C;
+                    float d = GameMath.Dot(tri.A, bestDir);
+                    if (d < GameMath.Dot(tri.B, bestDir)) { contact = tri.B; d = GameMath.Dot(tri.B, bestDir); }
+                    if (d < GameMath.Dot(tri.C, bestDir)) contact = tri.C;
                 }
                 break;
             case 2:
             {
-                float d0 = Dot(tri.A, bestDir), d1 = Dot(tri.B, bestDir), d2 = Dot(tri.C, bestDir);
+                float d0 = GameMath.Dot(tri.A, bestDir), d1 = GameMath.Dot(tri.B, bestDir), d2 = GameMath.Dot(tri.C, bestDir);
                 Vector3 a0, a1;
                 if (d0 < d1 && d0 < d2) { a0 = tri.B; a1 = tri.C; }
                 else if (d1 < d0 && d1 < d2) { a0 = tri.A; a1 = tri.C; }
@@ -283,7 +295,7 @@ public sealed class ConvexHull
                 var c = new Vector3(da.Y * db.Z - da.Z * db.Y, da.Z * db.X - da.X * db.Z, da.X * db.Y - da.Y * db.X);
                 if (!(9.999999e-09f < c.X * c.X + c.Y * c.Y + c.Z * c.Z)) continue;
                 if (0x100 <= axes.Count) return axes;
-                axes.Add(new Axis(c * InverseLength(c), 2));
+                axes.Add(new Axis(c * GameMath.InverseLength(c), 2));
             }
         }
         return axes;
@@ -310,7 +322,7 @@ public sealed class ConvexHull
             for (int i = 0, n = 0; i < pa.Length && n < usable; i++) // Amedo
                 for (int j = 0; j < pb.Length && n < usable; j++, n++)
                 {
-                    float v = Dot(pa[i] - pb[j], dir);
+                    float v = GameMath.Dot(pa[i] - pb[j], dir);
                     if (v < lo) lo = v;
                     if (hi < v) hi = v;
                 }
@@ -342,7 +354,7 @@ public sealed class ConvexHull
         foreach (var point in Points)
         {
             var p = Vector3.Transform(point, m);
-            float d = Dot(p, dir);
+            float d = GameMath.Dot(p, dir);
             if (!(best < d)) continue;
             best = d;
             at = p;
@@ -358,7 +370,7 @@ public sealed class ConvexHull
         {
             var pa = Vector3.Transform(Points[a], m);
             var pb = Vector3.Transform(Points[b], m);
-            float d = MathF.Min(Dot(pb, dir), Dot(pa, dir));
+            float d = MathF.Min(GameMath.Dot(pb, dir), GameMath.Dot(pa, dir));
             if (!(best < d)) continue;
             best = d;
             p = pa;
@@ -366,14 +378,14 @@ public sealed class ConvexHull
         }
     }
 
-    private static Vector3 ClosestOnSecond(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b1)
+    private static Vector3 ClosestOnSecond(in Vector3 a0, in Vector3 a1, in Vector3 b0, in Vector3 b1)
     {
         var u = a1 - a0;
         var v = b1 - b0;
         var w = a0 - b0;
-        float uu = Dot(u, u), uv = Dot(u, v), vv = Dot(v, v);
+        float uu = GameMath.Dot(u, u), uv = GameMath.Dot(u, v), vv = GameMath.Dot(v, v);
         float det = uu * vv - uv * uv;
-        float t = MathF.Abs(det) < 1e-4f ? 0.5f : (Dot(w, v) * uu - Dot(w, u) * uv) / det;
+        float t = MathF.Abs(det) < 1e-4f ? 0.5f : (GameMath.Dot(w, v) * uu - GameMath.Dot(w, u) * uv) / det;
         if (t < 0f) t = 0f;
         if (1f < t) t = 1f;
         return b0 + v * t;

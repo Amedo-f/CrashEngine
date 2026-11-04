@@ -47,15 +47,15 @@ public sealed class PositionChainRenderer : Component
 
     public override void OnDestroy() => _mesh?.Dispose();
 
-    private static void AppendTube(List<GpuMesh.Vertex> verts, Vector3 a, Vector3 b, float radius, int sides, Vector4 color)
+    private static void AppendTube(List<GpuMesh.Vertex> verts, in Vector3 a, in Vector3 b, float radius, int sides, in Vector4 color)
     {
         var axis = b - a;
-        float len = axis.Length();
+        float len = GameMath.Length(axis);
         if (len < 0.0001f) return;
         var dir = axis / len;
 
-        var up = Math.Abs(Vector3.Dot(dir, Vector3.UnitY)) > 0.99f ? Vector3.UnitX : Vector3.UnitY;
-        var right = Vector3.Normalize(Vector3.Cross(up, dir));
+        var up = Math.Abs(GameMath.Dot(dir, Vector3.UnitY)) > 0.99f ? Vector3.UnitX : Vector3.UnitY;
+        var right = GameMath.Normalize(Vector3.Cross(up, dir));
         var trueUp = Vector3.Cross(dir, right);
 
         var bottom = new Vector3[sides];
@@ -83,6 +83,6 @@ public sealed class PositionChainRenderer : Component
         }
     }
 
-    private static GpuMesh.Vertex V(Vector3 pos, Vector3 normal, Vector4 col) =>
+    private static GpuMesh.Vertex V(in Vector3 pos, in Vector3 normal, in Vector4 col) =>
         new() { Position = pos, Normal = normal, UV = Vector2.Zero, Color = col };
 }

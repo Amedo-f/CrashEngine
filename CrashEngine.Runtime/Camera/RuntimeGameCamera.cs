@@ -6,6 +6,7 @@ using Twinsanity.TwinsanityInterchange.Common.CameraSubtypes;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;
 
@@ -21,7 +22,9 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     private readonly AgentLabWorld _world;
     private readonly List<Zone> _zones = new();
     private readonly List<(AgentLabAgent Agent, uint Node)> _zoneTargets = new(); // Amedo 2026-09-29
-    private readonly uint _inst, _node, _c, _motion, _comp, _c9;
+    private readonly uint _inst, _node, _c, _motion;
+    private uint _comp, _c9; // Amedo 2026-10-30
+    private readonly Dictionary<CharacterController, (uint Comp, uint C9)> _cameras = new(ReferenceEqualityComparer.Instance); // Amedo 2026-10-30
     private readonly uint _vehicle; // Amedo 2026-09-29
     private readonly List<uint> _overlapping = new();
     public IReadOnlyList<uint> OverlappingZones => _overlapping;
@@ -113,8 +116,8 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
             _prevFov = fov;
             var f0 = new Vector3(pose.M31, pose.M32, pose.M33);
             var f1 = new Vector3(_pose.M31, _pose.M32, _pose.M33);
-            float l = f0.Length() * f1.Length();
-            if (Vector3.DistanceSquared(pose.Translation, _pose.Translation) > 9f || (l > 1e-6f && Vector3.Dot(f0, f1) / l < 0.85f))
+            float l = GameMath.Length(f0) * GameMath.Length(f1);
+            if (GameMath.DistanceSq(pose.Translation, _pose.Translation) > 9f || (l > 1e-6f && GameMath.Dot(f0, f1) / l < 0.85f))
             {
                 _prevPose = _pose;
                 _prevFov = FovDegrees;
@@ -148,8 +151,8 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
             static Vector3 NLerp(Vector3 x, Vector3 y, float t)
             {
                 var v = Vector3.Lerp(x, y, t);
-                float len = v.Length();
-                return len > 1e-6f ? v * (x.Length() + (y.Length() - x.Length()) * t) / len : v;
+                float len = GameMath.Length(v);
+                return len > 1e-6f ? v * (GameMath.Length(x) + (GameMath.Length(y) - GameMath.Length(x)) * t) / len : v;
             }
             var right = NLerp(Row(p, 1), Row(c, 1), a);
             var up = NLerp(Row(p, 2), Row(c, 2), a);
@@ -172,6 +175,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     public float Near { get; private set; } = 0.1f;
     public float Far { get; private set; } = 1500f;
     public uint Controller => _comp + 0x30;
+    public (uint Inst, uint Node, uint C, uint Motion, uint Comp, uint C9) Addresses => (_inst, _node, _c, _motion, _comp, _c9);
     public uint CurrentZone => Memory.U(_comp + 0x38);
     public ulong EyeFlags => Memory.Q(_comp + 0x50 + 0x2F0 + 0x40);
     public Vector4 RigTarget => Memory.V(_comp + 0x50 + 0xE0 + 0x20); // Amedo 2026-09-29
@@ -185,7 +189,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     {
         _world = world;
         Camera = new GameCamera(Memory) { Collision = world.Collision };
-        Camera.CharacterVelocity = _ => new Vector4(c.Velocity, 1f); // Amedo
+        Camera.CharacterVelocity = _ => new Vector4((_bound ?? c).Velocity, 1f); // Amedo
         Camera.CharacterKind = _ => _world.PlayerCharacter?.Kind ?? c.Kind; // Amedo
         Camera.LinkedSecond_15FE98 = () => _world.PlayerCharacter?.Link?.Follower_15FE98() is { } fc && _world.Agents.FirstOrDefault(a => ReferenceEquals(a.OwnCharacter, fc)) is { } fa ? Proxy(fa) : 0u; // Amedo
         Camera.ObjectAt = obj => obj != 0 && _proxyAgents.TryGetValue(obj, out var pa) ? pa : null; // Amedo
@@ -195,8 +199,8 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         _c      = Camera.Alloc(0x310, "crash controller");
         _motion = Camera.Alloc(0x40, "crash motion");
         _vehicle = Camera.Alloc(0x1B0, "crash vehicle"); // Amedo 2026-09-29
-        Camera.VehicleKind = _ => c.Vehicle?.Kind ?? 0;
-        Camera.VehicleVelocity = _ => new Vector4(c.Vehicle?.Velocity ?? Vector3.Zero, 1f); // Amedo
+        Camera.VehicleKind = _ => (_bound ?? c).Vehicle?.Kind ?? 0;
+        Camera.VehicleVelocity = _ => new Vector4((_bound ?? c).Vehicle?.Velocity ?? Vector3.Zero, 1f); // Amedo
         Memory.U(_inst + 8, _node);
         Memory.B(_inst + 0x153, 2);
         Memory.U(_c + 0x10, _motion);
@@ -206,6 +210,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         _comp = Camera.CreatePlayerCamera(_inst, _c);
         _bound = c; // Amedo
         _c9 = Camera.CameraComponent(Camera.Handle(_comp + 0x20));
+        _cameras[c] = (_comp, _c9); // Amedo 2026-10-30
         uint comp12 = Camera.Alloc(0x20, "crash comp12"); // Amedo 2026-09-29
         Memory.U(comp12 + 0x18, _c);
         Memory.U(_inst + 0xD8 + 0xC * 4, comp12);
@@ -554,11 +559,31 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         if (!ReferenceEquals(c, _bound)) // Amedo
         {
             _bound = c;
-            Camera.PlayerBind_1422F0(_comp + 0x50, _c);
+            SwitchCamera_177A90(c); // Amedo 2026-10-30
         }
         Camera.SetTime((uint)_world.NowTicks, dtTicks);
         if (play) PlayUpdate(pad, c, player);
         FinishUpdate(Memory.U(Camera.Handle(_comp + 0x20) + 8));
+    }
+
+    // Amedo 2026-10-30
+    private void SwitchCamera_177A90(CharacterController c)
+    {
+        if (!_cameras.TryGetValue(c, out var cam))
+        {
+            uint comp = Camera.CreatePlayerCamera(_inst, _c);
+            cam = (comp, Camera.CameraComponent(Camera.Handle(comp + 0x20)));
+            _cameras[c] = cam;
+        }
+        (_comp, _c9) = cam;
+        Memory.U(_inst + 0xD8 + 0x16 * 4, _comp);
+        if (Camera.Handle(_comp + 0x1A4) != _inst) Memory.U(_comp + 0x1A4, Camera.HandleOf(_inst));
+        uint obj = Camera.Handle(_comp + 0x20);
+        Camera.SetActiveCamera_177A90(obj);
+        Camera.ShakeTarget_177A90(obj);
+        FovDegrees = Memory.I(_c9 + 0x1C) * 360f / 65536f;
+        Near = Memory.F(_c9 + 0x24);
+        Far = Memory.F(_c9 + 0x28);
     }
 
     // Amedo 2026-09-29

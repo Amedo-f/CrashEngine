@@ -22,10 +22,11 @@ public static class ParticleFx
                             MeshDecoder.ParticleTexturePage[] pages, bool drawDistanceCull)
     {
         _batch ??= new ParticleBatch(gl);
-        var right = Vector3.Normalize(new Vector3(view.M11, view.M21, view.M31));
-        var down = -Vector3.Normalize(new Vector3(view.M12, view.M22, view.M32));
+        var right = GameMath.Normalize(new Vector3(view.M11, view.M21, view.M31));
+        var down = -GameMath.Normalize(new Vector3(view.M12, view.M22, view.M32));
         float now = world.RenderTime;
         bool begun = false;
+        Vector3? eye = Matrix4x4.Invert(view, out var camWorld) && Matrix4x4.Invert(toEditor, out var fromEditor) ? Vector3.Transform(camWorld.Translation, fromEditor) : null; // Amedo
 
         foreach (int blend in DrawOrder)
         {
@@ -37,8 +38,8 @@ public static class ParticleFx
                 foreach (var em in world.Emitters)
                 {
                     if (!em.Enabled || em.Def.Blend != blend || em.Def.Page != page || !world.SceneDrawn_1E8(em)) continue; // Amedo
-                    if (drawDistanceCull && !em.IgnoreDistance && em.LastDistance > em.Def.DrawMaxDist) continue; // Amedo 2026-09-27
-                    n = AppendEmitter(em, now, toEditor, right, down, pages[page], n);
+                    if (drawDistanceCull && !Shown_1B5990(world, em, eye)) continue; // Amedo
+                    n = AppendEmitter(em, now, toEditor, right, down, pages[page], n, eye); // Amedo
                 }
                 if (n == 0) continue;
                 if (!begun) { _batch.Begin(view * projection); begun = true; }
@@ -48,7 +49,7 @@ public static class ParticleFx
         if (begun) _batch.End();
     }
 
-    private static ParticleBatch.Vertex V(Vector3 p, Vector2 uv, Vector4 c) => new() { Position = p, UV = uv, Color = c };
+    private static ParticleBatch.Vertex V(in Vector3 p, in Vector2 uv, in Vector4 c) => new() { Position = p, UV = uv, Color = c };
 
     // Amedo 2026-09-30
     public static void DrawDecals(GL gl, ParticleWorld world, Matrix4x4 view, Matrix4x4 projection, Matrix4x4 toEditor)
@@ -76,7 +77,7 @@ public static class ParticleFx
                         if (s > 2) { s = 2; f = 1f; }
                         else if (s < 0) s = 0;
                         var c = Vector4.Lerp(t.Colour[s], t.Colour[s + 1], f);
-                        var col = new Vector4(MathF.Truncate(c.X), MathF.Truncate(c.Y), MathF.Truncate(c.Z), MathF.Truncate(c.W)) * (1f / 128f);
+                        var col = new Vector4(MathF.Truncate(c.X) * (1f / 255f), MathF.Truncate(c.Y) * (1f / 255f), MathF.Truncate(c.Z) * (1f / 255f), MathF.Truncate(c.W) * (1f / 128f));
                         var size = Vector4.Lerp(t.Size[s], t.Size[s + 1], f);
                         var side = d.Side * size.X;
                         var dir = d.Dir * size.Z;
@@ -142,7 +143,7 @@ public static class ParticleFx
                     gl.Enable(EnableCap.StencilTest);
                     gl.StencilMask(0);
                     gl.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
-                    gl.StencilFunc(StencilFunction.Equal, 0, GameShadowPass.ReceiverBit);
+                    GlState.StencilFunc(gl, StencilFunction.Equal, 0, GameShadowPass.ReceiverBit);
                 }
                 begun = true;
             }
@@ -161,10 +162,28 @@ public static class ParticleFx
         V(eye + (Vector3.Transform(p, toWorld) - eye) * s, Vector2.Zero,
           new Vector4((c & 0xFF) / 255f, ((c >> 8) & 0xFF) / 255f, ((c >> 16) & 0xFF) / 255f, (c >> 24) / 128f));
 
+    // Amedo
+    private static bool Shown_1B5990(ParticleWorld world, ParticleEmitterSim em, Vector3? eye)
+    {
+        if (eye is { } e && !(GameMath.Distance(e, em.Origin) < em.Def.DrawMaxDist)) return false;
+        return world.BoxInView?.Invoke(em.Origin, em.Def.Bounds * em.Scale) ?? true;
+    }
+
+    // Amedo
+    private static Vector3 TowardCamera_1B5990(ParticleEmitterSim em, Vector3? eye)
+    {
+        float pull = em.Def.TowardCamera * em.Scale;
+        if (pull == 0f || eye is not { } e) return Vector3.Zero;
+        var d = e - em.Origin;
+        float l = GameMath.Length(d);
+        return l > 0f ? d * (pull / l) : Vector3.Zero;
+    }
+
     private static int AppendEmitter(ParticleEmitterSim em, float now, Matrix4x4 toEditor, Vector3 right, Vector3 down,
-                                     MeshDecoder.ParticleTexturePage page, int n)
+                                     MeshDecoder.ParticleTexturePage page, int n, Vector3? eye)
     {
         var d = em.Def;
+        var origin = em.DrawOrigin + TowardCamera_1B5990(em, eye); // Amedo
         float iw = 1f / Math.Max(page.Width, 1), ih = 1f / Math.Max(page.Height, 1);
         var uv00 = new Vector2(d.UvRect.X * iw, d.UvRect.Y * ih);
         var uv01 = new Vector2(d.UvRect.X * iw, d.UvRect.W * ih);
@@ -193,7 +212,7 @@ public static class ParticleFx
             var e = Vector2.Lerp(s0.E, s1.E, f);
 
             var local = p.Pos + p.Vel * age + new Vector3(0f, d.GravityHalf * em.Scale * age * age, 0f); // Amedo
-            var c = Vector3.Transform(em.DrawOrigin + Vector3.TransformNormal(local, em.RenderRotation), toEditor); // Amedo 2026-09-27
+            var c = Vector3.Transform(origin + Vector3.TransformNormal(local, em.RenderRotation), toEditor); // Amedo
 
             if (n + 4 > _verts.Length) Array.Resize(ref _verts, _verts.Length * 2);
             var col = s0.Color;
@@ -264,6 +283,19 @@ public sealed class ParticleEffectsRenderer : Component
 
     public override void OnUpdate()
     {
+        if (World.LogicDriven) return; // Amedo
+        SyncEmitters();
+
+        Vector3? cam = null;
+        var camera = RenderPipeline.Instance?.Camera;
+        if (camera is not null && Matrix4x4.Invert(Transform.World, out var inv))
+            cam = Vector3.Transform(camera.Transform.Position, inv);
+        World.Advance(ClockStopped?.Invoke() == true ? 0f : EngineTime.Delta, cam, DistanceGating); // Amedo
+    }
+
+    // Amedo
+    private void SyncEmitters()
+    {
         foreach (var l in Links)
         {
             bool present = l.Marker.Parent is { } parent && !PausedRoots.Contains(parent); // Amedo 2026-09-29
@@ -272,12 +304,15 @@ public sealed class ParticleEffectsRenderer : Component
             l.Sim.Origin = l.Marker.Transform.Position;
             l.Sim.ApplyEmitter(l.Source);
         }
+    }
 
+    // Amedo
+    public void StepWithLogic(Vector3? cameraWorld)
+    {
+        SyncEmitters();
         Vector3? cam = null;
-        var camera = RenderPipeline.Instance?.Camera;
-        if (camera is not null && Matrix4x4.Invert(Transform.World, out var inv))
-            cam = Vector3.Transform(camera.Transform.Position, inv);
-        World.Advance(ClockStopped?.Invoke() == true ? 0f : EngineTime.Delta, cam, DistanceGating); // Amedo
+        if (cameraWorld is { } c && Matrix4x4.Invert(Transform.World, out var inv)) cam = Vector3.Transform(c, inv);
+        if (ClockStopped?.Invoke() != true) World.EndFrame_100D78(cam, DistanceGating);
     }
 
     public DecalAssets? Decals { get => World.Decals.Assets; set => World.Decals.Assets = value; } // Amedo 2026-09-30

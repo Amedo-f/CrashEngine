@@ -30,7 +30,7 @@ public sealed class CameraComponent : Component
     public void FocusOn(Vector3 target, float distance = 5f)
     {
         _pos   = target + new Vector3(0f, distance * 0.4f, distance);
-        var dir = Vector3.Normalize(target - _pos);
+        var dir = GameMath.Normalize(target - _pos);
         _pitch  = MathF.Asin(Math.Clamp(dir.Y, -1f, 1f)) * 180f / MathF.PI;
         _yaw    = MathF.Atan2(dir.X, dir.Z)               * 180f / MathF.PI;
     }
@@ -65,14 +65,14 @@ public sealed class CameraComponent : Component
     }
 
     // Amedo
-    public void SetExternal(Vector3 eye, Vector3 forward, Vector3 up, float fovDegrees, float near, float far, Vector2 clipShift)
+    public void SetExternal(in Vector3 eye, in Vector3 forward, in Vector3 up, float fovDegrees, float near, float far, in Vector2 clipShift)
     {
         SetExternal(eye, forward, up, fovDegrees, near, far);
         Projection = ShiftClip(Projection, clipShift);
         SkyProjection = ShiftClip(SkyProjection, clipShift);
     }
 
-    public void SetExternal(Vector3 eye, Vector3 forward, Vector3 up, float fovDegrees, float near, float far)
+    public void SetExternal(in Vector3 eye, in Vector3 forward, in Vector3 up, float fovDegrees, float near, float far)
     {
         External   = true;
         _pos       = eye;
@@ -109,8 +109,8 @@ public sealed class CameraComponent : Component
 
     public void SnapTo(Vector3 forward, Vector3 pivot)
     {
-        forward = Vector3.Normalize(forward);
-        float dist = OrbitTarget is not null ? OrbitDistance : MathF.Max(1f, Vector3.Distance(_pos, pivot));
+        forward = GameMath.Normalize(forward);
+        float dist = OrbitTarget is not null ? OrbitDistance : MathF.Max(1f, GameMath.Distance(_pos, pivot));
         if (!Orthographic) OrthoHeight = MathF.Max(0.5f, 2f * dist * MathF.Tan(Fov * MathF.PI / 360f));
         _pitch = MathF.Asin(Math.Clamp(forward.Y, -1f, 1f)) * 180f / MathF.PI;
         _yaw = MathF.Abs(forward.Y) < 0.999f ? MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI : 180f;
@@ -121,8 +121,8 @@ public sealed class CameraComponent : Component
     private (Vector3 Forward, Vector3 Right, Vector3 Up) Basis()
     {
         float yr = _yaw * MathF.PI / 180f, pr = _pitch * MathF.PI / 180f;
-        var forward = Vector3.Normalize(new Vector3(MathF.Cos(pr) * MathF.Sin(yr), MathF.Sin(pr), MathF.Cos(pr) * MathF.Cos(yr)));
-        var right = Vector3.Normalize(Vector3.Cross(new Vector3(MathF.Sin(yr), 0f, MathF.Cos(yr)), Vector3.UnitY));
+        var forward = GameMath.Normalize(new Vector3(MathF.Cos(pr) * MathF.Sin(yr), MathF.Sin(pr), MathF.Cos(pr) * MathF.Cos(yr)));
+        var right = GameMath.Normalize(Vector3.Cross(new Vector3(MathF.Sin(yr), 0f, MathF.Cos(yr)), Vector3.UnitY));
         return (forward, right, Vector3.Cross(right, forward));
     }
 
@@ -213,17 +213,17 @@ public sealed class CameraComponent : Component
             0f,     0f,          -(far + near) / (far - near),   1f);
     }
 
-    public static Matrix4x4 CreateLookAtRH(Vector3 eye, Vector3 target, Vector3 up)
+    public static Matrix4x4 CreateLookAtRH(in Vector3 eye, in Vector3 target, in Vector3 up)
     {
-        var f = Vector3.Normalize(target - eye);
-        var s = Vector3.Normalize(Vector3.Cross(f, up));
+        var f = GameMath.Normalize(target - eye);
+        var s = GameMath.Normalize(Vector3.Cross(f, up));
         var u = Vector3.Cross(s, f);
 
         return new Matrix4x4(
             s.X, u.X, -f.X, 0f,
             s.Y, u.Y, -f.Y, 0f,
             s.Z, u.Z, -f.Z, 0f,
-            -Vector3.Dot(s, eye), -Vector3.Dot(u, eye), Vector3.Dot(f, eye), 1f);
+            -GameMath.Dot(s, eye), -GameMath.Dot(u, eye), GameMath.Dot(f, eye), 1f);
     }
 
     public static Matrix4x4 CreatePerspectiveRH(float fovY, float aspect, float near, float far)

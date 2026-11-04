@@ -1,6 +1,7 @@
 using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using CrashEngine.Core;
 
 namespace CrashEngine.Renderer;
 
@@ -30,10 +31,27 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     public  readonly int           IndexCount;
     public  readonly int           VertexCount;
 
-    public readonly Vector3[]? RaycastPositions;
+    public Vector3[]? RaycastPositions { get; private set; }
     public readonly uint[]?    RaycastIndices;
 
-    public readonly Vertex[]? RaycastVertices;
+    public Vertex[]? RaycastVertices { get; private set; }
+
+    public static bool KeepVertices { get; set; } = true;
+
+    private Vector3? _mirroredDirections;
+
+    public Vector3 MirroredDirectionSum() => _mirroredDirections ?? (RaycastVertices is { } verts ? MirroredDirectionSum(verts) : Vector3.Zero);
+
+    private static Vector3 MirroredDirectionSum(Vertex[] verts)
+    {
+        var sum = Vector3.Zero;
+        foreach (ref readonly var v in verts.AsSpan())
+        {
+            var p = new Vector3(-v.Position.X, v.Position.Y, v.Position.Z);
+            if (GameMath.LengthSquared(p) > 1e-12f) sum += GameMath.Normalize(p);
+        }
+        return sum;
+    }
 
     // Amedo 2026-09-29
     public bool Dynamic { get; private set; }
@@ -69,7 +87,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
         return _bounds == 1 && !Dynamic;
     }
 
-    // Amedo: bounds of the stored (bind pose) positions, also for skinned meshes (LocalBounds refuses those)
+    // Amedo
     private bool _bindBounds;
     private Vector3 _bindMin, _bindMax;
 
@@ -148,9 +166,21 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
             Uploaded = true;
             GpuStats.MeshBytes += _bytes;
             GpuStats.Meshes++;
+            ForgetVertices();
             return;
         }
         Own(verts, indices);
+        ForgetVertices();
+    }
+
+    private void ForgetVertices()
+    {
+        if (KeepVertices || Dynamic || RaycastVertices is null) return;
+        LocalBounds(out _, out _);
+        BindBounds(out _, out _);
+        _mirroredDirections = MirroredDirectionSum(RaycastVertices);
+        RaycastVertices = null;
+        RaycastPositions = null;
     }
 
     // Amedo 2026-10-01
@@ -187,12 +217,12 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     }
 
     // Amedo 2026-10-01
-    private void Unpool()
+    private void Unpool(ReadOnlySpan<Vertex> now)
     {
         if (_page is not { } page) return;
         _page = null;
         MeshPool.Free(_gl, page, _baseVertex, VertexCount, _firstIndex, IndexCount);
-        Own(RaycastVertices, RaycastIndices);
+        Own(RaycastVertices ?? now, RaycastIndices);
     }
 
     private long _bytes; // Amedo 2026-09-30
@@ -228,7 +258,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     {
         Dynamic = true; // Amedo 2026-09-29
         if (!Uploaded) Upload();
-        Unpool(); // Amedo 2026-10-01
+        Unpool(verts); // Amedo 2026-10-01
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         fixed (Vertex* p = verts)
             gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, (nuint)(verts.Length * sizeof(Vertex)), p);
@@ -238,6 +268,8 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     {
         if (!Uploaded) Upload(); // Amedo 2026-09-29
         GlState.VertexArray(gl, _vao); // Amedo 2026-10-01
+        TwinShaderProgram.SendLater();
+        GlState.SendLater(gl);
         if (_page is not null)
             gl.DrawElementsBaseVertex(PrimitiveType.Triangles, (uint)IndexCount, DrawElementsType.UnsignedInt, (void*)((long)_firstIndex * sizeof(uint)), _baseVertex);
         else if (_useElements)
@@ -254,6 +286,8 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     {
         if (!Uploaded) Upload();
         GlState.VertexArray(gl, _vao);
+        TwinShaderProgram.SendLater();
+        GlState.SendLater(gl);
         if (_page is not null)
             gl.DrawElementsInstancedBaseVertex(PrimitiveType.Triangles, (uint)IndexCount, DrawElementsType.UnsignedInt, (void*)((long)_firstIndex * sizeof(uint)), (uint)count, _baseVertex);
         else if (_useElements)
@@ -276,16 +310,16 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
             var a = pos[idx[i]]; var b = pos[idx[i + 1]]; var c = pos[idx[i + 2]];
             var e1 = b - a; var e2 = c - a;
             var h  = Vector3.Cross(dir, e2);
-            float det = Vector3.Dot(e1, h);
+            float det = GameMath.Dot(e1, h);
             if (MathF.Abs(det) < eps) continue;
             float invDet = 1f / det;
             var s = orig - a;
-            float u = Vector3.Dot(s, h) * invDet;
+            float u = GameMath.Dot(s, h) * invDet;
             if (u < 0f || u > 1f) continue;
             var q = Vector3.Cross(s, e1);
-            float v = Vector3.Dot(dir, q) * invDet;
+            float v = GameMath.Dot(dir, q) * invDet;
             if (v < 0f || u + v > 1f) continue;
-            float tri = Vector3.Dot(e2, q) * invDet;
+            float tri = GameMath.Dot(e2, q) * invDet;
             if (tri > eps && tri < t) { t = tri; hit = true; }
         }
         return hit;

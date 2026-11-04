@@ -4,6 +4,7 @@ using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -38,8 +39,9 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     private readonly Dictionary<uint, (PS2AnySound Sound, int Refs)>[] _speech = Enumerable.Range(0, Languages).Select(_ => new Dictionary<uint, (PS2AnySound, int)>()).ToArray(); // Amedo
     private readonly Dictionary<uint, PS2AnySound>[] _speechDefault = Enumerable.Range(0, Languages).Select(_ => new Dictionary<uint, PS2AnySound>()).ToArray();
 
-    // Amedo: the language table GetSoundAddress 0x1DEE10 falls back to ([G+0x20][0x309754])
+    // Amedo
     public Func<int>? Language { get; set; }
+    public Func<ushort, int, PS2AnySound?>? Held { get; set; }
     private readonly List<Tracked> _tracked = new();
 
     public SoundMixer Mixer { get; }
@@ -116,13 +118,13 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     }
 
     public PS2AnySound? Sound(ushort id) =>
-        _default.TryGetValue(id, out var d) ? d : _level.TryGetValue(id, out var s) ? s.Sound : Speech(id); // Amedo 2026-09-29
+        _default.TryGetValue(id, out var d) ? d : _level.TryGetValue(id, out var s) ? s.Sound : Speech(id) ?? Held?.Invoke(id, Constants.CODE_SOUND_EFFECTS_SECTION); // Amedo 2026-09-29
 
     // Amedo
     private PS2AnySound? Speech(ushort id)
     {
         int l = Math.Clamp(Language?.Invoke() ?? 0, 0, Languages - 1);
-        return _speechDefault[l].TryGetValue(id, out var d) ? d : _speech[l].TryGetValue(id, out var s) ? s.Sound : null;
+        return _speechDefault[l].TryGetValue(id, out var d) ? d : _speech[l].TryGetValue(id, out var s) ? s.Sound : Held?.Invoke(id, Constants.CODE_LANG_ENG_SECTION + l);
     }
 
     public static int BasePitchOf(PS2AnySound s) => (s.FreqFac << 8) | s.UnkFlag;
@@ -133,11 +135,11 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
         if (!Spatial(position, volume, BasePitchOf(s), pitch, out int l, out int r, out int p))
         {
             Rejected++;
-            Log?.Invoke($"[sound {Clock?.Invoke() ?? 0:0.00}s] inaudible 0x{id:X} by {who} at {Vector3.Distance(position, ListenerPosition):0.0}u");
+            Log?.Invoke($"[sound {Clock?.Invoke() ?? 0:0.00}s] inaudible 0x{id:X} by {who} at {GameMath.Distance(position, ListenerPosition):0.0}u");
             return -1;
         }
         bool loops = Loops(s); // Amedo 2026-09-30
-        int h = Begin(s, id, p, l, r, $"3D at {Vector3.Distance(position, ListenerPosition):0.0}u{(loops ? ", looped sample played once" : "")}", who, repeat: false, category: category); // Amedo 2026-10-06
+        int h = Begin(s, id, p, l, r, $"3D at {GameMath.Distance(position, ListenerPosition):0.0}u{(loops ? ", looped sample played once" : "")}", who, repeat: false, category: category); // Amedo 2026-10-06
         if (h >= 0 && loops && alive is not null) _tracked.Add(new Tracked { Handle = h, Id = id, Alive = alive });
         return h;
     }
@@ -175,7 +177,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
             Key = _nextKey, State = h < 0 ? TrackVirtual : TrackReal, Category = category, Persistent = persistent, Who = who,
         };
         _tracked.Add(t);
-        if (h < 0) Log?.Invoke($"[sound {Clock?.Invoke() ?? 0:0.00}s] tracked 0x{id:X} by {who}: virtual at {Vector3.Distance(pos, ListenerPosition):0.0}u");
+        if (h < 0) Log?.Invoke($"[sound {Clock?.Invoke() ?? 0:0.00}s] tracked 0x{id:X} by {who}: virtual at {GameMath.Distance(pos, ListenerPosition):0.0}u");
         return t.Key;
     }
 
@@ -183,7 +185,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     private int Start3D(PS2AnySound s, ushort id, Vector3 pos, float volume, float pitch, string who, int category, string kind)
     {
         if (!Spatial(pos, volume, BasePitchOf(s), pitch, out int l, out int r, out int p)) return -1;
-        return Begin(s, id, p, l, r, $"{kind} 3D at {Vector3.Distance(pos, ListenerPosition):0.0}u", who, category: category);
+        return Begin(s, id, p, l, r, $"{kind} 3D at {GameMath.Distance(pos, ListenerPosition):0.0}u", who, category: category);
     }
 
     public int Play2D(ushort id, float volume, float pitch, string who, int category = 0) // Amedo 2026-10-06
@@ -330,7 +332,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     public float ListenerDistance(Vector3 position)
     {
         var d = position - ListenerPosition;
-        return new Vector3(Vector3.Dot(d, ListenerRight), Vector3.Dot(d, ListenerUp), Vector3.Dot(d, ListenerForward)).Length();
+        return GameMath.Length(new Vector3(GameMath.Dot(d, ListenerRight), GameMath.Dot(d, ListenerUp), GameMath.Dot(d, ListenerForward)));
     }
 
     // Amedo
@@ -338,14 +340,14 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     {
         if (radius == 0f) radius = DefaultRange;
         var d = position - ListenerPosition;
-        var rel = new Vector3(Vector3.Dot(d, ListenerRight), Vector3.Dot(d, ListenerUp), Vector3.Dot(d, ListenerForward));
-        dist = rel.Length();
+        var rel = new Vector3(GameMath.Dot(d, ListenerRight), GameMath.Dot(d, ListenerUp), GameMath.Dot(d, ListenerForward));
+        dist = GameMath.Length(rel);
         float v = volume - dist / radius;
         left = right = pitch = 0f;
         if (!(0.005f < v)) return false;
         pitch = freq;
         var flat = new Vector3(rel.X, 0f, rel.Z);
-        float sq = flat.LengthSquared();
+        float sq = GameMath.LengthSquared(flat);
         float k = 2.4999998e-09f < sq ? 1f / MathF.Sqrt(sq) : 0f;
         flat *= k;
         float a = flat.X * Diagonal + flat.Z * Diagonal;

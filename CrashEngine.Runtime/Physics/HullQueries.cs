@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -8,12 +9,6 @@ public static class HullQueries
     private const float Eps = 5e-5f;
 
     public static float Plane(Vector4 pl, Vector3 p) => pl.X * p.X + pl.Y * p.Y + pl.Z * p.Z + pl.W;
-
-    public static float InvLength(Vector3 v)
-    {
-        float l = v.LengthSquared();
-        return 2.4999998e-09f < l ? 1f / MathF.Sqrt(l) : 0f; // Amedo 2026-09-28
-    }
 
     public static bool SphereHull_1FC818(float r, ConvexHull h, Vector3 p, out Vector3 push)
     {
@@ -49,7 +44,7 @@ public static class HullQueries
             {
                 var va = h.Points[h.FaceVerts[start + 1 + j]];
                 var vb = h.Points[h.FaceVerts[j == count - 1 ? start + 1 : start + 2 + j]];
-                if (0f < Plane(PlaneFrom3_185DC0(va, vb, va + nrm), p)) break;
+                if (0f < Plane(GameMath.PlaneFromTriangle_185DC0(va, vb, va + nrm), p)) break;
             }
             if (j == count)
             {
@@ -63,39 +58,39 @@ public static class HullQueries
         {
             var va = h.Points[h.Edges[e].Item1];
             var vb = h.Points[h.Edges[e].Item2];
-            var dir = (vb - va) * InvLength(vb - va);
-            float pd = Vector3.Dot(p, dir);
-            if (!((pd - Vector3.Dot(va, dir)) * (pd - Vector3.Dot(vb, dir)) < 0f)) continue;
+            var dir = (vb - va) * GameMath.InverseLength(vb - va);
+            float pd = GameMath.Dot(p, dir);
+            if (!((pd - GameMath.Dot(va, dir)) * (pd - GameMath.Dot(vb, dir)) < 0f)) continue;
             var t = va - p;
-            var perp = t - dir * Vector3.Dot(t, dir);
-            float dd = perp.LengthSquared();
+            var perp = t - dir * GameMath.Dot(t, dir);
+            float dd = GameMath.LengthSquared(perp);
             if (dd < bestEdge) { bestEdge = dd; edge = e; }
         }
         if (edge != -1)
         {
             var va = h.Points[h.Edges[edge].Item1];
             var vb = h.Points[h.Edges[edge].Item2];
-            var dir = (vb - va) * InvLength(vb - va);
+            var dir = (vb - va) * GameMath.InverseLength(vb - va);
             var t = va - p;
-            var perp = t - dir * Vector3.Dot(t, dir);
-            push = perp * InvLength(perp) * (MathF.Sqrt(bestEdge) - r);
+            var perp = t - dir * GameMath.Dot(t, dir);
+            push = perp * GameMath.InverseLength(perp) * (MathF.Sqrt(bestEdge) - r);
             return true;
         }
         float bestVertex = r2;
         int vertex = -1;
         for (int v = 0; v < h.Points.Length; v++)
         {
-            float dd = (h.Points[v] - p).LengthSquared();
+            float dd = GameMath.LengthSquared((h.Points[v] - p));
             if (dd < bestVertex) { bestVertex = dd; vertex = v; }
         }
         if (vertex == -1) return false;
         var away = p - h.Points[vertex];
-        push = away * InvLength(away) * (r - MathF.Sqrt(bestVertex));
+        push = away * GameMath.InverseLength(away) * (r - MathF.Sqrt(bestVertex));
         return true;
     }
 
     // Amedo 2026-09-30
-    public static bool SphereBox_1F8988(float r, Vector3 min, Vector3 max, Vector3 c, out Vector3 push)
+    public static bool SphereBox_1F8988(float r, in Vector3 min, in Vector3 max, in Vector3 c, out Vector3 push)
     {
         push = Vector3.Zero;
         if (c.X < min.X - r || max.X + r < c.X || c.Y < min.Y - r || max.Y + r < c.Y || c.Z < min.Z - r || max.Z + r < c.Z) return false;
@@ -157,9 +152,9 @@ public static class HullQueries
         if (count != 2)
         {
             var v = c - q;
-            float d2 = v.LengthSquared();
+            float d2 = GameMath.LengthSquared(v);
             if (!(d2 < r * r)) return false;
-            push = v * InvLength(v) * (r - MathF.Sqrt(d2));
+            push = v * GameMath.InverseLength(v) * (r - MathF.Sqrt(d2));
             return true;
         }
         Vector3 axis;
@@ -179,15 +174,15 @@ public static class HullQueries
             axis = Vector3.UnitZ;
         }
         var e = q - c;
-        var w = e - axis * Vector3.Dot(e, axis);
-        float w2 = w.LengthSquared();
+        var w = e - axis * GameMath.Dot(e, axis);
+        float w2 = GameMath.LengthSquared(w);
         if (!(w2 < r * r)) return false;
-        push = w * InvLength(w) * (MathF.Sqrt(w2) - r);
+        push = w * GameMath.InverseLength(w) * (MathF.Sqrt(w2) - r);
         return true;
     }
 
     // Amedo 2026-10-05
-    public static Vector4 PlaneFrom3_18D0A0(Vector3 a, Vector3 b, Vector3 c)
+    public static Vector4 PlaneFrom3_18D0A0(in Vector3 a, in Vector3 b, in Vector3 c)
     {
         var e1 = b - a;
         var e2 = c - a;
@@ -208,7 +203,7 @@ public static class HullQueries
     {
         push = default;
         normal = default;
-        var inverse = Camera.CamMath.RigidInverse_18E808(frame);
+        var inverse = GameMath.RigidInverse_18E808(frame);
         var scale = Matrix4x4.Identity;
         scale.M11 = 1f / radii.X;
         scale.M22 = 1f / radii.Y;
@@ -230,16 +225,8 @@ public static class HullQueries
         if (!SphereHull_1FC818(1f, u, Vector3.Zero, out var p)) return false;
         push = Vector3.TransformNormal(p * radii, frame);
         normal = Vector3.TransformNormal(p / radii, frame);
-        normal *= InvLength(normal);
+        normal *= GameMath.InverseLength(normal);
         return true;
-    }
-
-    public static Vector4 PlaneFrom3_185DC0(Vector3 a, Vector3 b, Vector3 c)
-    {
-        var n = Vector3.Cross(b - a, c - a);
-        if (MathF.Abs(n.X) <= Eps && MathF.Abs(n.Y) <= Eps && MathF.Abs(n.Z) <= Eps) n = Vector3.UnitY;
-        n *= InvLength(n);
-        return new Vector4(n, -Vector3.Dot(n, a));
     }
 
     public static bool SegmentHull_1FC470(ConvexHull h, Vector3 a, Vector3 b, out float t)
@@ -282,7 +269,7 @@ public static class HullQueries
         return true;
     }
 
-    public static float Clip_1FC378(Vector4 pl, Vector3 a, Vector3 b, out Vector3 q)
+    public static float Clip_1FC378(in Vector4 pl, in Vector3 a, in Vector3 b, out Vector3 q)
     {
         float f = -Plane(pl, a) / (pl.X * (b.X - a.X) + pl.Y * (b.Y - a.Y) + pl.Z * (b.Z - a.Z));
         q = a + (b - a) * f;

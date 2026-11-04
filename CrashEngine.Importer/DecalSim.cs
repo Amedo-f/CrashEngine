@@ -1,5 +1,6 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2;
+using CrashEngine.Core;
 
 namespace CrashEngine.Importer;
 
@@ -122,8 +123,10 @@ public sealed class DecalWorld
         return batch;
     }
 
-    public void Add(Vector3 position, Vector3 normal, Vector3 direction, int type, int group, int flags, int key)
+    public void Add(in Vector3 position, in Vector3 normalIn, in Vector3 directionIn, int type, int group, int flags, int key)
     {
+        var normal = normalIn; // Amedo 2026-10-27
+        var direction = directionIn;
         if (Assets?.TypeOf(group, type) is not { } t) return;
         var batch = Alloc(key, group);
         if (batch is null) return;
@@ -145,7 +148,7 @@ public sealed class DecalWorld
     {
         n = Unit(n);
         d = Unit(d);
-        float dot = Vector3.Dot(n, d);
+        float dot = GameMath.Dot(n, d);
         if (!(0.001f < dot)) return;
         if (dot < 0.99f) d = Unit(Vector3.Cross(Unit(Vector3.Cross(n, d)), n));
         else d = Unit(Vector3.Cross(n, new Vector3(RandomSigned(), RandomSigned(), RandomSigned())));
@@ -153,7 +156,7 @@ public sealed class DecalWorld
 
     private static Vector3 Unit(Vector3 v)
     {
-        float l = v.LengthSquared();
+        float l = GameMath.LengthSquared(v);
         return 2.4999998e-09f < l ? v * (1f / MathF.Sqrt(l)) : v;
     }
 

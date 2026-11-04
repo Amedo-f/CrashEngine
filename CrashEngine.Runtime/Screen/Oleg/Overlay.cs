@@ -143,7 +143,7 @@ public sealed class OverlayQueue
     }
 
     // Amedo
-    public void AddQuad(GameFont.Page? image, Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, Vector2 uv0, Vector2 uv1, Vector2 uv2, Vector2 uv3, uint colour)
+    public void AddQuad(GameFont.Page? image, in Vector2 p0, in Vector2 p1, in Vector2 p2, in Vector2 p3, in Vector2 uv0, in Vector2 uv1, in Vector2 uv2, in Vector2 uv3, uint colour)
     {
         var c = Vector4.Clamp(Colour.ToVector(colour), Vector4.Zero, Vector4.One);
         if (c.W <= 0f) return;

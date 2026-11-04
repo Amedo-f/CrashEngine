@@ -11,8 +11,8 @@ namespace CrashEngine.Runtime;
 // Amedo 2026-09-26
 public sealed partial class SceneSimulation
 {
-    private sealed record Snapshot(Entity Entity, Matrix4x4? LocalMatrix, Vector3 Position, Quaternion Rotation,
-                                   Vector3 Scale, bool Active, AnimatedObject.SlotGroup? Group, float Frame,
+    private sealed record Snapshot(Entity Entity, Matrix4x4? LocalMatrix, in Vector3 Position, in Quaternion Rotation,
+                                   in Vector3 Scale, bool Active, AnimatedObject.SlotGroup? Group, float Frame,
                                    bool Playing, bool Loop)
     {
         public WorldChunk? Chunk { get; init; } // Amedo 2026-09-28
@@ -21,7 +21,7 @@ public sealed partial class SceneSimulation
 
     private readonly List<Snapshot> _snapshot = new();
     private Entity? _gameSpace;
-    private IDisposable? _audio; // Amedo 2026-09-28
+    private Audio.IAudioOutput? _audio; // Amedo 2026-10-26
 
     public AgentLabWorld World { get; }
     public Character.CharacterPad Pad { get; } = new(); // Amedo 2026-09-27
@@ -39,7 +39,10 @@ public sealed partial class SceneSimulation
         _playerPhysics = playerPhysics;
         _jumpRules     = jumpRules;
         _log           = log;
+        Latest         = this;
     }
+
+    public static SceneSimulation? Latest { get; private set; }
 
     // Amedo 2026-10-04
     public static SceneSimulation? Start(Entity chunkRoot, Action<string>? log, PlaySettings play,
@@ -65,6 +68,8 @@ public sealed partial class SceneSimulation
                                          string? discLanguage = null, string? savesDirectory = null) // Amedo
     {
         discLanguage ??= PlaySettings.DetectDiscLanguage(musicDirectory); // Amedo
+        LogicTicks = discLanguage == PlaySettings.AmericanLanguage ? NtscLogicTicks : PalLogicTicks;
+        ParticleWorld.Dt = LogicTicks / 9000f;
         var src = chunkRoot.Get<ChunkSource>();
         if (src?.Rm2 is null) return null;
 
@@ -117,10 +122,13 @@ public sealed partial class SceneSimulation
             var anchorChunk = world.RootChunk; // Amedo
             world.Particles.AnchorDrawn = () => anchorChunk.DrawFrame == world.Frame;
             world.Particles.ClockStopped = () => !world.ChunkClocksRunning; // Amedo
+            world.Particles.LogicDriven = FixedLogicStep; // Amedo
+            world.Particles.BoxInView = sim.ParticleBoxInView; // Amedo
         }
         CrashEngine.Renderer.RenderPipeline.ShaderClockStopped = () => !world.ChunkClocksRunning; // Amedo
+        Engine.SceneHeld = () => world.RunState_309718 == 3;
         Mark("particles"); // Amedo 2026-10-02
-        world.Sounds = new RuntimeSounds(src.GlobalRm2, src.Rm2, new Audio.SoundMixer()) { Clock = () => world.Now, Language = () => world.AudioTrack_309754 }; // Amedo 2026-09-28
+        world.Sounds = new RuntimeSounds(src.GlobalRm2, src.Rm2, new Audio.SoundMixer()) { Clock = () => world.Now, Language = () => world.AudioTrack_309754, Held = world.HeldSound }; // Amedo 2026-09-28
         Mark("sounds"); // Amedo 2026-10-02
         world.Music = new RuntimeMusic(world.Sounds.Mixer, musicDirectory, discLanguage) { Clock = () => world.Now, Unimplemented = world.Unimplemented, Listener = world.Sounds, // Amedo
             GoldenTrack = goldenMusic, GoldenVolume = goldenMusicVolume, GoldenInvincible = () => world.PlayerCharacter?.Invincible == true }; // Amedo 2026-10-04
@@ -266,6 +274,7 @@ public sealed partial class SceneSimulation
         c.Limbs.ExitPoint_293B70 = agent.ExitPoint_293B70; // Amedo
         c.SetVideoModel_29E988 = () => world.SetVideoModelInstance_29E988((ushort)((agent.GameObject is { OGISlots.Count: > 0 } go ? go.OGISlots[0] : 0xFFFF) & 0x7FFF), agent); // Amedo
         c.Bodies = (min, max, mask) => world.QueryBodies(min, max, mask, 1, 0x18, agent);
+        c.SolveSkip_139964 = () => c.InstanceInt_2619D8?.Invoke(0) == 1 ? world.PlayerSlot_570(0) : null;
         c.LinkedTo = (owner, to) => to is AgentLabAgent t && owner is AgentLabAgent o && t.Links.Contains(o); // Amedo 2026-10-05
         c.Touch = (owner, type) => { if (owner is AgentLabAgent touched) world.PostTouch_13E0A0(touched, type, agent); }; // Amedo 2026-10-06
         c.CheckTriggers_131320 = () => world.CheckTriggers_131320(c); // Amedo
@@ -296,6 +305,7 @@ public sealed partial class SceneSimulation
         c.SetCollidable = agent.SetCollidable; // Amedo 2026-09-29
         c.SetInstanceBox = agent.SetBoxOverride_1F0168;
         c.TriggerForced = slot => agent.TriggerEventSlot(slot, null, true);
+        c.TriggerOnChannel = (slot, channel) => agent.TriggerEventSlot(slot, null, false, channel);
         c.CameraImpulse = (strength, falloff, at) => world.CameraImpulse?.Invoke(strength, falloff, at);
         c.SetBump154 = agent.SetBump_154; // Amedo
         c.SnowCloud = agent.SnowCloud_150AD0;
@@ -412,6 +422,24 @@ public sealed partial class SceneSimulation
         using (PerfStats.Measure(PerfSection.Camera)) GameCamera?.Step(Pad, _cameraTicks);
     }
 
+    private Character.CharacterController? _heldBeforeGame;
+
+    private void HoldPlayerBeforeGame()
+    {
+        bool beforeGame = World.GameMode <= AgentLabWorld.ModeMainMenu;
+        if (beforeGame && World.PlayerCharacter is { } c && ReferenceEquals(c.Pad, Pad))
+        {
+            c.Pad = null;
+            c.Move = Vector3.Zero;
+            _heldBeforeGame = c;
+        }
+        else if (!beforeGame && _heldBeforeGame is { } held)
+        {
+            if (held.Pad is null && ReferenceEquals(World.PlayerCharacter, held)) held.Pad = Pad;
+            _heldBeforeGame = null;
+        }
+    }
+
     private void LogicStep(double dt) // Amedo 2026-09-30
     {
         InputTape.Current?.BeginStep(this); // Amedo
@@ -419,6 +447,7 @@ public sealed partial class SceneSimulation
         UseLogicalCamera(); // Amedo 2026-09-30
         _cameraTicks = (uint)Math.Round(dt * 9000.0); // Amedo 2026-10-02
         World.CameraGroup_172A48 ??= StepCamera;
+        HoldPlayerBeforeGame();
         using (PerfStats.Measure(PerfSection.Sim)) World.Step(dt); // Amedo 2026-09-28
         if (World.ResetPending) // Amedo 2026-09-28
         {
@@ -442,7 +471,11 @@ public sealed partial class SceneSimulation
             World.DrawScene_1F11D8(GameCamera); // Amedo
         }
         StepAnimations_19FE38((int)Math.Round(World.Dt * 9000.0)); // Amedo
-        using (PerfStats.Measure(PerfSection.Particles)) World.Particles?.Update(); // Amedo 2026-09-27
+        using (PerfStats.Measure(PerfSection.Particles))
+        {
+            World.Particles?.Update(); // Amedo 2026-09-27
+            if (World.Particles is { LogicDriven: true } stepped) stepped.StepWithLogic(GameCameraEye()); // Amedo
+        }
         bool soundPaused = World.RunState_309718 == 3; // Amedo
         if (!soundPaused && !World.MoviePlaying) // Amedo
             using (PerfStats.Measure(PerfSection.Sounds)) World.Sounds?.Update(); // Amedo 2026-09-28
@@ -461,8 +494,8 @@ public sealed partial class SceneSimulation
     // Amedo 2026-09-28
     public string? StartAudio()
     {
-        if (World.Sounds is not { } sounds || _audio is not null || !OperatingSystem.IsWindows()) return null;
-        var player = new Audio.WaveOutPlayer(sounds.Mixer);
+        if (World.Sounds is not { } sounds || _audio is not null) return null;
+        if (Audio.AudioOutput.Create(sounds.Mixer) is not { } player) return null; // Amedo 2026-10-26
         if (player.Error is { } error)
         {
             player.Dispose();
@@ -472,7 +505,7 @@ public sealed partial class SceneSimulation
         return null;
     }
 
-    public int AudioBuffersWritten => _audio is Audio.WaveOutPlayer p && OperatingSystem.IsWindows() ? p.BuffersWritten : 0;
+    public int AudioBuffersWritten => _audio?.BuffersWritten ?? 0; // Amedo 2026-10-26
 
     public float Volume
     {
@@ -499,7 +532,7 @@ public sealed partial class SceneSimulation
     internal (Vector3 Right, Vector3 Up, Vector3 Forward)? HostCamera { get; private set; }
     internal (Vector3 Right, Vector3 Up, Vector3 Forward)? ControlBasis => _controlBasis;
     internal void ApplyTapeViewer(Matrix4x4 viewProjection, Vector3 position) => SetViewerCore(viewProjection, position);
-    internal void ApplyTapeCamera(Vector3 right, Vector3 up, Vector3 forward, bool? hostShowsGameCamera = null)
+    internal void ApplyTapeCamera(in Vector3 right, in Vector3 up, in Vector3 forward, bool? hostShowsGameCamera = null)
     {
         if (hostShowsGameCamera is { } shows) _hostShowsGameCamera = shows; // Amedo
         else NoteHostCamera(forward);
@@ -519,7 +552,7 @@ public sealed partial class SceneSimulation
     }
 
     // Amedo 2026-09-27
-    public void SetCamera(Vector3 right, Vector3 up, Vector3 forward)
+    public void SetCamera(in Vector3 right, in Vector3 up, in Vector3 forward)
     {
         if (InputTape.Current is { Replaying: true }) return; // Amedo
         HostCamera = (right, up, forward);
@@ -544,11 +577,14 @@ public sealed partial class SceneSimulation
     }
 
     // Amedo 2026-09-30
-    private void ApplyCameraBasis(Vector3 right, Vector3 up, Vector3 forward)
+    private void ApplyCameraBasis(in Vector3 rightIn, in Vector3 upIn, in Vector3 forwardIn)
     {
+        var right = rightIn; // Amedo 2026-10-27
+        var up = upIn;
+        var forward = forwardIn;
         var gameToWorld = RootToWorld; // Amedo 2026-09-28
         if (!Matrix4x4.Invert(gameToWorld, out var worldToGame)) return;
-        static Vector3 Unit(Vector3 v) => v.LengthSquared() > 0f ? Vector3.Normalize(v) : v;
+        static Vector3 Unit(Vector3 v) => GameMath.LengthSquared(v) > 0f ? GameMath.Normalize(v) : v;
         if (World.Sounds is { } sounds) // Amedo 2026-09-28
         {
             sounds.ListenerRight   = Unit(Vector3.TransformNormal(right, worldToGame));
@@ -566,7 +602,7 @@ public sealed partial class SceneSimulation
     private (Vector3 Right, Vector3 Up, Vector3 Forward)? _controlBasis;
 
     // Amedo 2026-10-06
-    public void SetControlCamera(Vector3 right, Vector3 up, Vector3 forward)
+    public void SetControlCamera(in Vector3 right, in Vector3 up, in Vector3 forward)
     {
         if (InputTape.Current is { Replaying: true }) return; // Amedo
         _controlBasis = (right, up, forward);
@@ -622,8 +658,11 @@ public sealed partial class SceneSimulation
         {
             particles.AnchorDrawn = null; // Amedo
             particles.ClockStopped = null; // Amedo
+            particles.LogicDriven = false; // Amedo
+            particles.BoxInView = null; // Amedo
         }
         CrashEngine.Renderer.RenderPipeline.ShaderClockStopped = null; // Amedo
+        Engine.SceneHeld = null;
         World.Music?.StopAll(); // Amedo 2026-09-28
         World.Sounds?.StopAll();
         Pad.StopRumble(); // Amedo
@@ -635,6 +674,7 @@ public sealed partial class SceneSimulation
         RemoveAgents(); // Amedo 2026-09-28
         RestoreSnapshot();
         _snapshot.Clear();
+        GameLightingDraw.Forget();
     }
 
     // Amedo 2026-09-28
@@ -673,6 +713,17 @@ public sealed partial class SceneSimulation
     public void ResetGameCamera() => GameCamera = Camera.RuntimeGameCamera.Create(World);
 
     // Amedo 2026-09-28
+    // Amedo
+    private bool ParticleBoxInView(Vector3 centre, Vector3 half)
+    {
+        if (GameCamera is not { HasPose: true } cam || !Matrix4x4.Invert(World.RootChunk.ToAnchor, out var toRoot)) return true;
+        var c = Vector3.Transform(centre, toRoot);
+        return cam.BoxVisibility_1F5F90(c - half, c + half) != 0;
+    }
+
+    // Amedo
+    private Vector3? GameCameraEye() => GameCamera is { HasPose: true } cam ? Vector3.Transform(cam.Pose.Translation, RootToWorld) : null;
+
     public bool GameCameraView(out Vector3 eye, out Vector3 forward, out Vector3 up, out float fovDegrees)
     {
         eye = forward = up = default;
@@ -683,9 +734,9 @@ public sealed partial class SceneSimulation
         eye     = Vector3.Transform(new Vector3(pose.M41, pose.M42, pose.M43), gameToWorld);
         forward = Vector3.TransformNormal(new Vector3(pose.M31, pose.M32, pose.M33), gameToWorld);
         up      = Vector3.TransformNormal(new Vector3(pose.M21, pose.M22, pose.M23), gameToWorld);
-        if (forward.LengthSquared() <= 0f) return false;
-        forward = Vector3.Normalize(forward);
-        up      = up.LengthSquared() > 0f ? Vector3.Normalize(up) : Vector3.UnitY;
+        if (GameMath.LengthSquared(forward) <= 0f) return false;
+        forward = GameMath.Normalize(forward);
+        up      = GameMath.LengthSquared(up) > 0f ? GameMath.Normalize(up) : Vector3.UnitY;
         fovDegrees = cam.ShownFov; // Amedo 2026-09-30
         return true;
     }

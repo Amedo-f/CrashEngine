@@ -41,6 +41,7 @@ public sealed class RuntimeParticles
     // Amedo
     private static readonly Func<bool> AlwaysDrawn = static () => true;
     public Func<bool>? AnchorDrawn { get => _fx.World.AnchorDrawn; set => _fx.World.AnchorDrawn = value; }
+    public Func<Vector3, Vector3, bool>? BoxInView { get => _fx.World.BoxInView; set => _fx.World.BoxInView = value; } // Amedo
     public Func<bool>? ClockStopped { get => _fx.ClockStopped; set => _fx.ClockStopped = value; } // Amedo
 
     private static List<TwinParticleSystem> SystemsOf(PS2AnyTwinsanityRM2? rm) =>
@@ -170,8 +171,11 @@ public sealed class RuntimeParticles
     private Matrix4x4 AnchorMatrix(Matrix4x4 m) => RootToAnchor is { } f ? m * f() : m;
 
     // Amedo 2026-09-30
-    public void AddDecal_1ADC18(Vector3 position, Vector3 normal, Vector3 direction, int type, int group, int flags, int key)
+    public void AddDecal_1ADC18(in Vector3 positionIn, in Vector3 normalIn, in Vector3 directionIn, int type, int group, int flags, int key)
     {
+        var position = positionIn; // Amedo 2026-10-27
+        var normal = normalIn;
+        var direction = directionIn;
         if (RootToAnchor is { } f)
         {
             var m = f();
@@ -254,10 +258,18 @@ public sealed class RuntimeParticles
         if (_live.Remove(h, out var live)) _fx.World.Emitters.Remove(live.Sim);
     }
 
+    public bool LogicDriven { get => _fx.World.LogicDriven; set => _fx.World.LogicDriven = value; } // Amedo
+
+    // Amedo
+    public void StepWithLogic(Vector3? cameraWorld) => _fx.StepWithLogic(cameraWorld);
+
+    // Amedo
+    public void SetRenderAlpha(float alpha) => _fx.World.RenderCarry = -(1f - alpha) * ParticleWorld.Dt;
+
     public void Update()
     {
         if (_fx.World.SkidMarks.Count > 0) _fx.World.SkidToAnchor = RootToAnchor?.Invoke() ?? Matrix4x4.Identity; // Amedo
-        float now = _fx.World.RenderTime;
+        float now = _fx.World.LogicDriven ? _fx.World.Clock : _fx.World.RenderTime; // Amedo
         foreach (var (h, live) in _live.ToList())
             if (live.Sim.Finished && !live.Sim.AnyAlive(now)) Kill(h); // Amedo 2026-09-29
         for (int i = _dying.Count - 1; i >= 0; i--) // Amedo 2026-09-29

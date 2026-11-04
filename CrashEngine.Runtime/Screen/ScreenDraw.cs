@@ -71,9 +71,20 @@ public sealed class ScreenDraw : IDisposable
             size = innerSize;
         }
         var items = Prepare(screen, size.X / size.Y * 0.75f, logicStep, alpha); // Amedo
-        bool add = false; // Amedo
-        foreach (var item in items)
+        float styleAlpha = ImGui.GetStyle().Alpha;
+        if (styleAlpha != _coloursAlpha)
         {
+            _colours.Clear();
+            _haveLastColour = false;
+            _coloursAlpha = styleAlpha;
+        }
+        Vector2 white = default;
+        bool haveWhite = false;
+        bool add = false; // Amedo
+        var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(items);
+        for (int index = 0; index < span.Length; index++)
+        {
+            ref readonly var item = ref span[index];
             bool itemAdd = item.Kind == ScreenItems.ItemKind.Sprite && item.Image is { Blend: GameFont.Page.BlendAdd }; // Amedo
             if (itemAdd != add)
             {
@@ -81,8 +92,20 @@ public sealed class ScreenDraw : IDisposable
                 else ImGuiBlend.Mix(list);
                 add = itemAdd;
             }
-            uint tint = ImGui.GetColorU32(item.Colour);
             Vector2 P(Vector2 p) => origin + p * size;
+            if (item.Kind == ScreenItems.ItemKind.Triangle) // Amedo
+            {
+                if (!haveWhite)
+                {
+                    white = ImGui.GetFontTexUvWhitePixel();
+                    haveWhite = true;
+                }
+                int run = 1;
+                while (index + run < span.Length && span[index + run].Kind == ScreenItems.ItemKind.Triangle) run++;
+                index = WriteTriangles(list, span, index, run, origin, size, white) - 1;
+                continue;
+            }
+            uint tint = Colour(item.Colour);
             switch (item.Kind)
             {
                 case ScreenItems.ItemKind.Rect:
@@ -92,25 +115,95 @@ public sealed class ScreenDraw : IDisposable
                     if (screen.Font is { } font && GlyphPage(font, item.Fallback, item.Page) is { } page)
                         list.AddImage((nint)page.GlId, P(item.P0), P(item.P2), item.Uv0, item.Uv2, tint);
                     break;
-                case ScreenItems.ItemKind.Triangle: // Amedo
-                {
-                    var white = ImGui.GetFontTexUvWhitePixel();
-                    list.PrimReserve(3, 3);
-                    list.PrimVtx(P(item.P0), white, ImGui.GetColorU32(item.Colour));
-                    list.PrimVtx(P(item.P1), white, ImGui.GetColorU32(item.Colour1));
-                    list.PrimVtx(P(item.P2), white, ImGui.GetColorU32(item.Colour2));
-                    break;
-                }
                 case ScreenItems.ItemKind.Sprite:
                     if (item.Image is { } image) // Amedo
                     {
                         var texture = ImageTexture(image);
-                        list.AddImageQuad((nint)texture.GlId, P(item.P0), P(item.P1), P(item.P2), P(item.P3), item.Uv0, item.Uv1, item.Uv2, item.Uv3, tint);
+                        if (WriteQuadsByVertex) AddImageQuadByVertex(list, (nint)texture.GlId, P(item.P0), P(item.P1), P(item.P2), P(item.P3), item.Uv0, item.Uv1, item.Uv2, item.Uv3, tint); // Amedo 2026-10-26
+                        else list.AddImageQuad((nint)texture.GlId, P(item.P0), P(item.P1), P(item.P2), P(item.P3), item.Uv0, item.Uv1, item.Uv2, item.Uv3, tint);
                     }
                     break;
             }
         }
         if (add) ImGuiBlend.Mix(list); // Amedo
+    }
+
+    private readonly Dictionary<Vector4, uint> _colours = new();
+    private float _coloursAlpha = -1f;
+    private Vector4 _lastColour;
+    private bool _haveLastColour;
+    private uint _lastColourU32;
+
+    private uint Colour(in Vector4 c)
+    {
+        if (_haveLastColour && c.Equals(_lastColour)) return _lastColourU32;
+        if (!_colours.TryGetValue(c, out uint u))
+        {
+            if (_colours.Count >= 4096) _colours.Clear();
+            u = ImGui.GetColorU32(c);
+            _colours[c] = u;
+        }
+        _lastColour = c;
+        _haveLastColour = true;
+        _lastColourU32 = u;
+        return u;
+    }
+
+    private unsafe int WriteTriangles(ImDrawListPtr list, ReadOnlySpan<ScreenItems.Item> items, int first, int count, Vector2 origin, Vector2 size, Vector2 white)
+    {
+        int end = first + count;
+        if (list._VtxCurrentIdx + (uint)(count * 3) >= 1u << 16)
+        {
+            for (int i = first; i < end; i++)
+            {
+                ref readonly var t = ref items[i];
+                list.PrimReserve(3, 3);
+                list.PrimVtx(origin + t.P0 * size, white, Colour(t.Colour));
+                list.PrimVtx(origin + t.P1 * size, white, Colour(t.Colour1));
+                list.PrimVtx(origin + t.P2 * size, white, Colour(t.Colour2));
+            }
+            return end;
+        }
+        list.PrimReserve(count * 3, count * 3);
+        var native = list.NativePtr;
+        ImDrawVert* vtx = native->_VtxWritePtr;
+        ushort* idx = native->_IdxWritePtr;
+        uint next = native->_VtxCurrentIdx;
+        for (int i = first; i < end; i++)
+        {
+            ref readonly var t = ref items[i];
+            *idx++ = (ushort)next++;
+            *vtx++ = new ImDrawVert { pos = origin + t.P0 * size, uv = white, col = Colour(t.Colour) };
+            *idx++ = (ushort)next++;
+            *vtx++ = new ImDrawVert { pos = origin + t.P1 * size, uv = white, col = Colour(t.Colour1) };
+            *idx++ = (ushort)next++;
+            *vtx++ = new ImDrawVert { pos = origin + t.P2 * size, uv = white, col = Colour(t.Colour2) };
+        }
+        native->_VtxWritePtr = vtx;
+        native->_IdxWritePtr = idx;
+        native->_VtxCurrentIdx = next;
+        return end;
+    }
+
+    public static bool WriteQuadsByVertex { get; set; } // Amedo 2026-10-26
+
+    // Amedo 2026-10-26
+    private static void AddImageQuadByVertex(ImDrawListPtr list, nint texture, in Vector2 p0, in Vector2 p1, in Vector2 p2, in Vector2 p3, in Vector2 uv0, in Vector2 uv1, in Vector2 uv2, in Vector2 uv3, uint colour)
+    {
+        list.PushTextureID(texture);
+        list.PrimReserve(6, 4);
+        ushort first = (ushort)list._VtxCurrentIdx;
+        list.PrimWriteIdx(first);
+        list.PrimWriteIdx((ushort)(first + 1));
+        list.PrimWriteIdx((ushort)(first + 2));
+        list.PrimWriteIdx(first);
+        list.PrimWriteIdx((ushort)(first + 2));
+        list.PrimWriteIdx((ushort)(first + 3));
+        list.PrimWriteVtx(p0, uv0, colour);
+        list.PrimWriteVtx(p1, uv1, colour);
+        list.PrimWriteVtx(p2, uv2, colour);
+        list.PrimWriteVtx(p3, uv3, colour);
+        list.PopTextureID();
     }
 
     private Texture2D? _movie; // Amedo
@@ -180,25 +273,26 @@ public sealed class ScreenDraw : IDisposable
         _shown.Clear();
         bool queued = SameLayout(0, _previousQueued, 0, _currentQueued);
         bool immediate = SameLayout(_previousQueued, _previous.Count, _currentQueued, _current.Count);
-        for (int i = 0; i < _current.Count; i++)
+        System.Runtime.InteropServices.CollectionsMarshal.SetCount(_shown, _current.Count);
+        var current = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_current);
+        var previous = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_previous);
+        var shown = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_shown);
+        for (int i = 0; i < current.Length; i++)
         {
-            var c = _current[i];
+            ref readonly var c = ref current[i];
+            ref var o = ref shown[i];
+            o = c;
             bool tail = i >= _currentQueued;
             int j = tail ? i - _currentQueued + _previousQueued : i;
-            if (!(tail ? immediate : queued) || !Close(_previous[j], c))
-            {
-                _shown.Add(c);
-                continue;
-            }
-            var p = _previous[j];
-            c.P0 = Vector2.Lerp(p.P0, c.P0, alpha);
-            c.P1 = Vector2.Lerp(p.P1, c.P1, alpha);
-            c.P2 = Vector2.Lerp(p.P2, c.P2, alpha);
-            c.P3 = Vector2.Lerp(p.P3, c.P3, alpha);
-            c.Colour = Vector4.Lerp(p.Colour, c.Colour, alpha);
-            c.Colour1 = Vector4.Lerp(p.Colour1, c.Colour1, alpha);
-            c.Colour2 = Vector4.Lerp(p.Colour2, c.Colour2, alpha);
-            _shown.Add(c);
+            if (!(tail ? immediate : queued) || !Close(previous[j], c)) continue;
+            ref readonly var p = ref previous[j];
+            o.P0 = Vector2.Lerp(p.P0, c.P0, alpha);
+            o.P1 = Vector2.Lerp(p.P1, c.P1, alpha);
+            o.P2 = Vector2.Lerp(p.P2, c.P2, alpha);
+            o.P3 = Vector2.Lerp(p.P3, c.P3, alpha);
+            o.Colour = Vector4.Lerp(p.Colour, c.Colour, alpha);
+            o.Colour1 = Vector4.Lerp(p.Colour1, c.Colour1, alpha);
+            o.Colour2 = Vector4.Lerp(p.Colour2, c.Colour2, alpha);
         }
         return _shown;
     }
@@ -214,8 +308,8 @@ public sealed class ScreenDraw : IDisposable
 
     // Amedo
     private static bool Close(in ScreenItems.Item a, in ScreenItems.Item b) =>
-        Vector2.DistanceSquared(a.P0, b.P0) <= MaxStepMove * MaxStepMove && Vector2.DistanceSquared(a.P1, b.P1) <= MaxStepMove * MaxStepMove &&
-        Vector2.DistanceSquared(a.P2, b.P2) <= MaxStepMove * MaxStepMove && Vector2.DistanceSquared(a.P3, b.P3) <= MaxStepMove * MaxStepMove;
+        GameMath.DistanceSq(a.P0, b.P0) <= MaxStepMove * MaxStepMove && GameMath.DistanceSq(a.P1, b.P1) <= MaxStepMove * MaxStepMove &&
+        GameMath.DistanceSq(a.P2, b.P2) <= MaxStepMove * MaxStepMove && GameMath.DistanceSq(a.P3, b.P3) <= MaxStepMove * MaxStepMove;
 
     // Amedo
     private static bool Matches(in ScreenItems.Item a, in ScreenItems.Item b) =>

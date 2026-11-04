@@ -25,8 +25,8 @@ public static partial class SunShadowPass
     public static int DebugView { get; set; }
     public static Vector3 SunDirection { get; private set; } = Vector3.UnitY;
     public static event Action<GL>? AfterCascade;
-    public static Entity? FocusEntity { get; set; } // Amedo: the player (set by the simulation); null = nearest character to the view centre
-    public static Vector3? LevelDirection { get; set; } // Amedo: the level's first directional light (towards the light), filled during RenderDepth
+    public static Entity? FocusEntity { get; set; } // Amedo
+    public static Vector3? LevelDirection { get; set; } // Amedo
 
     private static uint _fbo, _depth;
     private static bool _failed;
@@ -38,7 +38,7 @@ public static partial class SunShadowPass
     private static TwinShaderProgram[] _programs = [];
     private static TwinShaderProgram? _current;
 
-    // Amedo: one scene walk per frame fills this; each cascade only tests the bounding spheres
+    // Amedo
     private struct Caster
     {
         public ISunCaster Who;
@@ -71,7 +71,7 @@ public static partial class SunShadowPass
         c.PointRadius = pointRadius >= 0f ? pointRadius : radius;
     }
 
-    // Amedo: the character nearest the camera gets its own tiny, very sharp layer (self-shadow: hair on the back)
+    // Amedo
     private static bool FindFocus(Vector3 eyePos, Vector3 forward, out Vector3 focus)
     {
         focus = default;
@@ -83,9 +83,9 @@ public static partial class SunShadowPass
             if (!c.Character || (player && !c.Player)) continue;
             var point = c.Center + Vector3.UnitY * FocusLift;
             var to = point - eyePos;
-            float along = Vector3.Dot(to, forward);
-            if (to.LengthSquared() > FocusReach * FocusReach || along <= 0f) continue;
-            float score = c.Player ? to.LengthSquared() : (to - forward * along).LengthSquared();
+            float along = GameMath.Dot(to, forward);
+            if (GameMath.LengthSquared(to) > FocusReach * FocusReach || along <= 0f) continue;
+            float score = c.Player ? GameMath.LengthSquared(to) : GameMath.LengthSquared((to - forward * along));
             if (c.Player && !player) best = float.MaxValue;
             if (score >= best) continue;
             best = score;
@@ -108,7 +108,7 @@ public static partial class SunShadowPass
         }
     }
 
-    // Amedo: [0] = solid (empty fragment shader, fastest), [1] = alpha-tested (leaves, grass)
+    // Amedo
     public static TwinShaderProgram UseDepthProgram(bool cutout)
     {
         if (_pointMode && _pointProgram is { } point) // Amedo
@@ -149,7 +149,7 @@ public static partial class SunShadowPass
     public static Vector3 DirectionFor(GraphicsSettings s)
     {
         float az = s.SunAzimuth * MathF.PI / 180f, el = s.SunElevation * MathF.PI / 180f;
-        return Vector3.Normalize(new Vector3(MathF.Cos(el) * MathF.Sin(az), MathF.Sin(el), MathF.Cos(el) * MathF.Cos(az)));
+        return GameMath.Normalize(new Vector3(MathF.Cos(el) * MathF.Sin(az), MathF.Sin(el), MathF.Cos(el) * MathF.Cos(az)));
     }
 
     public static float RadiusOf(int cascade, float range)
@@ -175,7 +175,7 @@ public static partial class SunShadowPass
         SunDirection = DirectionFor(settings);
         Matrix4x4.Invert(cameraView, out var eye);
         var eyePos = new Vector3(eye.M41, eye.M42, eye.M43);
-        var forward = -Vector3.Normalize(new Vector3(eye.M31, eye.M32, eye.M33));
+        var forward = -GameMath.Normalize(new Vector3(eye.M31, eye.M32, eye.M33));
 
         Span<int> viewport = stackalloc int[4];
         gl.GetInteger(GetPName.Viewport, viewport);
@@ -187,7 +187,7 @@ public static partial class SunShadowPass
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         gl.Viewport(0, 0, MapSize, MapSize);
-        gl.Enable(EnableCap.DepthClamp);
+        if (GlCaps.DepthClamp) gl.Enable(EnableCap.DepthClamp);
         GlState.DepthTest(gl, true);
         GlState.PolygonOffset(gl, true);
         gl.PolygonOffset(1.5f, 2f);
@@ -273,9 +273,10 @@ public static partial class SunShadowPass
             _current = null;
             sh.Use();
             GlState.PolygonOffset(gl, false);
-            gl.Disable(EnableCap.DepthClamp);
+            if (GlCaps.DepthClamp) gl.Disable(EnableCap.DepthClamp);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
             gl.Viewport(viewport[0], viewport[1], (uint)viewport[2], (uint)viewport[3]);
+            if (GlCaps.TiledMsaa) SceneTarget.Instance?.ResumeAfterOffscreen(gl);
             if (scissor) gl.Enable(EnableCap.ScissorTest);
             if (stencil) gl.Enable(EnableCap.StencilTest);
         }
@@ -283,6 +284,7 @@ public static partial class SunShadowPass
         gl.ActiveTexture(Silk.NET.OpenGL.TextureUnit.Texture0 + TextureUnit);
         gl.BindTexture(TextureTarget.Texture2DArray, _depth);
         gl.ActiveTexture(Silk.NET.OpenGL.TextureUnit.Texture0);
+        GlState.ForgetTextures();
         sh.SetMatrixArray("SunViewProj", _viewProjection);
         sh.Set(u.Count, Cascades);
         sh.Set(u.Dir, SunDirection);
@@ -299,8 +301,7 @@ public static partial class SunShadowPass
     private static bool _focus; // Amedo
     private const float FocusTexel = FocusRadius * 2f / MapSize; // Amedo
 
-    // Amedo: the sun (or moon) drawn in the skydome = a sky mesh bunched around one direction (the domes surround the
-    // viewer, so their vertex directions cancel out). Read from the mesh data itself, so any level / swapped sky follows.
+    // Amedo
     public static Vector3? SkySunDirection => SkySun();
 
     private static object? _skyList;
@@ -325,30 +326,25 @@ public static partial class SunShadowPass
         float best = SunBunching;
         foreach (var (mesh, _) in draws)
         {
-            if (mesh.RaycastVertices is not { Length: >= 3 } verts) continue;
-            var sum = Vector3.Zero;
-            foreach (ref readonly var v in verts.AsSpan())
-            {
-                var p = new Vector3(-v.Position.X, v.Position.Y, v.Position.Z);
-                if (p.LengthSquared() > 1e-12f) sum += Vector3.Normalize(p);
-            }
-            float bunched = sum.Length() / verts.Length;
+            if (mesh.VertexCount < 3) continue;
+            var sum = mesh.MirroredDirectionSum();
+            float bunched = GameMath.Length(sum) / mesh.VertexCount;
             if (bunched <= best) continue;
             best = bunched;
-            _skyDir = Vector3.Normalize(Vector3.TransformNormal(Vector3.Normalize(sum), _skyRotation));
+            _skyDir = GameMath.Normalize(Vector3.TransformNormal(GameMath.Normalize(sum), _skyRotation));
         }
         return _skyDir;
     }
 
-    private const float SunBunching = 0.9f; // Amedo: average vertex direction length; 0.9 ~ within 25 degrees (domes/clouds spread 55+)
+    private const float SunBunching = 0.9f; // Amedo
     private static readonly float MinSunHeight = MathF.Sin(5f * MathF.PI / 180f);
 
     private static Vector3 AboveHorizon(Vector3 dir)
     {
         if (dir.Y >= MinSunHeight) return dir;
         var flat = new Vector3(dir.X, 0f, dir.Z);
-        flat = flat.LengthSquared() > 1e-12f ? Vector3.Normalize(flat) : Vector3.UnitZ;
-        return Vector3.Normalize(flat * MathF.Sqrt(1f - MinSunHeight * MinSunHeight) + Vector3.UnitY * MinSunHeight);
+        flat = GameMath.LengthSquared(flat) > 1e-12f ? GameMath.Normalize(flat) : Vector3.UnitZ;
+        return GameMath.Normalize(flat * MathF.Sqrt(1f - MinSunHeight * MinSunHeight) + Vector3.UnitY * MinSunHeight);
     }
 
     public static void EnableSampling(TwinShaderProgram sh, bool on) =>
@@ -398,7 +394,7 @@ public static partial class SunShadowPass
         _fbo = gl.GenFramebuffer();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         gl.FramebufferTextureLayer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, _depth, 0, 0);
-        gl.DrawBuffer(DrawBufferMode.None);
+        if (GlCaps.Gles) gl.DrawBuffers(1, [DrawBufferMode.None]); else gl.DrawBuffer(DrawBufferMode.None);
         gl.ReadBuffer(ReadBufferMode.None);
         bool ok = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer) == GLEnum.FramebufferComplete;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previous);

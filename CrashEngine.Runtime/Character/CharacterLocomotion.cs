@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -59,7 +60,7 @@ public sealed class CharacterLocomotion
             move = Vector3.Zero;
             rl = turnIn = 0f;
         }
-        float len = move.Length();
+        float len = GameMath.Length(move);
         Move = _c.Move;
         Facing = Vector3.Zero;
         if (Pending != 0)
@@ -191,7 +192,7 @@ public sealed class CharacterLocomotion
         if (_c.StrafeTarget_124?.Invoke() is { } target)
         {
             var d = new Vector3(target.X - m.M41, 0f, target.Z - m.M43);
-            float inv = CharacterController.InverseLength(d);
+            float inv = GameMath.InverseLength(d);
             Facing = new Vector3(d.X * inv, d.Y * inv, d.Z * inv);
         }
         else Facing = new Vector3(m.M31, m.M32, m.M33);
@@ -276,7 +277,7 @@ public sealed class CharacterLocomotion
         {
             angle = SignedAngle(ForcedCurrent, _c.ForwardAxis);
             Turn = 0;
-            Speed = ForcedCurrent.Length();
+            Speed = GameMath.Length(ForcedCurrent);
         }
         if (!_c.IsGrounded) AirSpeed = Speed;
         float radians = angle * (MathF.PI * 2f / 65536f);

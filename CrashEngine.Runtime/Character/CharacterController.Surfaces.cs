@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -66,7 +67,7 @@ public sealed partial class CharacterController
     {
         if (s.Id != WaterSurfaceId) return;
         CollisionWorld.Plane(tri.A, tri.B, tri.C, out var n, out float w);
-        WaterPoint = p - n * (Vector3.Dot(n, p) + w);
+        WaterPoint = p - n * (GameMath.Dot(n, p) + w);
         if (WetSurface != WaterSurfaceId) WaterEnter(s);
         else WaterStay(s);
         WetSurface = WaterSurfaceId;

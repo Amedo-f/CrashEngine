@@ -2,6 +2,7 @@ using System.Numerics;
 using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
 using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
+using CrashEngine.Core;
 
 namespace CrashEngine.Importer;
 
@@ -39,6 +40,8 @@ public sealed class ParticleDef
     public readonly float EmitMinDist, EmitMaxDist, DrawMaxDist, BaseSpeedY, GravityHalf, Life, SampleRate, RepeatDelay, RadiusRamp;
     public readonly int SphereCount; // Amedo
     public readonly long[] SphereRadius; // Amedo
+    public readonly float TowardCamera; // Amedo
+    public readonly Vector3 Bounds; // Amedo
     public readonly Vector3 VelRange, PosRange, StartScale, StartBase, VelScale, VelBase; // Amedo
     public readonly Vector4 UvRect;
     public readonly Vector4 Swatch;
@@ -73,6 +76,8 @@ public sealed class ParticleDef
         RepeatCount = Math.Max(0, (int)s.UnkShorts[1]);
         RepeatDelay = s.UnkFloat38;
         RadiusRamp = s.UnkFloat40;
+        TowardCamera = s.UnkFloat37; // Amedo
+        Bounds = new Vector3(s.UnkVec3.X, s.UnkVec3.Y, s.UnkVec3.Z); // Amedo
         SphereCount = (sbyte)s.UnkByte8; // Amedo
         SphereRadius = s.UnkLongs7 ?? Array.Empty<long>(); // Amedo
         UvRect = new Vector4(Texel(s.UnkFloat33), Texel(s.UnkFloat34), Texel(s.UnkFloat35), Texel(s.UnkFloat36));
@@ -153,7 +158,7 @@ public sealed class ParticleDef
 
             var rgb = ColorCurve(s.UnkVecs, t);
             float alpha = Curve(s.UnkLongs1, t);
-            smp.Color = new Vector4(LowByte(rgb.X), LowByte(rgb.Y), LowByte(rgb.Z), LowByte(alpha)) / 128f;
+            smp.Color = new Vector4(LowByte(rgb.X) / 255f, LowByte(rgb.Y) / 255f, LowByte(rgb.Z) / 255f, LowByte(alpha) / 128f);
         }
     }
 
@@ -189,7 +194,7 @@ public sealed class ParticleDef
 // Amedo 2026-09-26
 public sealed class ParticleWorld
 {
-    public const float Dt = 1f / 60f;
+    public static float Dt { get; set; } = 1f / 60f;
     private const float MaxCatchUp = 0.25f;
 
     public float Clock;
@@ -197,6 +202,7 @@ public sealed class ParticleWorld
     public CrashEngine.Core.GameRandom Rng = CrashEngine.Core.GameRandom.Shared; // Amedo
     public readonly List<ParticleEmitterSim> Emitters = new();
     public Func<bool>? AnchorDrawn; // Amedo
+    public Func<Vector3, Vector3, bool>? BoxInView; // Amedo
     public readonly DecalWorld Decals = new(); // Amedo 2026-09-30
     public readonly List<SkidMarkRing> SkidMarks = new(); // Amedo
     public Matrix4x4 SkidToAnchor = Matrix4x4.Identity; // Amedo
@@ -204,8 +210,17 @@ public sealed class ParticleWorld
     private uint _floatSeed = 12345u;
     private int _intSeed = 1;
     private float _acc;
+    public bool LogicDriven; // Amedo
+    public float RenderCarry; // Amedo
 
-    public float RenderTime => Clock + _acc;
+    public float RenderTime => Clock + (LogicDriven ? RenderCarry : _acc); // Amedo
+
+    // Amedo
+    public void EndFrame_100D78(Vector3? camera, bool distanceGating)
+    {
+        Tick(camera, distanceGating);
+        Decals.Step_1AD158();
+    }
 
     public float Rand01()
     {
@@ -244,7 +259,7 @@ public sealed class ParticleWorld
         foreach (var em in Emitters)
         {
             if (!em.Enabled) continue;
-            float dist = camera is { } c && SceneDrawn_1E8(em) ? Vector3.Distance(c, em.Origin) : 1e7f; // Amedo
+            float dist = camera is { } c && SceneDrawn_1E8(em) ? GameMath.Distance(c, em.Origin) : 1e7f; // Amedo
             em.Process(this, dist, distanceGating);
         }
         foreach (var em in Emitters)
@@ -512,7 +527,7 @@ public sealed class ParticleEmitterSim
             float reach = r + radius;
             var d = point - pos;
             if (invY != 1f) d.Y *= reach / (r + radius * invY);
-            if (d.LengthSquared() < reach * reach) return true;
+            if (GameMath.LengthSquared(d) < reach * reach) return true;
         }
         return false;
     }
@@ -556,7 +571,7 @@ public sealed class ParticleEmitterSim
 
     // Amedo
     private static int AsinAngle(float x) =>
-        CrashEngine.Core.GameMath.CvtWS(CrashEngine.Core.GameMath.Asin16_18B7F8(x) * CrashEngine.Core.GameMath.UnitToRad * CrashEngine.Core.GameMath.RadToUnit);
+        CrashEngine.Core.GameMath.Trunc(CrashEngine.Core.GameMath.Asin16_18B7F8(x) * CrashEngine.Core.GameMath.UnitToRad * CrashEngine.Core.GameMath.RadToUnit);
 
     // Amedo
     private static float Sym(ParticleWorld world, float range)

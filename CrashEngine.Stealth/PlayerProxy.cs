@@ -22,7 +22,7 @@ public sealed class PlayerProxy : Component
         if (Input.KeyHeld(Silk.NET.Input.Key.A)) move.X -= 1f;
         if (Input.KeyHeld(Silk.NET.Input.Key.D)) move.X += 1f;
         if (move != System.Numerics.Vector3.Zero)
-            move = System.Numerics.Vector3.Normalize(move);
+            move = CrashEngine.Core.GameMath.Normalize(move);
         Transform.Position += move * speed * EngineTime.Delta;
     }
 }

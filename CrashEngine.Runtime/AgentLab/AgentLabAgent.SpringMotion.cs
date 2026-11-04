@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -43,8 +44,8 @@ public sealed partial class AgentLabAgent
             return;
         }
         _velocity += force * dt;
-        if (damping * damping < _velocity.LengthSquared())
-            _velocity *= InverseLength(_velocity) * -damping;
+        if (damping * damping < GameMath.LengthSquared(_velocity))
+            _velocity *= GameMath.InverseLength(_velocity) * -damping;
     }
 
     private void StepSpring_232260(float dt)
@@ -56,7 +57,7 @@ public sealed partial class AgentLabAgent
         var step = _velocity * dt;
         var next = pos + step;
         SetTrajectoryRest50(next); // Amedo
-        if (_sqrTolerance != 0f && Vector3.DistanceSquared(next, _moveTarget) < _sqrTolerance)
+        if (_sqrTolerance != 0f && GameMath.DistanceSq(next, _moveTarget) < _sqrTolerance)
         {
             MoveInstance_23C280(next);
             _translationDone = true;
@@ -71,7 +72,7 @@ public sealed partial class AgentLabAgent
             if (next == _moveTarget) _translationDone = true;
             return;
         }
-        if (_velocity.LengthSquared() + _springForce.LengthSquared() < SpringRest)
+        if (GameMath.LengthSquared(_velocity) + GameMath.LengthSquared(_springForce) < SpringRest)
         {
             MoveInstance_23C280(_moveTarget);
             _translationDone = true;

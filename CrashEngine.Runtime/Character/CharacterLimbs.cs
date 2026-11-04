@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
 
 namespace CrashEngine.Runtime.Character;
@@ -90,11 +91,11 @@ public sealed class CharacterLimbs
                 var from = new Vector3(center.X, pos.Y, center.Z);
                 if (owner?.Triangles2B0 is { } cache && CharacterCollision.LimbCast(cache, from, pos, out var hit, out var n)) // Amedo
                 {
-                    if (Vector3.Dot(pos - from, n) < 0f) n = -n;
+                    if (GameMath.Dot(pos - from, n) < 0f) n = -n;
                     if (-0.707f < n.Y && n.Y < 0.707f) // Amedo 2026-09-27
                     {
                         var gap = hit - pos;
-                        push = n * -MathF.Sqrt(Vector3.Dot(gap, gap));
+                        push = n * -MathF.Sqrt(GameMath.Dot(gap, gap));
                     }
                 }
                 if (owner?.LimbBodies is { } bodies && DynamicCast(bodies(Vector3.Min(from, pos), Vector3.Max(from, pos)), from, pos, owner,
@@ -103,7 +104,7 @@ public sealed class CharacterLimbs
                     if (-0.707f < bn.Y && bn.Y < 0.707f)
                     {
                         var gap = bodyHit - pos;
-                        push += bn * MathF.Sqrt(Vector3.Dot(gap, gap));
+                        push += bn * MathF.Sqrt(GameMath.Dot(gap, gap));
                         owner.TouchSide(body);
                         owner.LimbTouched = body; // Amedo 2026-09-30
                         owner.LimbTouchPush = Smooth_13CA60();
@@ -113,7 +114,7 @@ public sealed class CharacterLimbs
             LastPosition[k] = pos;
             LastPush[k] = push;
             Accumulated += push * part.Strength;
-            if (k == 3 && owner is { Bones.Kind: not 4 } nose && 0.01f < push.Length()) nose.Bones.Squash_15F350(1f - push.Length() * 5f); // Amedo 2026-09-30
+            if (k == 3 && owner is { Bones.Kind: not 4 } nose && 0.01f < GameMath.Length(push)) nose.Bones.Squash_15F350(1f - GameMath.Length(push) * 5f); // Amedo 2026-09-30
         }
         Smooth_13CA60(); // Amedo 2026-09-30
         var v = new Vector3(Smoothed.X, 0f, Smoothed.Z);
@@ -121,8 +122,8 @@ public sealed class CharacterLimbs
         float k5 = dt * 5f;
         var step = new Vector3(v.X * k5, 0f, v.Z * k5);
         var mv = disp;
-        var dir = step * CharacterController.InverseLength(step);
-        float into = Vector3.Dot(dir, mv);
+        var dir = step * GameMath.InverseLength(step);
+        float into = GameMath.Dot(dir, mv);
         if (into < 0f) mv -= dir * into;
         return mv + step;
     }
@@ -131,7 +132,7 @@ public sealed class CharacterLimbs
     private Vector3 Smooth_13CA60()
     {
         Smoothed = Smoothed * 0.5f + Accumulated * 0.5f;
-        if (MathF.Sqrt(Vector3.Dot(Smoothed, Smoothed)) < 0.1f) Smoothed = Vector3.Zero;
+        if (MathF.Sqrt(GameMath.Dot(Smoothed, Smoothed)) < 0.1f) Smoothed = Vector3.Zero;
         return Smoothed;
     }
 
@@ -176,8 +177,8 @@ public sealed class CharacterLimbs
         {
             var f = hull.Faces[i];
             var n = new Vector3(f.X, f.Y, f.Z);
-            float dist = Vector3.Dot(n, a) + f.W;
-            float denom = Vector3.Dot(n, d);
+            float dist = GameMath.Dot(n, a) + f.W;
+            float denom = GameMath.Dot(n, d);
             if (denom == 0f)
             {
                 if (0f < dist) return false;
@@ -195,7 +196,7 @@ public sealed class CharacterLimbs
         t = tIn;
         var fn = hull.Faces[face];
         normal = Vector3.TransformNormal(new Vector3(fn.X, fn.Y, fn.Z), m);
-        normal *= CharacterController.InverseLength(normal);
+        normal *= GameMath.InverseLength(normal);
         return true;
     }
 
@@ -235,9 +236,9 @@ public sealed class CharacterLimbs
         var x = new Vector3(w.M11, w.M12, w.M13);
         var y = new Vector3(w.M21, w.M22, w.M23);
         var z = new Vector3(w.M31, w.M32, w.M33);
-        x *= CharacterController.InverseLength(x);
-        y *= CharacterController.InverseLength(y);
-        z *= CharacterController.InverseLength(z);
+        x *= GameMath.InverseLength(x);
+        y *= GameMath.InverseLength(y);
+        z *= GameMath.InverseLength(z);
         return new Matrix4x4(x.X, x.Y, x.Z, 0f, y.X, y.Y, y.Z, 0f, z.X, z.Y, z.Z, 0f, w.M41, w.M42, w.M43, 1f);
     }
 }

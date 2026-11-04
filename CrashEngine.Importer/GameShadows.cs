@@ -221,8 +221,8 @@ public static class GameShadowDefs
             foreach (var (a, b, c) in tris)
             {
                 var n = Vector3.Cross(b - a, c - a);
-                if (n.LengthSquared() < 1e-12f) continue;
-                bool outward = Vector3.Dot(n, (a + b + c) / 3f - centroid) >= 0f;
+                if (GameMath.LengthSquared(n) < 1e-12f) continue;
+                bool outward = GameMath.Dot(n, (a + b + c) / 3f - centroid) >= 0f;
                 verts.Add(a);
                 verts.Add(outward ? b : c);
                 verts.Add(outward ? c : b);
@@ -386,7 +386,7 @@ public sealed class GameShadowCasters : Component
         var obj = e.Transform.World * toGame;
         var pos = obj.Translation;
         int maxDist = (int)shape.MaxDistance & 0x3FF;
-        int d2 = (int)Vector3.DistanceSquared(camGame, pos);
+        int d2 = (int)GameMath.DistanceSq(camGame, pos);
         if (d2 >= maxDist * maxDist) return false;
         int dist = (int)MathF.Sqrt(d2);
         float t = (float)dist / maxDist;
@@ -478,8 +478,9 @@ public sealed class GameShadowCasters : Component
         return true;
     }
 
-    private static void Emit(GameShadowPass pass, byte type, Vector3 axisZ, Vector3 origin, Vector3 size, Vector3 offset, Matrix4x4 chunkWorld, Vector4[] planes)
+    private static void Emit(GameShadowPass pass, byte type, in Vector3 axisZ, in Vector3 origin, in Vector3 sizeIn, in Vector3 offset, Matrix4x4 chunkWorld, Vector4[] planes)
     {
+        var size = sizeIn; // Amedo 2026-10-27
         const float Eps = 2.4999998e-09f; // Amedo
         var up = Vector3.UnitY;
         var z = axisZ * GameMath.InvLength_11C030(Eps, axisZ.X, axisZ.Y, axisZ.Z);

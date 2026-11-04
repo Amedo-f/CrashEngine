@@ -84,6 +84,7 @@ public sealed class InputTape : IDisposable
         writer.WriteLine($"# host {host}");
         writer.WriteLine($"# created {DateTime.UtcNow.ToString("o", Inv)}");
         writer.WriteLine($"# logicticks {SceneSimulation.LogicTicks}");
+        writer.WriteLine($"# widescreen {(Screen.Oleg.OverlayQueue.Widescreen_30A744 ? 1 : 0)}"); // Amedo
         foreach (var (k, v) in extra ?? []) writer.WriteLine($"# {k} {v}");
         var tape = new InputTape(path, writer) { Level = level };
         tape._header["level"] = level;
@@ -192,7 +193,7 @@ public sealed class InputTape : IDisposable
             _expectedHash = null;
             if (_expectedDetail.Count > 0)
             {
-                if (Step == 0 || (!diverged && Divergence is not null)) CompareDetail(sim); // Amedo: step 0 and the first divergence
+                if (Step == 0 || (!diverged && Divergence is not null)) CompareDetail(sim); // Amedo
                 else _expectedDetail.Clear();
             }
             return;
@@ -202,7 +203,7 @@ public sealed class InputTape : IDisposable
         if (Step % HashEvery == 0)
         {
             _writer!.WriteLine($"h {Step} {StateHash(sim):X16}");
-            foreach (var line in Detail(sim)) _writer.WriteLine($"{line[0]} {Step} {line[2..]}"); // Amedo: every check, so a divergence names the agent
+            foreach (var line in Detail(sim)) _writer.WriteLine($"{line[0]} {Step} {line[2..]}"); // Amedo
             _writer.Flush();
         }
     }
@@ -246,7 +247,7 @@ public sealed class InputTape : IDisposable
         Log?.Invoke($"[tape] player first differs at {PlayerDivergence} (recorded/here)");
     }
 
-    // Amedo: what the step-0 hash is made of, so a replay that starts differently can say which part differs
+    // Amedo
     private static IEnumerable<string> Detail(SceneSimulation sim)
     {
         var world = sim.World;
@@ -279,7 +280,7 @@ public sealed class InputTape : IDisposable
         Log?.Invoke($"[tape] step {Step}: {recorded.Count} recorded agents, {here.Count} here, {shown} difference(s) shown");
         _expectedDetail.Clear();
         static string Tail(string l) => string.Join(' ', l.Split(' ').Skip(3));
-        static Dictionary<string, string> Keyed(IEnumerable<string> lines) // Amedo: names repeat across chunks: name#n
+        static Dictionary<string, string> Keyed(IEnumerable<string> lines) // Amedo
         {
             var keyed = new Dictionary<string, string>();
             foreach (var l in lines)
@@ -364,7 +365,7 @@ public sealed class InputTape : IDisposable
     private static IEnumerable<float> M(Matrix4x4 m) =>
         [m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44];
 
-    private static IEnumerable<float> B(Vector3 r, Vector3 u, Vector3 f) => [r.X, r.Y, r.Z, u.X, u.Y, u.Z, f.X, f.Y, f.Z];
+    private static IEnumerable<float> B(in Vector3 r, in Vector3 u, in Vector3 f) => [r.X, r.Y, r.Z, u.X, u.Y, u.Z, f.X, f.Y, f.Z];
 
     private static string Floats(IEnumerable<float> v) => string.Join(' ', v.Select(x => BitConverter.SingleToUInt32Bits(x).ToString("X8")));
 

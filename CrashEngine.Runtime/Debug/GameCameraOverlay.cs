@@ -18,7 +18,7 @@ public sealed class GameCameraOverlay : Component
     private const float XRayAlpha = 0.3f, ZoneFaceAlpha = 0.07f, TargetSize = 0.25f, DefaultLength = 6f, MaxLength = 40f;
     private const int TrailSegments = 400;
     private const float TrailStep = 0.05f, TrailBreak = 3f;
-    private static readonly Vector3 Light = Vector3.Normalize(new Vector3(-0.35f, 0.85f, 0.4f));
+    private static readonly Vector3 Light = GameMath.Normalize(new Vector3(-0.35f, 0.85f, 0.4f));
 
     private readonly Func<SceneSimulation?> _sim;
     private readonly Func<float> _aspect;
@@ -63,7 +63,7 @@ public sealed class GameCameraOverlay : Component
         }
         if (sim is null || !sim.GameCameraView(out var eye, out _, out _, out _)) return;
         if (_trailLast is not { } last) { _trailLast = eye; return; }
-        float d = Vector3.Distance(last, eye);
+        float d = GameMath.Distance(last, eye);
         if (d < TrailStep) return;
         _trailLast = eye;
         if (d > TrailBreak) return;
@@ -80,7 +80,7 @@ public sealed class GameCameraOverlay : Component
         if (!sim.GameCameraView(out var eye, out var forward, out var up, out float fov)) return;
         if (!_loadTried) Load(gl);
         var sh = pipeline.Shader;
-        var right = Vector3.Normalize(Vector3.Cross(forward, up));
+        var right = GameMath.Normalize(Vector3.Cross(forward, up));
         var u = Vector3.Cross(right, forward);
         var basis = new Matrix4x4(right.X, right.Y, right.Z, 0f, u.X, u.Y, u.Z, 0f, -forward.X, -forward.Y, -forward.Z, 0f, eye.X, eye.Y, eye.Z, 1f);
         var gameToWorld = sim.RootToWorld;
@@ -89,7 +89,7 @@ public sealed class GameCameraOverlay : Component
         DrawTrail(gl, sh);
 
         var focus = sim.World.Player is { } player ? player.Entity.Transform.World.Translation : eye + forward * 5f;
-        float depth = Vector3.Dot(focus - eye, forward);
+        float depth = GameMath.Dot(focus - eye, forward);
         float length = depth >= 1f ? MathF.Min(depth, MaxLength) : DefaultLength;
         var target = eye + forward * length;
         float ty = MathF.Tan(fov * MathF.PI / 360f);
@@ -185,10 +185,10 @@ public sealed class GameCameraOverlay : Component
     private static Matrix4x4 Segment(Vector3 a, Vector3 b)
     {
         var d = b - a;
-        float len = d.Length();
+        float len = GameMath.Length(d);
         if (len < 1e-5f) return Matrix4x4.CreateScale(0f) * Matrix4x4.CreateTranslation(a);
         var z = d / len;
-        var x = Vector3.Normalize(Vector3.Cross(MathF.Abs(z.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX, z));
+        var x = GameMath.Normalize(Vector3.Cross(MathF.Abs(z.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX, z));
         var y = Vector3.Cross(z, x);
         return new Matrix4x4(x.X, x.Y, x.Z, 0f, y.X, y.Y, y.Z, 0f, d.X, d.Y, d.Z, 0f, a.X, a.Y, a.Z, 1f);
     }
@@ -206,7 +206,7 @@ public sealed class GameCameraOverlay : Component
             uint baseIndex = (uint)verts.Count;
             for (int i = 0; i < p.Positions.Length; i++)
             {
-                float shade = 0.6f + 0.4f * MathF.Max(0f, Vector3.Dot(p.Normals[i], Light));
+                float shade = 0.6f + 0.4f * MathF.Max(0f, GameMath.Dot(p.Normals[i], Light));
                 verts.Add(new GpuMesh.Vertex { Position = p.Positions[i], Normal = p.Normals[i], UV = p.UVs[i], Color = new Vector4(shade, shade, shade, 1f) });
             }
             foreach (uint i in p.Indices) idx.Add(baseIndex + i);

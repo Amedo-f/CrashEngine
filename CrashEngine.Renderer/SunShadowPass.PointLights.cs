@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace CrashEngine.Renderer;
 
-// Amedo: the level's point lights lit per pixel on scenery + objects, the nearest ones casting shadows (cube maps)
+// Amedo
 public static partial class SunShadowPass
 {
     public const int MaxPointLights = 4;
@@ -49,7 +49,7 @@ public static partial class SunShadowPass
         s.Range = RangeOf(radius * 0.5f * MathF.Max(color.X, MathF.Max(color.Y, color.Z)), s.Exponent);
     }
 
-    // Amedo: the game's falloff f = 25 / (d^2 + 25), light = Radius * f^exp * dot(N, d * f); range = where it drops under 1/255
+    // Amedo
     private static float RangeOf(float peak, int exponent)
     {
         for (float d = 1f; d < 400f; d *= 1.1f)
@@ -62,7 +62,7 @@ public static partial class SunShadowPass
 
     private static void BeginPointLights() => _sourceCount = 0;
 
-    // Amedo: called after scene.RenderDepth (lights + casters collected); picks the nearest lights and renders their cube maps
+    // Amedo
     private static void RenderPointLights(GL gl, Vector3 eyePos)
     {
         _pointCount = 0;
@@ -78,7 +78,7 @@ public static partial class SunShadowPass
         for (int i = 0; i < _sourceCount; i++)
         {
             ref var s = ref _sources[i];
-            float d = Vector3.Distance(s.Position, eyePos) - s.Range;
+            float d = GameMath.Distance(s.Position, eyePos) - s.Range;
             if (d > PointReach) continue;
             int at = count < MaxPointLights ? count++ : MaxPointLights;
             if (at == MaxPointLights)
@@ -96,7 +96,6 @@ public static partial class SunShadowPass
             chosen[at] = i;
         }
 
-        // keep each light in the slot it had (its cube map is still valid); new lights take free slots and render now
         Span<bool> keep = stackalloc bool[MaxPointLights];
         Span<int> slotOf = stackalloc int[MaxPointLights];
         for (int c = 0; c < count; c++)
@@ -161,9 +160,7 @@ public static partial class SunShadowPass
         (Vector3.UnitZ, -Vector3.UnitY), (-Vector3.UnitZ, -Vector3.UnitY),
     ];
 
-    // Amedo: per light, what stands still (scenery, resting objects) is drawn once into a cached cube; every frame that
-    // cache is copied and only characters and what is seen moving are drawn on top. A cached caster that moves (more
-    // than a small sway) becomes a mover for that light and the cache is rebuilt once without it.
+    // Amedo
     private static readonly bool[] _staticValid = new bool[MaxPointLights];
     private static readonly Dictionary<ISunCaster, Matrix4x4>[] _staticSet = [new(), new(), new(), new()];
     private static readonly HashSet<ISunCaster>[] _movers = [new(), new(), new(), new()];
@@ -171,8 +168,8 @@ public static partial class SunShadowPass
     private static uint _pointStatic;
     private static readonly int[] _rebuilds = new int[MaxPointLights];
     private static readonly int[] _builtAt = new int[MaxPointLights];
-    private const int RebuildEvery = 20; // Amedo: a moved object's old shadow lingers at most this many frames
-    private const float ShadowReach = 0.5f; // Amedo: past half its reach a point light is too dim for a visible shadow
+    private const int RebuildEvery = 20; // Amedo
+    private const float ShadowReach = 0.5f; // Amedo
 
     private static void RenderSlot(GL gl, int slot)
     {
@@ -188,7 +185,7 @@ public static partial class SunShadowPass
         for (int k = 0; k < _casterCount; k++)
         {
             ref var c = ref _casters[k];
-            if (c.PointRadius != float.MaxValue && Vector3.Distance(c.PointCenter, s.Position) - c.PointRadius > s.Range * ShadowReach) continue;
+            if (c.PointRadius != float.MaxValue && GameMath.Distance(c.PointCenter, s.Position) - c.PointRadius > s.Range * ShadowReach) continue;
             _inRange[inRange++] = k;
             if (!c.Still || !_staticValid[slot] || movers.Contains(c.Who)) continue;
             if (!set.TryGetValue(c.Who, out var world)) continue;
@@ -243,9 +240,9 @@ public static partial class SunShadowPass
         }
     }
 
-    // Amedo: small sways (bobbing books, swaying grass) keep the cache; the shadow is off by under 5 cm
+    // Amedo
     private static bool Near(in Matrix4x4 a, in Matrix4x4 b) =>
-        Vector3.DistanceSquared(a.Translation, b.Translation) < 0.05f * 0.05f
+        GameMath.DistanceSq(a.Translation, b.Translation) < 0.05f * 0.05f
         && MathF.Abs(a.M11 - b.M11) + MathF.Abs(a.M12 - b.M12) + MathF.Abs(a.M13 - b.M13)
          + MathF.Abs(a.M21 - b.M21) + MathF.Abs(a.M22 - b.M22) + MathF.Abs(a.M23 - b.M23)
          + MathF.Abs(a.M31 - b.M31) + MathF.Abs(a.M32 - b.M32) + MathF.Abs(a.M33 - b.M33) < 0.05f;
@@ -275,7 +272,7 @@ public static partial class SunShadowPass
                 if (c.PointRadius != float.MaxValue)
                 {
                     var d = c.PointCenter - s.Position;
-                    float along = Vector3.Dot(d, dir);
+                    float along = GameMath.Dot(d, dir);
                     if (along < -c.PointRadius) continue;
                     var side = d - dir * along;
                     if (MathF.Max(MathF.Abs(side.X), MathF.Max(MathF.Abs(side.Y), MathF.Abs(side.Z))) > along + c.PointRadius * 1.5f) continue;
@@ -293,6 +290,7 @@ public static partial class SunShadowPass
         gl.ActiveTexture(Silk.NET.OpenGL.TextureUnit.Texture0 + PointTextureUnit);
         gl.BindTexture(TextureTarget.TextureCubeMapArray, _pointDepth);
         gl.ActiveTexture(Silk.NET.OpenGL.TextureUnit.Texture0);
+        GlState.ForgetTextures();
         sh.Set("PointCount", _pointCount);
         sh.SetVector4Array("PointPosRange", _pointPosRange);
         sh.SetVector4Array("PointColor", _pointColor);
@@ -335,7 +333,7 @@ public static partial class SunShadowPass
         _pointFbo = gl.GenFramebuffer();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _pointFbo);
         gl.FramebufferTextureLayer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, _pointDepth, 0, 0);
-        gl.DrawBuffer(DrawBufferMode.None);
+        if (GlCaps.Gles) gl.DrawBuffers(1, [DrawBufferMode.None]); else gl.DrawBuffer(DrawBufferMode.None);
         gl.ReadBuffer(ReadBufferMode.None);
         bool ok = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer) == GLEnum.FramebufferComplete;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previous);

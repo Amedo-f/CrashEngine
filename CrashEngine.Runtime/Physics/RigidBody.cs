@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -128,9 +129,9 @@ public sealed class RigidBody
         if ((Flags & MomentumDirty) != 0)
         {
             Velocity = Momentum * InvMass;
-            if (MaxSpeed * MaxSpeed < Velocity.LengthSquared())
+            if (MaxSpeed * MaxSpeed < GameMath.LengthSquared(Velocity))
             {
-                Velocity = Velocity * InverseLength(Velocity) * MaxSpeed;
+                Velocity = Velocity * GameMath.InverseLength(Velocity) * MaxSpeed;
                 Momentum = Velocity * Mass;
             }
             Flags &= ~MomentumDirty;
@@ -151,9 +152,9 @@ public sealed class RigidBody
         rot.M41 = 0f; rot.M42 = 0f; rot.M43 = 0f;
         InvInertiaWorld = scaled * rot;
         Spin = Vector3.TransformNormal(AngularMomentum, InvInertiaWorld);
-        if (MaxSpin * MaxSpin < Spin.LengthSquared())
+        if (MaxSpin * MaxSpin < GameMath.LengthSquared(Spin))
         {
-            Spin = Spin * InverseLength(Spin) * MaxSpin;
+            Spin = Spin * GameMath.InverseLength(Spin) * MaxSpin;
             AngularMomentum = Vector3.TransformNormal(Spin, Matrix4x4.Transpose(InvInertiaWorld));
         }
         var q = Orientation;
@@ -170,8 +171,8 @@ public sealed class RigidBody
     {
         UpdateDerived();
         var step = Velocity * h;
-        float len = step.Length();
-        if (0.5f < len) step = step * InverseLength(step) * 0.5f;
+        float len = GameMath.Length(step);
+        if (0.5f < len) step = step * GameMath.InverseLength(step) * 0.5f;
         Position += step;
         Momentum += Force * h;
         AngularMomentum += Torque * h;
@@ -192,13 +193,13 @@ public sealed class RigidBody
     public void Decelerate(float a, float dt)
     {
         float drop = a * dt;
-        float len = Momentum.Length();
+        float len = GameMath.Length(Momentum);
         if (!(MathF.Abs(len) <= 5e-5f))
         {
             float k = MathF.Max(0f, len - drop) / len;
             if (k < 1f) Momentum *= k;
         }
-        len = AngularMomentum.Length();
+        len = GameMath.Length(AngularMomentum);
         if (MathF.Abs(len) <= 5e-5f) return;
         float kk = MathF.Max(0f, len - drop) / len;
         if (kk < 1f) AngularMomentum *= kk;
@@ -212,7 +213,7 @@ public sealed class RigidBody
         if (Buoyancy < 0f) keep = 1f - Damping * dt * 60f;
         else
         {
-            if (!(0.01f < Force2.LengthSquared())) return;
+            if (!(0.01f < GameMath.LengthSquared(Force2))) return;
             keep = 1f - Damping * (sphere ? 4f : 70f) * dt * 60f;
         }
         if (keep < 0f) keep = 0f;
@@ -241,14 +242,14 @@ public sealed class RigidBody
         var t = Vector3.TransformNormal(Vector3.Cross(nb, local), World);
         var u = Vector3.TransformNormal(t, InvInertiaWorld);
         var r = Vector3.TransformNormal(local, World);
-        return Vector3.Dot(n, Vector3.Cross(r, u)) + InvMass;
+        return GameMath.Dot(n, Vector3.Cross(r, u)) + InvMass;
     }
 
     public float ImpulseMagnitude(Vector3 local, Vector3 n, float e, float k)
     {
         UpdateDerived();
         UpdateDerived();
-        float vn = Vector3.Dot(PointVelocity(local), n);
+        float vn = GameMath.Dot(PointVelocity(local), n);
         if (0f < vn) return 0f;
         if (k != 0f) e *= vn * vn / (vn * vn + k);
         return -(e + 1f) * vn / EffectiveMass(local, n);
@@ -264,7 +265,7 @@ public sealed class RigidBody
         ImpulseTrail = ImpulseTrail * 0.7f + dl * 0.3f;
         AngularMomentum -= dl;
         Flags |= OrientationDirty;
-        ImpulseSum += j.Length();
+        ImpulseSum += GameMath.Length(j);
     }
 
     // Amedo
@@ -292,12 +293,12 @@ public sealed class RigidBody
     }
 
     // Amedo
-    public void Spring_28A198(Vector3 target, Vector3 local, bool pullOnly, float length, float stiffness, float damping)
+    public void Spring_28A198(in Vector3 target, in Vector3 local, bool pullOnly, float length, float stiffness, float damping)
     {
         var d = target - Vector3.Transform(local, World);
         float stretch = MathF.Sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z) - length;
         if (pullOnly && stretch < 0f) return;
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         UpdateDerived();
         var v = Velocity + Vector3.Cross(Vector3.TransformNormal(local, World), Spin);
         float f = stretch * stiffness - (v.X * d.X + v.Y * d.Y + v.Z * d.Z) * damping;
@@ -305,13 +306,13 @@ public sealed class RigidBody
     }
 
     // Amedo
-    public void LevelSpring_28A4F0(Vector3 target, Vector3 local, float stiffness, float damping, float sideways)
+    public void LevelSpring_28A4F0(in Vector3 target, in Vector3 local, float stiffness, float damping, float sideways)
     {
         var p = Vector3.Transform(local, World);
         var h = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
         float rise = target.Y - p.Y;
         float across = MathF.Sqrt(h.X * h.X + h.Z * h.Z);
-        h *= InverseLength(h);
+        h *= GameMath.InverseLength(h);
         UpdateDerived();
         var v = Velocity + Vector3.Cross(Vector3.TransformNormal(local, World), Spin);
         float up = rise * stiffness - v.Y * damping;
@@ -363,15 +364,15 @@ public sealed class RigidBody
     {
         var inertia = WorldInertia();
         var dl = Vector3.TransformNormal(targetSpin - Spin, inertia);
-        var n = j * InverseLength(j);
-        var along = n * Vector3.Dot(n, dl);
-        float magnitude = j.Length();
+        var n = j * GameMath.InverseLength(j);
+        var along = n * GameMath.Dot(n, dl);
+        float magnitude = GameMath.Length(j);
         float limit = magnitude * twist;
         var a = along;
-        if (limit < a.Length()) a = a * InverseLength(a) * limit;
+        if (limit < GameMath.Length(a)) a = a * GameMath.InverseLength(a) * limit;
         limit = magnitude * roll;
         var b = dl - along;
-        if (limit < b.Length()) b = b * InverseLength(b) * limit;
+        if (limit < GameMath.Length(b)) b = b * GameMath.InverseLength(b) * limit;
         AngularMomentum += a;
         AngularMomentum += b;
     }
@@ -380,7 +381,7 @@ public sealed class RigidBody
     {
         var half = push * 0.5f;
         Correction += half;
-        CorrectionSum += half.Length();
+        CorrectionSum += GameMath.Length(half);
         Position += half;
         Matrix4x4.Invert(World, out Inverse);
     }
@@ -408,7 +409,7 @@ public sealed class RigidBody
             var surface = world.SurfaceAt(tri.Surface);
             if (((surface.Mask >> 6) & 1) != 0)
             {
-                var contact = pushed * InverseLength(pushed) * -Radius;
+                var contact = pushed * GameMath.InverseLength(pushed) * -Radius;
                 var push = pushed;
                 if (IsEllipsoid)
                 {
@@ -417,10 +418,10 @@ public sealed class RigidBody
                 }
                 var pushWorld = Vector3.TransformNormal(push, World);
                 Correct(pushWorld);
-                var normal = pushed * InverseLength(pushed);
+                var normal = pushed * GameMath.InverseLength(pushed);
                 if (IsEllipsoid) normal /= Ellipsoid;
                 normal = Vector3.TransformNormal(normal, World);
-                normal *= InverseLength(normal);
+                normal *= GameMath.InverseLength(normal);
                 Decelerate(Decel, 1f);
                 Flags2 |= ContactThisStep;
                 SurfaceContact_28B7E8(contact, normal, surface);
@@ -469,7 +470,7 @@ public sealed class RigidBody
                 var surface = world.SurfaceAt(tri.Surface);
                 if (((surface.Mask >> 6) & 1) != 0)
                 {
-                    var normal = push * InverseLength(push);
+                    var normal = push * GameMath.InverseLength(push);
                     Correct(push);
                     Flags2 |= ContactThisStep;
                     SurfaceContact_28B7E8(Vector3.Transform(contact, Inverse), normal, surface);
@@ -506,24 +507,24 @@ public sealed class RigidBody
         var local = Vector3.Transform(p, RigidInverse(m));
         if (!HullQueries.SphereHull_1FC818(Radius, hull, local, out var pushed)) return false;
         push = Vector3.TransformNormal(pushed, m);
-        normal = push * InverseLength(push);
+        normal = push * GameMath.InverseLength(push);
         contact = Vector3.TransformNormal(normal, RigidInverse(World)) * -Radius;
         return true;
     }
 
     // Amedo 2026-10-01
-    public float ImpulseMagnitude_28AE38(Vector3 local, Vector3 surfaceVelocity, Vector3 n, float e, float k)
+    public float ImpulseMagnitude_28AE38(in Vector3 local, in Vector3 surfaceVelocity, in Vector3 n, float e, float k)
     {
         UpdateDerived();
         UpdateDerived();
-        float vn = Vector3.Dot(surfaceVelocity - PointVelocity(local), n);
+        float vn = GameMath.Dot(surfaceVelocity - PointVelocity(local), n);
         if (0f < vn) return 0f;
         if (k != 0f) e *= vn * vn / (vn * vn + k);
         return -(e + 1f) * vn / EffectiveMass(local, n);
     }
 
     // Amedo 2026-10-01
-    public void RespondMoving_28C358(Vector3 point, Vector3 n, Vector3 surfaceVelocity, Vector3 surfaceSpin)
+    public void RespondMoving_28C358(in Vector3 point, in Vector3 n, in Vector3 surfaceVelocity, in Vector3 surfaceSpin)
     {
         float grip = MathF.Min(1f, Grip), twist = MathF.Min(1f, Twist), roll = MathF.Min(1f, Roll);
         var local = Vector3.Transform(point, Inverse);
@@ -532,10 +533,10 @@ public sealed class RigidBody
         float limit = j * grip;
         UpdateDerived();
         var slide = PointVelocity(local) - surfaceVelocity;
-        slide -= n * Vector3.Dot(slide, n);
-        var dir = slide * InverseLength(slide);
+        slide -= n * GameMath.Dot(slide, n);
+        var dir = slide * GameMath.InverseLength(slide);
         var friction = dir * -ImpulseMagnitude_28AE38(local, surfaceVelocity, dir, 0f, 0f);
-        if (limit < friction.Length()) friction = friction * InverseLength(friction) * limit;
+        if (limit < GameMath.Length(friction)) friction = friction * GameMath.InverseLength(friction) * limit;
         ApplyImpulse_289CC0(friction, local);
         SpinFriction(friction, surfaceSpin, twist, roll);
     }
@@ -544,7 +545,7 @@ public sealed class RigidBody
     {
         var half = push * 0.5f;
         Correction += half;
-        CorrectionSum += half.Length();
+        CorrectionSum += GameMath.Length(half);
         CorrectCapped_28D450(half); // Amedo 2026-10-01
     }
 
@@ -552,12 +553,12 @@ public sealed class RigidBody
     public void CorrectCapped_28D450(Vector3 v)
     {
         InstanceCorrection += v;
-        float total = InstanceCorrection.Length();
+        float total = GameMath.Length(InstanceCorrection);
         if (0.2f < total)
         {
-            float left = 0.2f - (total - v.Length());
+            float left = 0.2f - (total - GameMath.Length(v));
             if (!(0f < left)) return;
-            Position += v * InverseLength(v) * left * 0.5f;
+            Position += v * GameMath.InverseLength(v) * left * 0.5f;
         }
         else Position += v * 0.5f;
         Matrix4x4.Invert(World, out Inverse);
@@ -589,7 +590,7 @@ public sealed class RigidBody
         if ((Flags2 & ContactThisStep) != 0)
         {
             var change = impulse * InvMass;
-            if (1.8f < change.LengthSquared())
+            if (1.8f < GameMath.LengthSquared(change))
             {
                 bool played = OnLanded?.Invoke(surface, Vector3.Transform(contact, World), change) ?? false;
                 Flags2 = played ? Flags2 | HardImpact : Flags2 & ~HardImpact;
@@ -597,13 +598,13 @@ public sealed class RigidBody
         }
         UpdateDerived();
         var slide = -PointVelocity(contact);
-        slide -= normal * Vector3.Dot(slide, normal);
-        if (0.01f < slide.Length())
+        slide -= normal * GameMath.Dot(slide, normal);
+        if (0.01f < GameMath.Length(slide))
         {
             float limit = j * limitK;
-            var dir = slide * InverseLength(slide);
+            var dir = slide * GameMath.InverseLength(slide);
             var friction = dir * ImpulseMagnitude(contact, dir, 0f, 0f);
-            if (limit < friction.Length()) friction = friction * InverseLength(friction) * limit;
+            if (limit < GameMath.Length(friction)) friction = friction * GameMath.InverseLength(friction) * limit;
             ApplyImpulse_289CC0(friction, contact);
         }
         var at = Vector3.Transform(contact, World);
@@ -682,6 +683,13 @@ public sealed class RigidBody
         AngularMomentum = Vector3.TransformNormal(spin, WorldInertia());
     }
 
+    // Amedo
+    public void Stop_291398()
+    {
+        SetSpin_289528(Vector3.Zero);
+        SetVelocity_2915D0(Vector3.Zero);
+    }
+
     // Amedo 2026-09-30
     public void SetOrientation_291588(Matrix4x4 m)
     {
@@ -703,11 +711,5 @@ public sealed class RigidBody
         }
         scene = World;
         scene.M41 = origin.X; scene.M42 = origin.Y; scene.M43 = origin.Z;
-    }
-
-    public static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return lenSq > 2.4999998e-09f ? 1f / MathF.Sqrt(lenSq) : 0f;
     }
 }

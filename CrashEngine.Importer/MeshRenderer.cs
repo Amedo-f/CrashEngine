@@ -47,32 +47,33 @@ public sealed class MeshRenderer : Component, ISunCaster // Amedo
         DrawNow(gl, world);
     }
 
-    // Amedo: collect once per frame (world matrix + bounding sphere); SunShadowPass tests it per cascade
+    // Amedo
     public override void OnRenderDepth(GL gl)
     {
         if (Mesh is null || !SunShadowPass.InDepthPass) return;
         if (Material is not { } m || m.AlwaysOnTop || m.IgnoreDepthTest) return;
         if (IsTranslucent && m.AlphaTest <= 0f) return;
         var world = Entity!.Transform.World;
-        float scale = MathF.Sqrt(MathF.Max(new Vector3(world.M11, world.M12, world.M13).LengthSquared(),
-                      MathF.Max(new Vector3(world.M21, world.M22, world.M23).LengthSquared(), new Vector3(world.M31, world.M32, world.M33).LengthSquared())));
+        float scale = MathF.Sqrt(MathF.Max(GameMath.LengthSquared(new Vector3(world.M11, world.M12, world.M13)),
+                      MathF.Max(GameMath.LengthSquared(new Vector3(world.M21, world.M22, world.M23)), GameMath.LengthSquared(new Vector3(world.M31, world.M32, world.M33)))));
         if (!Mesh.LocalBounds(out var min, out var max))
         {
-            // Amedo: point light shadows still need a size: the bind pose bounds, grown for limbs/animation
+            // Amedo
             Vector3? pointCenter = null;
             float pointRadius = float.MaxValue;
             if (Mesh.BindBounds(out var bmin, out var bmax))
             {
                 pointCenter = Vector3.Transform((bmin + bmax) * 0.5f, world);
-                pointRadius = (bmax - bmin).Length() * 0.55f * scale * 1.5f + 1f;
+                pointRadius = GameMath.Length((bmax - bmin)) * 0.55f * scale * 1.5f + 1f;
             }
             SunShadowPass.AddCaster(this, world, world.Translation, float.MaxValue, IsSkinned, IsSkinned && Under(SunShadowPass.FocusEntity), // Amedo
                                     pointCenter: pointCenter, pointRadius: pointRadius);
             return;
         }
-        float radius = (max - min).Length() * 0.55f * scale;
-        if (IsSkinned || m.BillboardRender || m.ClothKind > 0 || m.DeformSpeed != Vector2.Zero) radius = radius * 1.5f + 1f;
-        SunShadowPass.AddCaster(this, world, Vector3.Transform((min + max) * 0.5f, world), radius, still: !IsSkinned && !Mesh.Dynamic); // Amedo
+        float radius = GameMath.Length((max - min)) * 0.55f * scale;
+        bool moving = IsSkinned || m.BillboardRender || m.ClothKind > 0 || m.DeformSpeed != Vector2.Zero;
+        if (moving) radius = radius * 1.5f + 1f;
+        SunShadowPass.AddCaster(this, world, Vector3.Transform((min + max) * 0.5f, world), radius, still: !moving && !Mesh.Dynamic); // Amedo
     }
 
     // Amedo
@@ -142,12 +143,12 @@ public sealed class MeshRenderer : Component, ISunCaster // Amedo
         Material.SetSelectPulse(sh, SelectPulse); // Amedo 2026-10-01
         bool gameLit = GameLightingDraw.Apply(sh, Entity!, mat); // Amedo 2026-09-26
         bool receiver = mat.ShadowReceiver && GameShadowPass.MarkingReceivers; // Amedo 2026-09-26
-        if (receiver) gl.StencilFunc(StencilFunction.Always, 0, 0xFF); // Amedo 2026-09-26
+        if (receiver) GlState.StencilFunc(gl, StencilFunction.Always, 0, 0xFF); // Amedo 2026-09-26
         Mesh.Draw(gl);
-        if (receiver) gl.StencilFunc(StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF); // Amedo 2026-09-26
+        if (receiver) GlState.StencilFuncLater(gl, StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF); // Amedo 2026-09-26
         if (gameLit) GameLightingDraw.Reset(sh); // Amedo 2026-09-26
         mat.Restore(gl, sh);
-        sh.Set(u.ShapeCenter, Vector4.Zero); // Amedo
+        sh.SetLater(u.ShapeCenter, Vector4.Zero); // Amedo
 
         DrawCallsThisFrame++;
 
@@ -167,7 +168,8 @@ public sealed class MeshRenderer : Component, ISunCaster // Amedo
         if (Material?.Layers is { } layers)
             foreach (var layer in layers)
                 if (!Expand(layer, min, max, ref lo, ref hi)) return false;
-        return RenderPipeline.Outside(world, lo, hi); // Amedo 2026-10-01
+        return RenderPipeline.Outside(world, lo, hi) // Amedo 2026-10-01
+            || (PortalClip.Enabled && PortalClip.Of(Entity!) is { } clip && clip.Hides(world, lo, hi)); // Amedo 2026-10-27
     }
 
     // Amedo 2026-09-29
@@ -203,9 +205,9 @@ public sealed class MeshRenderer : Component, ISunCaster // Amedo
         Material.SetSelectPulse(sh, SelectPulse); // Amedo 2026-10-01
         bool lit = GameLightingDraw.Apply(sh, Entity!, layer);
         bool receiver = layer.ShadowReceiver && GameShadowPass.MarkingReceivers;
-        if (receiver) gl.StencilFunc(StencilFunction.Always, 0, 0xFF);
+        if (receiver) GlState.StencilFunc(gl, StencilFunction.Always, 0, 0xFF);
         Mesh!.Draw(gl);
-        if (receiver) gl.StencilFunc(StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
+        if (receiver) GlState.StencilFuncLater(gl, StencilFunction.Always, GameShadowPass.ReceiverBit, 0xFF);
         if (lit) GameLightingDraw.Reset(sh);
         layer.Restore(gl, sh);
         DrawCallsThisFrame++;

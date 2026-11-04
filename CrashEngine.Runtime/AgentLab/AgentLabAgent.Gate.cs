@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -11,7 +12,7 @@ public sealed partial class AgentLabAgent
     private ushort _extra;
     private bool _wakeOnce;
     private SceneryTree.Node? _treeNode;
-    private long _lastStep; // Amedo: A+8 (0 = never)
+    private long _lastStep; // Amedo
     private Vector3 _boxMin;
     private Vector3 _boxMax;
     private bool _hasBox;
@@ -50,7 +51,7 @@ public sealed partial class AgentLabAgent
     internal void MeasureTravel()
     {
         var p = GamePosition;
-        if (_travelFrom is { } from) Travel += Vector3.Distance(from, p);
+        if (_travelFrom is { } from) Travel += GameMath.Distance(from, p);
         _travelFrom = p;
     }
 
@@ -234,7 +235,7 @@ public sealed partial class AgentLabAgent
             _seenFrame = World.Frame;
             return;
         }
-        float dSq = Vector3.DistanceSquared(viewer, GamePosition);
+        float dSq = GameMath.DistanceSq(viewer, GamePosition);
         int value = dSq >= 2147483520f ? int.MaxValue : (int)dSq;
         _metric = (uint)value & MetricFar;
         _seenFrame = World.Frame; // Amedo 2026-10-01
@@ -267,7 +268,7 @@ public sealed partial class AgentLabAgent
         bool full = !_animComposed || d == 0;
         if (!full)
         {
-            uint mask = (1u << (CrashEngine.Importer.MeshDecoder.Cvt(AnimSkipScale * d) + 1)) - 1u;
+            uint mask = (1u << (GameMath.Trunc(AnimSkipScale * d) + 1)) - 1u;
             full = (((uint)World.Frame + (uint)Phase) & mask) == 0;
         }
         if (!full)

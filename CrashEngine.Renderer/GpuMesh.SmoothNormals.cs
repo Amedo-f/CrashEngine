@@ -1,16 +1,14 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Renderer;
 
-// Amedo: smooth surface directions built from the shape itself (the game's own normals don't follow it), used by the
-// PC sun / point lights. Several parts of one object are smoothed together (no seams where they meet), triangle
-// winding is made consistent first (the game's strips flip it), and each point averages the faces within a radius
-// around it (not only the ones touching it), so the triangles of a low-poly model stop showing in the shading.
+// Amedo
 public sealed partial class GpuMesh
 {
-    public const float SmoothRadiusScale = 0.06f; // Amedo: of the object's size
-    public const float SkinRadiusScale = 0.12f; // Amedo: characters (bones): wider, so the body reads as one smooth skin
-    public const float SmoothRadiusMax = 0.3f; // Amedo: big scenery pieces: their triangles are larger than this, so they get just their neighbours
+    public const float SmoothRadiusScale = 0.06f; // Amedo
+    public const float SkinRadiusScale = 0.12f; // Amedo
+    public const float SmoothRadiusMax = 0.3f; // Amedo
 
     public static bool HasSmoothNormals(Vertex[] verts)
     {
@@ -65,7 +63,6 @@ public sealed partial class GpuMesh
 
     private static void ComputeSmoothNormals(IReadOnlyList<Vertex[]> parts, IReadOnlyList<uint[]> indices)
     {
-        // all vertices of all parts, welded by position
         int total = 0;
         foreach (var p in parts) total += p.Length;
         if (total < 3) return;
@@ -96,7 +93,6 @@ public sealed partial class GpuMesh
         int groupCount = groupPos.Count;
         job.GroupPos = groupPos;
 
-        // faces (skipping degenerate ones)
         int faceCapacity = 0;
         foreach (var idx in indices) faceCapacity += idx.Length / 3;
         job.FacePart = new int[faceCapacity];
@@ -115,7 +111,7 @@ public sealed partial class GpuMesh
                 if (g0 == g1 || g1 == g2 || g0 == g2) continue;
                 var a = verts[idx[t]].Position;
                 var n = Vector3.Cross(verts[idx[t + 1]].Position - a, verts[idx[t + 2]].Position - a);
-                if (n.LengthSquared() < 1e-20f) continue;
+                if (GameMath.LengthSquared(n) < 1e-20f) continue;
                 job.FacePart[faces] = pi;
                 job.FaceFirst[faces] = t;
                 faceGroup[faces * 3] = g0;
@@ -127,8 +123,6 @@ public sealed partial class GpuMesh
         }
         if (faces == 0) return;
 
-        // consistent winding: pair the two faces of each edge (sorted edge keys), walk neighbours and flip the ones
-        // that run their shared edge the same way
         int halfEdges = faces * 3;
         var edgeKey = new long[halfEdges];
         var edgeOwner = new int[halfEdges];
@@ -176,10 +170,9 @@ public sealed partial class GpuMesh
         for (int f = 0; f < faces; f++)
         {
             if (flip[f]) faceNormal[f] = -faceNormal[f];
-            job.FaceUnit[f] = Vector3.Normalize(faceNormal[f]);
+            job.FaceUnit[f] = GameMath.Normalize(faceNormal[f]);
         }
 
-        // faces touching each welded point
         job.GroupStart = new int[groupCount + 1];
         for (int f = 0; f < faces; f++)
             for (int k = 0; k < 3; k++) job.GroupStart[faceGroup[f * 3 + k] + 1]++;
@@ -189,7 +182,6 @@ public sealed partial class GpuMesh
         for (int f = 0; f < faces; f++)
             for (int k = 0; k < 3; k++) job.GroupFaces[fill[faceGroup[f * 3 + k]]++] = f;
 
-        // points within the radius of each point (grid of radius-sized cells)
         bool skinned = false;
         foreach (var part in parts)
         {
@@ -197,7 +189,7 @@ public sealed partial class GpuMesh
                 if (v.BoneWeights != Vector3.Zero) { skinned = true; break; }
             if (skinned) break;
         }
-        job.Radius = Math.Min((hi - lo).Length() * (skinned ? SkinRadiusScale : SmoothRadiusScale), SmoothRadiusMax);
+        job.Radius = Math.Min(GameMath.Length((hi - lo)) * (skinned ? SkinRadiusScale : SmoothRadiusScale), SmoothRadiusMax);
         if (job.Radius > 1e-4f)
         {
             job.Cells = new Dictionary<(int, int, int), List<int>>();
@@ -233,8 +225,7 @@ public sealed partial class GpuMesh
             _ => { });
     }
 
-    // Amedo: one welded point: gather the faces within the radius, then give each corner there the average of the
-    // ones facing its own way (thin parts like ears/fingers keep their two sides apart)
+    // Amedo
     private sealed class SmoothJob
     {
         public required IReadOnlyList<Vertex[]> Parts;
@@ -278,7 +269,7 @@ public sealed partial class GpuMesh
                             foreach (int other in list)
                             {
                                 if (other == g) continue;
-                                float d = Vector3.Distance(p, GroupPos[other]);
+                                float d = GameMath.Distance(p, GroupPos[other]);
                                 if (d >= Radius) continue;
                                 float w = 1f - d / Radius;
                                 Take(other, w * w, g, stamp, near);
@@ -293,11 +284,11 @@ public sealed partial class GpuMesh
                 var sum = Vector3.Zero;
                 foreach (var (other, weight) in near)
                 {
-                    float facing = Vector3.Dot(FaceUnit[other], own);
+                    float facing = GameMath.Dot(FaceUnit[other], own);
                     if (facing <= 0f) continue;
                     sum += FaceNormal[other] * (weight * facing);
                 }
-                var smooth = sum.LengthSquared() < 1e-20f ? own : Vector3.Normalize(sum);
+                var smooth = GameMath.LengthSquared(sum) < 1e-20f ? own : GameMath.Normalize(sum);
                 int pi = FacePart[f];
                 var verts = Parts[pi];
                 var idx = Indices[pi];

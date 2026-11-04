@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -325,16 +326,16 @@ public sealed partial class AgentLabAgent
     internal void GatedStep_22F758()
     {
         if (_wobble is { } w && ((WArg(w.Args, 27) >> 15) & 1) != 0) PreWobble();
-        if (_physics?.Body is not null) PhysicsPrestep(false); // Amedo
+        if (_physics?.Body is not null) PhysicsPrestep(); // Amedo
     }
 
-    internal void PhysicsPrestep(bool ran = true) // Amedo
+    internal void PhysicsPrestep(bool clockRunning = true) // Amedo
     {
         float dt = StepDt;
         if (_physics is { } ctrl)
         {
             if ((ctrl.Flags & (PhysicsController.Damped | PhysicsController.Gravitates | PhysicsController.Launched)) != 0 && (AgentFlags & 0x40) == 0) // Amedo
-                StepRigidBody_24B510(ctrl, ran, dt); // Amedo
+                StepRigidBody_24B510(ctrl, clockRunning, dt); // Amedo
             var (bmin, bmax) = CommittedBox;
             _sphereCenter = (bmax - bmin) * 0.5f + bmin;
             bool had = (ctrl.Flags & (PhysicsController.TouchedAgent | PhysicsController.TouchedTerrain)) != 0;
@@ -368,11 +369,11 @@ public sealed partial class AgentLabAgent
     }
 
     // Amedo
-    private void StepRigidBody_24B510(PhysicsController ctrl, bool ran, float dt)
+    private void StepRigidBody_24B510(PhysicsController ctrl, bool clockRunning, float dt)
     {
         if (ctrl.Body is { } body && (body.Flags & RigidBody.Asleep) == 0)
         {
-            if (!ran) return;
+            if (!clockRunning) return;
             if (_contactResponse is { } r && (WArg(r, 23) & 0x4000) != 0) ForceVolumes_247930();
             if (!ctrl.Has(PhysicsController.Gravitates)) return;
             body.Force += new Vector3(0f, -ctrl.Gravity * body.Mass, 0f);
@@ -387,7 +388,7 @@ public sealed partial class AgentLabAgent
         if ((ctrl.State & PhysicsController.StateCounter) != PhysicsController.StateCounter)
             ctrl.State = (ctrl.State & ~PhysicsController.StateCounter) | (((((ctrl.State >> 11) & 0xF) + 1) & 0xF) << 11);
         if (ctrl.Has(PhysicsController.Bit57) // Amedo 2026-09-30
-            && ((ctrl.Flags & (PhysicsController.TouchedAgent | PhysicsController.TouchedTerrain)) != 0 || _velocity.LengthSquared() < 0.001f)
+            && ((ctrl.Flags & (PhysicsController.TouchedAgent | PhysicsController.TouchedTerrain)) != 0 || GameMath.LengthSquared(_velocity) < 0.001f)
             && (ctrl.State & PhysicsController.StateCounter) == PhysicsController.StateCounter)
         {
             ctrl.Flags &= ~(PhysicsController.Launched | PhysicsController.Bit57);
@@ -442,7 +443,7 @@ public sealed partial class AgentLabAgent
         foreach (var tri in cache.Triangles)
         {
             CollisionWorld.Plane(tri.A, tri.B, tri.C, out var n, out _);
-            if (!ctrl.Has(PhysicsController.Airborne) && !(0f <= Vector3.Dot(n, _velocity))) continue;
+            if (!ctrl.Has(PhysicsController.Airborne) && !(0f <= GameMath.Dot(n, _velocity))) continue;
             Vector3 pushed;
             if (ellipsoid is { } radii ? !CollisionWorld.EllipsoidTriangle_280258(tri, cur, radii, out pushed) : !CollisionWorld.SphereTriangle(tri, cur, r, out pushed)) continue; // Amedo 2026-10-05
             var s = world.SurfaceAt(tri.Surface);
@@ -487,7 +488,7 @@ public sealed partial class AgentLabAgent
         var s = world.SurfaceAt(tri.Surface);
         if (s.Id != WaterSurface) return;
         CollisionWorld.Plane(tri.A, tri.B, tri.C, out var n, out float w);
-        _waterPoint = pos - n * (Vector3.Dot(n, pos) + w);
+        _waterPoint = pos - n * (GameMath.Dot(n, pos) + w);
         if (_wetSurface != WaterSurface) WaterEnter_22EF18(s); // Amedo
         else WaterStay_22F220(s, n);
         _wetSurface = WaterSurface;
@@ -534,7 +535,7 @@ public sealed partial class AgentLabAgent
         float chance = speed * 0.001f + 0.01f;
         if (0.5f < chance) chance = 0.5f;
         var at = new Vector3(v.X * 0.14f + _waterPoint.X, _waterPoint.Y, v.Z * 0.14f + _waterPoint.Z);
-        if (World.Rng.GetRandFloat_18C0B8() <= chance) ScatterRipple_23C848(at); // Amedo
+        if (World.Rng.GetRandFloat_18C0B8() <= chance) ScatterDecal_2231B0(at); // Amedo
         if (ControllerType == 12) return;
         if (!(4f < speed) || !(0.5 < World.Now - _lastSplash150)) return;
         SurfaceSound_2248C8(s, at);
@@ -550,7 +551,7 @@ public sealed partial class AgentLabAgent
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 3f);
         for (int i = 0; i < 6; i++)
         {
-            ScatterRipple_23C848(at);
+            ScatterDecal_2231B0(at);
             if (pid != 0xFFFF) World.Particles?.Spawn(pid, 1, true, RootPoint(new Vector3(at.X + dir.X, at.Y + dir.Y - 0.2f, at.Z + dir.Z)));
             dir = Vector3.Transform(dir, turn);
         }
@@ -564,9 +565,9 @@ public sealed partial class AgentLabAgent
     }
 
     // Amedo
-    private void ScatterRipple_23C848(Vector3 at)
+    private void ScatterDecal_2231B0(Vector3 at)
     {
-        var j = Jitter_23C848(Vector3.Zero, 0.4f, 0f, 1f, 1f); // Amedo
+        var j = World.Rng.JitterVector_23C848(Vector3.Zero, 0.4f, 0f, 1f, 1f); // Amedo
         float x = j.X, y = j.Y, z = j.Z;
         Ripple_1AE158(Matrix4x4.CreateTranslation(at + new Vector3(x, y, z)));
     }
@@ -589,11 +590,11 @@ public sealed partial class AgentLabAgent
     private void Landing(PhysicsController ctrl, Vector3 push, float dt)
     {
         bool airborne = ctrl.Has(PhysicsController.Airborne);
-        if (!airborne && !(Vector3.Dot(push, _velocity) < 0f)) return;
-        push *= InverseLength(push);
-        float along = Vector3.Dot(_velocity, push);
+        if (!airborne && !(GameMath.Dot(push, _velocity) < 0f)) return;
+        push *= GameMath.InverseLength(push);
+        float along = GameMath.Dot(_velocity, push);
         if (along != 0f) _velocity -= push * along;
-        float bump = (1f - Vector3.Dot(push, _velocity)) * ((push.X * push.X + push.Z * push.Z) * 0.3f);
+        float bump = (1f - GameMath.Dot(push, _velocity)) * ((push.X * push.X + push.Z * push.Z) * 0.3f);
         Impact_23D6A8(bump); // Amedo 2026-10-05
         if (ctrl.Has(PhysicsController.Gripped) && ctrl.GripNow == 0f) ctrl.GripNow = 0.8f;
         if (0.7f < push.Y) ctrl.State |= PhysicsController.StateFloor;
@@ -609,7 +610,7 @@ public sealed partial class AgentLabAgent
         }
         else if ((ctrl.State & PhysicsController.StateSmoothNormal) != 0) n += (push - n) * (dt * 5f);
         else n = push;
-        ctrl.GroundNormal = n * InverseLength(n);
+        ctrl.GroundNormal = n * GameMath.InverseLength(n);
         if (airborne && !(ctrl.Has(PhysicsController.MaxTiltSet) && ctrl.GroundNormal.Y < ctrl.MaxTilt)) ctrl.AirTime = 0f;
     }
 
@@ -805,7 +806,7 @@ public sealed partial class AgentLabAgent
         var from = sender switch { AgentLabAgent a => a.GamePosition, DynamicSceneryInstance scenery => scenery.GameMatrix.Translation, _ => GamePosition }; // Amedo 2026-10-06
         var d = GamePosition - from;
         float s = strength * 4f / (d.X * d.X + d.Y * d.Y + d.Z * d.Z + 4f);
-        d *= CrashEngine.Runtime.Camera.CamMath.InvLengthGuarded_11C030(2.4999998e-09f, new Vector4(d, 0f));
+        d *= GameMath.InvLength_11C030(2.4999998e-09f, new Vector4(d, 0f));
         Knock_24BC60(d * s, from);
     }
 
@@ -1003,7 +1004,7 @@ public sealed partial class AgentLabAgent
         float back = F(5);
         if (back != 0f)
         {
-            float len = target.Length();
+            float len = GameMath.Length(target);
             target *= (len - back) / len;
         }
         FocusAt(target);
@@ -1075,12 +1076,6 @@ public sealed partial class AgentLabAgent
         var start = m.Translation + new Vector3(m.M31, m.M32, m.M33) * (parameter == 1 ? -5f : 5f) + new Vector3(0f, 8f, 0f);
         var ray = new Vector3(0f, -16f, 0f);
         return SceneRay_280958(start, ref ray, 0x252000, true) ? MathF.Abs(ray.Y + 8f) : 10000f;
-    }
-
-    private static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return lenSq > 2.4999998e-09f ? 1f / MathF.Sqrt(lenSq) : 0f;
     }
 
     private Vector3 ClampToRadius(Vector3 move) =>

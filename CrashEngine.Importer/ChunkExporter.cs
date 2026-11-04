@@ -257,7 +257,7 @@ public static class ChunkExporter
         var fwdVec   = new Vector3(lm.M31, lm.M32, lm.M33);
         var center   = new Vector3(lm.M41, lm.M42, lm.M43);
 
-        float hx = rightVec.Length(), hy = upVec.Length(), hz = fwdVec.Length();
+        float hx = GameMath.Length(rightVec), hy = GameMath.Length(upVec), hz = GameMath.Length(fwdVec);
         var right = hx > 1e-6f ? rightVec / hx : Vector3.UnitX;
         var up    = hy > 1e-6f ? upVec    / hy : Vector3.UnitY;
         var fwd   = hz > 1e-6f ? fwdVec   / hz : Vector3.UnitZ;
@@ -270,7 +270,7 @@ public static class ChunkExporter
         foreach (var p in new[] { p0, p1, p2, p3, p4, p5, p6, p7 })
             box.BoundingBoxPoints.Add(new TwinVec4(p.X, p.Y, p.Z, 1f));
 
-        TwinVec4 Plane(Vector3 n, Vector3 onFace) => new(n.X, n.Y, n.Z, -Vector3.Dot(n, onFace));
+        TwinVec4 Plane(Vector3 n, Vector3 onFace) => new(n.X, n.Y, n.Z, -GameMath.Dot(n, onFace));
         box.UnkVectors1.Clear();
         box.UnkVectors1.Add(Plane(-fwd, p0));
         box.UnkVectors1.Add(Plane( up,  p2));

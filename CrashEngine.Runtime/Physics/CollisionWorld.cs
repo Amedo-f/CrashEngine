@@ -4,6 +4,7 @@ using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
 
@@ -36,8 +37,8 @@ public sealed class CollisionWorld
     }
 
     public readonly record struct Surface(uint Mask, float Grip, int Id, float Bounce = 1f, float Roll = 1f, float Twist = 1f, bool Event = false,
-                                          float Accel = 1e6f, float Slide = 0f, float SlideLimit = 0f, Vector3 Conveyor = default,
-                                          Vector3 HitSource = default, uint HitKind = 0u, int HitAmount = 0, // Amedo 2026-09-28
+                                          float Accel = 1e6f, float Slide = 0f, float SlideLimit = 0f, in Vector3 Conveyor = default,
+                                          in Vector3 HitSource = default, uint HitKind = 0u, int HitAmount = 0, // Amedo 2026-09-28
                                           ushort[]? EffectIds = null, float[]? Phys = null)
     {
         public bool Deadly => ((Mask >> 9) & 1) != 0; // Amedo 2026-09-28
@@ -126,11 +127,14 @@ public sealed class CollisionWorld
     public Surface SurfaceAt(int surface) =>
         surface >= 0 && surface < _surfaces.Length ? _surfaces[surface] : new Surface(0u, 1f, surface);
 
+    [ThreadStatic] private static List<int>? _leaves;
+
     public int BoxQuery(Vector3 min, Vector3 max, uint mask, List<int> result, int limit = 0x400)
     {
         result.Clear();
         if (_nodes.Length == 0) return 0;
-        var leaves = new List<int>(16);
+        var leaves = _leaves ??= new List<int>(16);
+        leaves.Clear();
         CollectLeaves(0, min, max, leaves);
         foreach (int g in leaves)
         {
@@ -162,7 +166,7 @@ public sealed class CollisionWorld
         if (Overlap(min, max, _nodes[node.Second].Min, _nodes[node.Second].Max)) CollectLeaves(node.Second, min, max, leaves);
     }
 
-    private static bool BoxTouchesTriangle(Vector3 min, Vector3 max, Vector3 v1, Vector3 v2, Vector3 v3)
+    private static bool BoxTouchesTriangle(in Vector3 min, in Vector3 max, in Vector3 v1, in Vector3 v2, in Vector3 v3)
     {
         if (!Overlap(Vector3.Min(Vector3.Min(v1, v2), v3), Vector3.Max(Vector3.Max(v1, v2), v3), min, max)) return false;
         Plane(v1, v2, v3, out var n, out float w);
@@ -172,44 +176,44 @@ public sealed class CollisionWorld
             && !EdgeRejects(min, max, v3, v1, v2, n);
     }
 
-    private static bool EdgeRejects(Vector3 min, Vector3 max, Vector3 a, Vector3 b, Vector3 opposite, Vector3 n)
+    private static bool EdgeRejects(in Vector3 min, in Vector3 max, in Vector3 a, in Vector3 b, in Vector3 opposite, in Vector3 n)
     {
         if (!Plane(a, b, a + n, out var en, out float ew)) return false;
-        if (0f < Vector3.Dot(en, opposite) + ew) { en = -en; ew = -ew; }
+        if (0f < GameMath.Dot(en, opposite) + ew) { en = -en; ew = -ew; }
         return BoxOutside(min, max, en, ew);
     }
 
-    private static bool BoxStraddles(Vector3 min, Vector3 max, Vector3 n, float w)
+    private static bool BoxStraddles(in Vector3 min, in Vector3 max, in Vector3 n, float w)
     {
         int above = 0, below = 0;
         for (int i = 0; i < 8; i++)
         {
-            if (0f < Vector3.Dot(n, Corner(min, max, i)) + w) above++;
+            if (0f < GameMath.Dot(n, Corner(min, max, i)) + w) above++;
             else below++;
             if (above != 0 && below != 0) return true;
         }
         return false;
     }
 
-    private static bool BoxOutside(Vector3 min, Vector3 max, Vector3 n, float w)
+    private static bool BoxOutside(in Vector3 min, in Vector3 max, in Vector3 n, float w)
     {
         for (int i = 0; i < 8; i++)
-            if (Vector3.Dot(n, Corner(min, max, i)) + w < 0f) return false;
+            if (GameMath.Dot(n, Corner(min, max, i)) + w < 0f) return false;
         return true;
     }
 
     private static Vector3 Corner(Vector3 min, Vector3 max, int i) =>
         new((i & 1) != 0 ? min.X : max.X, (i & 2) != 0 ? min.Y : max.Y, (i & 4) != 0 ? min.Z : max.Z);
 
-    public static bool Overlap(Vector3 aMin, Vector3 aMax, Vector3 bMin, Vector3 bMax) =>
+    public static bool Overlap(in Vector3 aMin, in Vector3 aMax, in Vector3 bMin, in Vector3 bMax) => // Amedo 2026-10-27
         !(bMax.X < aMin.X) && !(bMax.Y < aMin.Y) && !(bMax.Z < aMin.Z)
         && !(aMax.X < bMin.X) && !(aMax.Y < bMin.Y) && !(aMax.Z < bMin.Z);
 
-    public static bool BoxInside(Vector3 aMin, Vector3 aMax, Vector3 bMin, Vector3 bMax) =>
+    public static bool BoxInside(in Vector3 aMin, in Vector3 aMax, in Vector3 bMin, in Vector3 bMax) => // Amedo 2026-10-27
         !(aMin.X < bMin.X) && !(aMin.Y < bMin.Y) && !(aMin.Z < bMin.Z)
         && !(bMax.X < aMax.X) && !(bMax.Y < aMax.Y) && !(bMax.Z < aMax.Z);
 
-    public static bool Plane(Vector3 v1, Vector3 v2, Vector3 v3, out Vector3 normal, out float w)
+    public static bool Plane(in Vector3 v1, in Vector3 v2, in Vector3 v3, out Vector3 normal, out float w)
     {
         var n = Vector3.Cross(v2 - v1, v3 - v1);
         float len = MathF.Sqrt(n.X * n.X + n.Y * n.Y + n.Z * n.Z);
@@ -256,18 +260,18 @@ public sealed class CollisionWorld
 
         Span<Vector3> v = stackalloc Vector3[3] { v1, v2, v3 };
         Span<Vector3> e = stackalloc Vector3[3] { v2 - v1, v3 - v2, v1 - v3 };
-        for (int i = 0; i < 3; i++) e[i] *= InverseLength(e[i]);
+        for (int i = 0; i < 3; i++) e[i] *= GameMath.InverseLength(e[i]);
         float rr = r * r;
         for (int i = 0; i < 3; i++)
         {
             if (!(0f < d[i])) continue;
-            if (!(0f < Dot(e[i], pos) - Dot(e[i], v[i]))) continue;
-            if (!(Dot(e[i], pos) - Dot(e[i], v[(i + 1) % 3]) < 0f)) continue;
+            if (!(0f < GameMath.Dot(e[i], pos) - GameMath.Dot(e[i], v[i]))) continue;
+            if (!(GameMath.Dot(e[i], pos) - GameMath.Dot(e[i], v[(i + 1) % 3]) < 0f)) continue;
             var q = v[i] - pos;
-            var perp = q - e[i] * Dot(q, e[i]);
-            float lenSq = Dot(perp, perp);
+            var perp = q - e[i] * GameMath.Dot(q, e[i]);
+            float lenSq = GameMath.Dot(perp, perp);
             if (!(lenSq < rr)) return false;
-            float inv = InverseLength(perp);
+            float inv = GameMath.InverseLength(perp);
             result = pos + perp * inv * (MathF.Sqrt(lenSq) - r);
             return true;
         }
@@ -277,16 +281,16 @@ public sealed class CollisionWorld
         for (int i = 0; i < 3; i++)
         {
             var q = v[i] - pos;
-            float dsq = Dot(q, q);
+            float dsq = GameMath.Dot(q, q);
             if (dsq < best) { best = dsq; nearest = i; }
         }
         var toVertex = v[nearest] - pos;
-        if (!(Dot(toVertex, toVertex) < rr)) return false;
-        result = v[nearest] + toVertex * InverseLength(toVertex) * -r;
+        if (!(GameMath.Dot(toVertex, toVertex) < rr)) return false;
+        result = v[nearest] + toVertex * GameMath.InverseLength(toVertex) * -r;
         return true;
     }
 
-    private static float EdgeDistance(Vector3 a, Vector3 b, float wb, Vector3 n, Vector3 pos)
+    private static float EdgeDistance(in Vector3 a, in Vector3 b, float wb, in Vector3 n, in Vector3 pos)
     {
         var d = b - a;
         var c = new Vector3(d.Y * n.Z - d.Z * n.Y, d.Z * n.X - d.X * n.Z, d.X * n.Y - d.Y * n.X);
@@ -299,14 +303,6 @@ public sealed class CollisionWorld
         }
         return c.X * pos.X + c.Y * pos.Y + c.Z * pos.Z + w;
     }
-
-    private static float InverseLength(Vector3 v)
-    {
-        float lenSq = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        return LengthEpsilon < lenSq ? 1f / MathF.Sqrt(lenSq) : 0f;
-    }
-
-    private static float Dot(Vector3 a, Vector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
 
     public bool SegmentCast(Vector3 start, Vector3 end, uint mask, out Hit hit)
     {
@@ -338,19 +334,19 @@ public sealed class CollisionWorld
         }
     }
 
-    private static bool SegmentTriangle(Vector3 v1, Vector3 v2, Vector3 v3, Vector3 start, Vector3 end, float bestT,
+    private static bool SegmentTriangle(in Vector3 v1, in Vector3 v2, in Vector3 v3, in Vector3 start, in Vector3 end, float bestT,
                                         out Vector3 point, out float t)
     {
         point = default;
         t = Far;
         var e1 = v2 - v1;
         var n = Vector3.Cross(e1, v3 - v1);
-        float nn = n.LengthSquared();
+        float nn = GameMath.LengthSquared(n);
         if (!(nn > 0f)) return false;
         var nu = n * (1f / MathF.Sqrt(nn));
-        float d = Vector3.Dot(nu, v1);
-        float ds = Vector3.Dot(start, nu) - d;
-        float de = Vector3.Dot(end, nu) - d;
+        float d = GameMath.Dot(nu, v1);
+        float ds = GameMath.Dot(start, nu) - d;
+        float de = GameMath.Dot(end, nu) - d;
         if ((ds < 0f) == (de < 0f)) return false;
         t = MathF.Abs(ds) / (MathF.Abs(ds) + MathF.Abs(de));
         if (!(t < bestT)) return false;
@@ -358,17 +354,17 @@ public sealed class CollisionWorld
         return Inside(n, e1, v1, point) && Inside(n, v3 - v2, v3, point) && Inside(n, v1 - v3, v1, point);
     }
 
-    private static bool Inside(Vector3 normal, Vector3 edge, Vector3 onEdge, Vector3 point)
+    private static bool Inside(in Vector3 normal, in Vector3 edge, in Vector3 onEdge, in Vector3 point)
     {
         var inward = Vector3.Cross(normal, edge);
-        float len = inward.LengthSquared();
+        float len = GameMath.LengthSquared(inward);
         if (!(len > 0f)) return false;
         inward *= 1f / MathF.Sqrt(len);
-        return Vector3.Dot(inward, point) - Vector3.Dot(inward, onEdge) + EdgeSlack >= 0f;
+        return GameMath.Dot(inward, point) - GameMath.Dot(inward, onEdge) + EdgeSlack >= 0f;
     }
 
     // Amedo
-    private static bool RayCrossesBox_1F9058(Vector3 min, Vector3 max, Vector3 p0, Vector3 p1)
+    private static bool RayCrossesBox_1F9058(in Vector3 min, in Vector3 max, in Vector3 p0, in Vector3 p1)
     {
         if (InBox(min, max, p0) || InBox(min, max, p1)) return true;
         if ((p0.X < min.X && p1.X < min.X) || (p0.Y < min.Y && p1.Y < min.Y) || (p0.Z < min.Z && p1.Z < min.Z)) return false;
@@ -392,6 +388,6 @@ public sealed class CollisionWorld
         return false;
     }
 
-    private static bool InBox(Vector3 min, Vector3 max, Vector3 p) =>
+    private static bool InBox(in Vector3 min, in Vector3 max, in Vector3 p) =>
         p.X >= min.X && p.X <= max.X && p.Y >= min.Y && p.Y <= max.Y && p.Z >= min.Z && p.Z <= max.Z;
 }

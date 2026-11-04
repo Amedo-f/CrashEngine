@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -106,12 +107,12 @@ public sealed partial class CharacterController
         Launch(new Vector3(d.X, 12.5f, d.Z), false, gravity, slot);
     }
 
-    private static int SignedAngle(Vector3 a, Vector3 b, Vector3 up)
+    private static int SignedAngle(in Vector3 a, in Vector3 b, in Vector3 up)
     {
-        float la = a.Length(), lb = b.Length();
+        float la = GameMath.Length(a), lb = GameMath.Length(b);
         if (la <= 0f || lb <= 0f) return 0;
-        float c = Math.Clamp(Vector3.Dot(a, b) / (la * lb), -1f, 1f);
-        float s = Vector3.Dot(Vector3.Cross(a, b), up);
+        float c = Math.Clamp(GameMath.Dot(a, b) / (la * lb), -1f, 1f);
+        float s = GameMath.Dot(Vector3.Cross(a, b), up);
         float rad = MathF.Acos(c);
         return (int)((s < 0f ? -rad : rad) * 10430.378f);
     }

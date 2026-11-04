@@ -184,12 +184,12 @@ public sealed class ObjectCollisionOverlay : Component
         DrawMesh(gl, sh, _sphere.Value, Matrix4x4.CreateScale(radius) * Matrix4x4.CreateTranslation(center) * parent, color);
         if (_eye is not { } eye) return;
         var wc = Vector3.Transform(center, parent);
-        float wr = radius * new Vector3(parent.M11, parent.M12, parent.M13).Length();
+        float wr = radius * GameMath.Length(new Vector3(parent.M11, parent.M12, parent.M13));
         var toEye = eye - wc;
-        float d = toEye.Length();
+        float d = GameMath.Length(toEye);
         if (d <= wr) return;
         var f = toEye / d;
-        var right = Vector3.Normalize(Vector3.Cross(MathF.Abs(f.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX, f));
+        var right = GameMath.Normalize(Vector3.Cross(MathF.Abs(f.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX, f));
         var up = Vector3.Cross(f, right);
         var basis = new Matrix4x4(right.X, right.Y, right.Z, 0f, up.X, up.Y, up.Z, 0f, f.X, f.Y, f.Z, 0f, 0f, 0f, 0f, 1f);
         float k = wr / d;

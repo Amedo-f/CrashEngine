@@ -33,19 +33,17 @@ public sealed class GameLightingEnvironment : Component
     public bool HasLights => Scenery is { HasLighting: true } s &&
         s.AmbientLights.Count + s.DirectionalLights.Count + s.PointLights.Count + s.NegativeLights.Count > 0;
 
-    // Amedo: the level's first enabled directional light = the sun for the PC sun shadows
+    // Amedo
     public Vector3? FirstDirectional()
     {
         if (Scenery is not { HasLighting: true } s) return null;
         bool[]? mask = s.Sceneries.Count > 0 ? s.Sceneries[0].LightsEnabler : null;
-        int nA = s.AmbientLights.Count;
-        for (int k = 0; k < s.DirectionalLights.Count; k++)
+        for (int g = 0, n = BitLimit(s, mask); g < n; g++) // Amedo
         {
-            int g = nA + k;
-            if (g >= 128 || (mask is not null && g < mask.Length && !mask[g])) continue;
+            if (!EnabledLight_1C77C0(s, mask, g, out int type, out int k) || type != 1) continue;
             var dir = DirectionalOverride is { } ov && k < ov.Count ? ov[k].Direction : V3(s.DirectionalLights[k].UnkVec3);
-            if (dir.LengthSquared() < 1e-12f) continue;
-            return Vector3.Normalize(dir);
+            if (GameMath.LengthSquared(dir) < 1e-12f) continue;
+            return GameMath.Normalize(dir);
         }
         return null;
     }
@@ -59,17 +57,15 @@ public sealed class GameLightingEnvironment : Component
         if (FirstDirectional() is { } dir) SunShadowPass.LevelDirection = dir;
     }
 
-    // Amedo: hand the level's point lights to the PC sun pass (world space through this chunk's transform)
+    // Amedo
     private void AddPointLights()
     {
         if (Scenery is not { HasLighting: true } s || s.PointLights.Count == 0) return;
         bool[]? mask = s.Sceneries.Count > 0 ? s.Sceneries[0].LightsEnabler : null;
-        int first = s.AmbientLights.Count + s.DirectionalLights.Count;
         var world = Entity?.Transform.World ?? Matrix4x4.Identity;
-        for (int k = 0; k < s.PointLights.Count; k++)
+        for (int g = 0, n = BitLimit(s, mask); g < n; g++) // Amedo
         {
-            int g = first + k;
-            if (g >= 128 || (mask is not null && g < mask.Length && !mask[g])) continue;
+            if (!EnabledLight_1C77C0(s, mask, g, out int type, out int k) || type != 2) continue;
             var p = s.PointLights[k];
             SunShadowPass.AddPointLight(Vector3.Transform(V3(p.Position), world), V3(p.Color), p.Radius, p.UnkShort);
         }
@@ -77,6 +73,20 @@ public sealed class GameLightingEnvironment : Component
 
     private static Vector3 V3(TwinVec4 v) => new(v.X, v.Y, v.Z);
     private static Vector4 V4(TwinVec4 v) => new(v.X, v.Y, v.Z, v.W);
+
+    // Amedo
+    private static int BitLimit(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery s, bool[]? mask) =>
+        mask is null ? Math.Min(128, s.AmbientLights.Count + s.DirectionalLights.Count + s.PointLights.Count + s.NegativeLights.Count) : Math.Min(128, mask.Length);
+
+    // Amedo
+    private static bool EnabledLight_1C77C0(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery s, bool[]? mask, int bit, out int type, out int index)
+    {
+        type = index = -1;
+        if (mask is not null && !mask[bit]) return false;
+        (type, index) = s.LightAt(bit);
+        int count = type switch { 0 => s.AmbientLights.Count, 1 => s.DirectionalLights.Count, 2 => s.PointLights.Count, 3 => s.NegativeLights.Count, _ => 0 };
+        return index >= 0 && index < count;
+    }
 
     public void Compute(Vector3 objectPos, GameLightSet result)
     {
@@ -89,25 +99,22 @@ public sealed class GameLightingEnvironment : Component
         }
         var ambient = Vector3.Zero;
         bool[]? mask = s.Sceneries.Count > 0 ? s.Sceneries[0].LightsEnabler : null;
-        int nA = s.AmbientLights.Count, nD = s.DirectionalLights.Count, nP = s.PointLights.Count, nS = s.NegativeLights.Count;
-        int total = Math.Min(128, nA + nD + nP + nS);
 
-        for (int g = 0; g < total; g++)
+        for (int g = 0, n = BitLimit(s, mask); g < n; g++) // Amedo
         {
-            if (mask is not null && !mask[g]) continue;
-            if (g < nA)
+            if (!EnabledLight_1C77C0(s, mask, g, out int type, out int k)) continue;
+            if (type == 0)
             {
-                var a = s.AmbientLights[g];
-                var c = g == 0 && AmbientOverride is { } ao ? ao : V3(a.Color);
+                var a = s.AmbientLights[k];
+                var c = k == 0 && AmbientOverride is { } ao ? ao : V3(a.Color);
                 ambient += c * a.Radius;
                 continue;
             }
 
-            int k = g - nA;
             Vector3 dir;
             float intensity;
             Vector4 color;
-            if (k < nD)
+            if (type == 1)
             {
                 var d = s.DirectionalLights[k];
                 dir = V3(d.UnkVec3);
@@ -119,7 +126,7 @@ public sealed class GameLightingEnvironment : Component
                     dir = ov[k].Direction;
                 }
             }
-            else if ((k -= nD) < nP)
+            else if (type == 2)
             {
                 var p = s.PointLights[k];
                 dir = PointTerms(p, objectPos, out float f);
@@ -128,7 +135,6 @@ public sealed class GameLightingEnvironment : Component
             }
             else
             {
-                k -= nP;
                 var sp = s.NegativeLights[k];
                 dir = PointTerms(sp, objectPos, out float f);
                 intensity = SpotIntensity(sp, dir, Falloff(sp.Radius, f, (short)sp.UnkUShort1));
@@ -213,6 +219,21 @@ public static class GameLightingDraw
 
     // Amedo 2026-09-30
     public static void SkipFades() => _epoch++;
+
+    public static void Forget()
+    {
+        Owners.Clear();
+        Cache.Clear();
+        _epoch++;
+    }
+
+    public static void ForgetChunk(Entity chunkRoot)
+    {
+        foreach (var (entity, owner) in Owners)
+            if (ReferenceEquals(owner.ChunkRoot, chunkRoot)) Owners.Remove(entity);
+        foreach (var (_, lit) in Cache)
+            if (ReferenceEquals(lit.Environment?.Entity, chunkRoot)) lit.Environment = null;
+    }
 
     private static readonly ConditionalWeakTable<Entity, Owner> Owners = new();
     private static readonly GameLightSet Set = new();
@@ -368,7 +389,7 @@ public static class GameLightingDraw
         return lit.Ok ? lit : null; // Amedo 2026-10-01
     }
 
-    public static void Reset(TwinShaderProgram sh) => sh.Set(U(sh).Lit, 0); // Amedo 2026-10-01
+    public static void Reset(TwinShaderProgram sh) => sh.SetLater(U(sh).Lit, 0); // Amedo 2026-10-01
 
     // Amedo 2026-09-30
     public static bool Shown(Entity instance, out Vector3 ambient, out Vector3 light0, out float fade, out string? chunk)

@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -48,7 +49,7 @@ public sealed partial class CharacterController
             if (Pushed is { } pushed)
             {
                 if (bodyOf(pushed) is not { } body) Pushed = null;
-                else if (_pushTouched.Contains(pushed)) PushDistance = (body.Position - Center_13F8C8()).Length() + 0.1f;
+                else if (_pushTouched.Contains(pushed)) PushDistance = GameMath.Length((body.Position - Center_13F8C8())) + 0.1f;
                 else if (0.1f < MathF.Sqrt(MoveX * MoveX + MoveZ * MoveZ)) PushDistance -= dt;
             }
             Force_134318();
@@ -79,27 +80,27 @@ public sealed partial class CharacterController
             if ((body.Flags & 0x60) == 0 || !IsGrounded) continue;
             var d = body.Position - Center_13F8C8();
             var flat = new Vector3(d.X, 0f, d.Z);
-            flat *= InverseLength(flat);
+            flat *= GameMath.InverseLength(flat);
             if (!(0.1f < MathF.Sqrt(MoveX * MoveX + MoveZ * MoveZ))) continue;
-            if (!(0.5f < Vector3.Dot(ForwardAxis, flat))) continue;
+            if (!(0.5f < GameMath.Dot(ForwardAxis, flat))) continue;
             Pushed = owner;
-            PushDistance = d.Length();
+            PushDistance = GameMath.Length(d);
             WakeBody?.Invoke(owner);
         }
     }
 
     private void Keep_133CE8()
     {
-        if (BodyOf!(Pushed!) is { } body && !(body.Velocity.Length() < 0.2f && Velocity.Length() < 0.2f) && IsGrounded)
+        if (BodyOf!(Pushed!) is { } body && !(GameMath.Length(body.Velocity) < 0.2f && GameMath.Length(Velocity) < 0.2f) && IsGrounded)
         {
             var d = body.Position - Center_13F8C8();
-            d *= InverseLength(d);
-            if (0f < Vector3.Dot(d, ForwardAxis) && d.Length() < 4f)
+            d *= GameMath.InverseLength(d);
+            if (0f < GameMath.Dot(d, ForwardAxis) && GameMath.Length(d) < 4f)
             {
                 var input = new Vector3(MoveX, 0f, MoveZ);
                 var flat = new Vector3(d.X, 0f, d.Z);
-                flat *= InverseLength(flat);
-                if (input.Length() < 0.2f || -0.35f < Vector3.Dot(input, flat)) return;
+                flat *= GameMath.InverseLength(flat);
+                if (GameMath.Length(input) < 0.2f || -0.35f < GameMath.Dot(input, flat)) return;
             }
         }
         Pushed = null;
@@ -123,16 +124,16 @@ public sealed partial class CharacterController
         var fwd = new Vector3(m.M31, m.M32, m.M33);
         var target = Center_13F8C8() + fwd * ((MotionFlagsHigh & 1u) != 0 ? r + 1.15f : PushDistance);
         var dv = target - body.Position;
-        if (1.3f < dv.Length())
+        if (1.3f < GameMath.Length(dv))
         {
             Pushed = null;
             return;
         }
         var f = dv * 350f - (body.Velocity - Velocity) * 90f;
-        float lateral = Vector3.Dot(dv, new Vector3(m.M11, m.M12, m.M13));
-        float along = Vector3.Dot(dv, fwd);
+        float lateral = GameMath.Dot(dv, new Vector3(m.M11, m.M12, m.M13));
+        float along = GameMath.Dot(dv, fwd);
         f.Y = 0f;
-        if (80f < MathF.Sqrt(f.X * f.X + f.Z * f.Z)) f = f * InverseLength(f) * 80f;
+        if (80f < MathF.Sqrt(f.X * f.X + f.Z * f.Z)) f = f * GameMath.InverseLength(f) * 80f;
         if (r < 0.6f) f *= r * 1.6666666f;
         body.AddForce_2918B0(f, Vector3.Zero);
         if (look) Bones.Look.Push_15EE38(lateral, along, r, true);
@@ -144,7 +145,7 @@ public sealed partial class CharacterController
         body.AngularMomentum += new Vector3(0f, -1f, 0f);
         body.Flags |= RigidBody.MomentumDirty;
         var fwd = ForwardAxis;
-        float k = Vector3.Dot(fwd, Velocity) * 0.6f + 15f;
+        float k = GameMath.Dot(fwd, Velocity) * 0.6f + 15f;
         var j = new Vector3(fwd.X * k, (fwd.Y + MathF.Sqrt(fwd.X * fwd.X + fwd.Z * fwd.Z) * 0.1f) * k, fwd.Z * k);
         var p = Center_13F8C8() + new Vector3(0f, 0.8f, 0f);
         body.ApplyImpulse_289CC0(j, Vector3.Transform(p, body.Inverse));
@@ -157,7 +158,7 @@ public sealed partial class CharacterController
         var local = Vector3.Transform(c, body.Inverse);
         var d = body.Position - c;
         d.Y = 0f;
-        d *= InverseLength(d);
+        d *= GameMath.InverseLength(d);
         float k = Crouch.SlideScale;
         if (k < 0f) k = 0f;
         if (1f < k) k = 1f;
@@ -175,7 +176,7 @@ public sealed partial class CharacterController
         var local = Vector3.Transform(p, body.Inverse);
         var dv = Velocity - body.PointVelocityAt_289408(p);
         var f = dv * 3.5f;
-        if (Vector3.Dot(dv, ForwardAxis) < 0f) return;
+        if (GameMath.Dot(dv, ForwardAxis) < 0f) return;
         if (MotionState is 6 or 10)
         {
             if (SpinKickCooldown == 0f && !ReferenceEquals(owner, Pushed))

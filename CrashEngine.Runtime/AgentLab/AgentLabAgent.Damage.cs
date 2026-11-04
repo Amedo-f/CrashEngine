@@ -1,5 +1,6 @@
 using System.Numerics;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -47,7 +48,7 @@ public sealed partial class AgentLabAgent
             if (found++ >= 0x40) break;
             if (o is not AgentLabAgent hit || hit.Component5 is not { } body) continue;
             var d = hit.LocalMatrix.Translation - center;
-            var j = d * InverseLength(d) * F(5);
+            var j = d * GameMath.InverseLength(d) * F(5);
             if (lift) j += d * ((F(6) - F(5)) / radius);
             body.ApplyImpulse_289CC0(j, lift ? new Vector3(0f, 3f, 0f) : Vector3.Zero);
         }
@@ -95,7 +96,7 @@ public sealed partial class AgentLabAgent
             foreach (var h in _damageHits)
             {
                 var (min, max) = h.TreeBox;
-                float d = Vector3.DistanceSquared((min + max) * 0.5f, pos);
+                float d = GameMath.DistanceSq((min + max) * 0.5f, pos);
                 if (d < best) { best = d; nearest = h; }
             }
             nearest?.ReceiveDamage(kind, amount, strength, this, true);
@@ -314,7 +315,7 @@ public sealed partial class AgentLabAgent
         return best;
     }
 
-    private static bool SegmentBox(Vector3 p, Vector3 d, Vector3 min, Vector3 max, out float t)
+    private static bool SegmentBox(in Vector3 p, in Vector3 d, in Vector3 min, in Vector3 max, out float t)
     {
         float t0 = 0f, t1 = 1f;
         t = 0f;
@@ -349,8 +350,8 @@ public sealed partial class AgentLabAgent
         foreach (var f in hull.Faces)
         {
             var n = new Vector3(f.X, f.Y, f.Z);
-            float num = -(Vector3.Dot(n, p) + f.W);
-            float den = Vector3.Dot(n, d);
+            float num = -(GameMath.Dot(n, p) + f.W);
+            float den = GameMath.Dot(n, d);
             if (MathF.Abs(den) < 1e-8f)
             {
                 if (num < 0f) return false;

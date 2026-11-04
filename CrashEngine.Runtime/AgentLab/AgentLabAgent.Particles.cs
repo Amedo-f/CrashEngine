@@ -1,6 +1,7 @@
 using System.Numerics;
 using CrashEngine.Importer;
 using CrashEngine.Runtime.Physics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
 
@@ -185,7 +186,7 @@ public sealed partial class AgentLabAgent
     private uint _keep88;
 
     private void Keep_20FE50(uint flags) =>
-        _keep88 = (_keep88 & ~0x401F00u) | ((flags & 1) != 0 ? 0x100u : 0u) // Amedo | ((flags & 2) != 0 ? 0x200u : 0u) | ((flags & 8) != 0 ? 0x800u : 0u)
+        _keep88 = (_keep88 & ~0x401F00u) | ((flags & 1) != 0 ? 0x100u : 0u) | ((flags & 2) != 0 ? 0x200u : 0u) | ((flags & 8) != 0 ? 0x800u : 0u) // Amedo
                 | ((flags & 4) != 0 ? 0x400u : 0u) | ((flags & 0x10) != 0 ? 0x1000u : 0u) | ((flags & 0x20) != 0 ? 0x400000u : 0u);
 
     private void ClearTrailCategory_23FD38(int category)
@@ -221,9 +222,9 @@ public sealed partial class AgentLabAgent
         pos.Y = node.M42 + 0.09f;
         var forward = new Vector3(node.M31, node.M32, node.M33);
         var dir = new Vector3(foot.M31, foot.M32, foot.M33);
-        if (Vector3.Dot(dir, forward) < 0.7f) dir = forward;
+        if (GameMath.Dot(dir, forward) < 0.7f) dir = forward;
         dir.Y = 0f;
-        dir *= InverseLength(dir);
+        dir *= GameMath.InverseLength(dir);
         if (Tracing) Trace($"footprint at {pos} dir {dir}"); // Amedo 2026-09-30
         fx.AddDecal_1ADC18(RootPoint(pos), RootDirection(Vector3.UnitY), RootDirection(dir), 1, 0, 1, 1);
     }
@@ -280,7 +281,7 @@ public sealed partial class AgentLabAgent
         float interval = t.Interval;
         if ((t.Flags & (1ul << 26)) != 0) // Amedo 2026-10-01
         {
-            float speed = _velocity.Length();
+            float speed = GameMath.Length(_velocity);
             if (speed < 0.0001f) return false;
             interval = 1f / (speed * t.RateScale);
         }

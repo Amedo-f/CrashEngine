@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -72,7 +73,7 @@ public sealed partial class CharacterController
             float since = (Ticks - _thrownTicks) * (1f / 9000f);
             if (_thrownStep < ThrownMarks.Length && since >= ThrownMarks[_thrownStep])
             {
-                Log?.Invoke($"[link] {th.Name} thrown +{since:0.00}s pos {th.Position} vel {th.Velocity} state {th.MotionState} moved {Vector3.Distance(th.Position, _thrownFrom):0.00}");
+                Log?.Invoke($"[link] {th.Name} thrown +{since:0.00}s pos {th.Position} vel {th.Velocity} state {th.MotionState} moved {GameMath.Distance(th.Position, _thrownFrom):0.00}");
                 _thrownStep++;
             }
             if (_thrownStep >= ThrownMarks.Length) _thrown = null;

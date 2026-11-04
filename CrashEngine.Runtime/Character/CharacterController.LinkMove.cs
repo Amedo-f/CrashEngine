@@ -1,4 +1,5 @@
 using System.Numerics;
+using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
 
@@ -20,7 +21,7 @@ public sealed partial class CharacterController
         var p = Position + new Vector3(0f, CenterOffset, 0f);
         var hull = (Crouch.LowShape && (MotionFlagsHigh & 1u) != 0) || InAirState ? LowHull : StandHull;
         var ext = new Vector3(0.5f, 2f, 0.5f);
-        var grow = new Vector3(disp.Length() + 0.1f);
+        var grow = new Vector3(GameMath.Length(disp) + 0.1f);
         var boxMin = Vector3.Min(p - ext, fl.Target1F0 - ext) - grow;
         var boxMax = Vector3.Max(p + ext, fl.Target1F0 + ext) + grow;
         Collision.Begin();
@@ -62,7 +63,7 @@ public sealed partial class CharacterController
             }
             else turnOut = turnSub;
             LastPlatform = plat;
-            if (5e-5f < Override1A0.Length()) mv = Override1A0 + followerPush;
+            if (5e-5f < GameMath.Length(Override1A0)) mv = Override1A0 + followerPush;
             else mv += followerPush;
             Rotate(turnOut);
             if (StateFlagsOf is { } flagsOf) Collision.ClassFilter(ShapeClass(), flagsOf, MotionStateOf); // Amedo
@@ -72,14 +73,14 @@ public sealed partial class CharacterController
             if (1f < depth && 0.25f < depth - pushSq && CrushedAgents_136478()) Crushed_1367D0(); // Amedo
             if (HullRadius * HullRadius < pushSq)
             {
-                push = push * InverseLength(push) * HullRadius;
+                push = push * GameMath.InverseLength(push) * HullRadius;
                 pushSq = HullRadius * HullRadius;
             }
             var start = p;
             if (pushSq != 0f)
             {
-                var pn = push * InverseLength(push);
-                float into = Vector3.Dot(mv, pn);
+                var pn = push * GameMath.InverseLength(push);
+                float into = GameMath.Dot(mv, pn);
                 if (into < 0f) mv -= pn * into;
                 Collision.Slide(p, push, out start, out _, false);
             }
@@ -106,7 +107,7 @@ public sealed partial class CharacterController
         return turnOut;
     }
 
-    private void FollowerTarget_13A500(CharacterLink fl, Vector3 pStart, Vector3 row2, Vector3 start, float dtSub, Vector3 followerPush)
+    private void FollowerTarget_13A500(CharacterLink fl, in Vector3 pStart, in Vector3 row2, in Vector3 start, float dtSub, in Vector3 followerPush)
     {
         fl.Value210 = 1.3f;
         var desired = pStart - row2 * 1.3f;
@@ -162,7 +163,7 @@ public sealed partial class CharacterController
     private void FollowerAnim_14E138(CharacterLink link, Vector3 vel, Vector3 forward)
     {
         float speed = MathF.Sqrt(vel.X * vel.X + vel.Z * vel.Z);
-        float dot = Vector3.Dot(vel * InverseLength(vel), forward * InverseLength(forward));
+        float dot = GameMath.Dot(vel * GameMath.InverseLength(vel), forward * GameMath.InverseLength(forward));
         void Set(int state) => link.Flags = (link.Flags & ~(0xFUL << 36)) | ((ulong)state << 36);
         switch ((int)((link.Flags >> 36) & 0xF))
         {

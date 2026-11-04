@@ -14,7 +14,8 @@ public static class SimulationClock
 public sealed partial class SceneSimulation
 {
     public static bool FixedLogicStep { get; set; } = true;
-    public const int LogicTicks = 150;
+    public const int NtscLogicTicks = 150, PalLogicTicks = 180;
+    public static int LogicTicks { get; private set; } = NtscLogicTicks;
     private const int MaxLogicSteps = 8;
     private const float SnapDistanceSq = 2.5f * 2.5f;
     private const float SnapTurnCos = 0.7f;
@@ -71,6 +72,7 @@ public sealed partial class SceneSimulation
         LastLogicSteps = steps;
         RenderAlpha = 1f - (_simTicks - _realTicks) / (float)LogicTicks;
         SimulationClock.Alpha = RenderAlpha;
+        World.Particles?.SetRenderAlpha(RenderAlpha); // Amedo
         CrashEngine.Importer.AnimatedObject.LogicAlpha = RenderAlpha; // Amedo 2026-10-01
         CrashEngine.Importer.AnimatedObject.LogicNowTicks = World.NowTicks; // Amedo 2026-10-02
         CrashEngine.Importer.AnimatedObject.LogicStepTicks = LogicTicks;
@@ -137,11 +139,11 @@ public sealed partial class SceneSimulation
 
     private static bool Jumped(Matrix4x4 prev, Matrix4x4 cur)
     {
-        if (Vector3.DistanceSquared(prev.Translation, cur.Translation) > SnapDistanceSq) return true;
+        if (GameMath.DistanceSq(prev.Translation, cur.Translation) > SnapDistanceSq) return true;
         var f0 = new Vector3(prev.M31, prev.M32, prev.M33);
         var f1 = new Vector3(cur.M31, cur.M32, cur.M33);
-        float l = f0.Length() * f1.Length();
-        return l > 1e-6f && Vector3.Dot(f0, f1) / l < SnapTurnCos;
+        float l = GameMath.Length(f0) * GameMath.Length(f1);
+        return l > 1e-6f && GameMath.Dot(f0, f1) / l < SnapTurnCos;
     }
 
     private bool _hostShowsGameCamera;
@@ -150,8 +152,8 @@ public sealed partial class SceneSimulation
     {
         _hostShowsGameCamera = false;
         if (GameCamera is null || !GameCameraView(out _, out var shown, out _, out _)) return;
-        float l = forward.Length();
-        _hostShowsGameCamera = l > 1e-6f && Vector3.Dot(forward / l, shown) > 0.99999f;
+        float l = GameMath.Length(forward);
+        _hostShowsGameCamera = l > 1e-6f && GameMath.Dot(forward / l, shown) > 0.99999f;
     }
 
     private void UseLogicalCamera()
@@ -162,11 +164,11 @@ public sealed partial class SceneSimulation
         var eye = Vector3.Transform(new Vector3(pose.M41, pose.M42, pose.M43), gameToWorld);
         var forward = Vector3.TransformNormal(new Vector3(pose.M31, pose.M32, pose.M33), gameToWorld);
         var up = Vector3.TransformNormal(new Vector3(pose.M21, pose.M22, pose.M23), gameToWorld);
-        if (forward.LengthSquared() <= 0f) return;
-        forward = Vector3.Normalize(forward);
-        up = up.LengthSquared() > 0f ? Vector3.Normalize(up) : Vector3.UnitY;
-        var f = Vector3.Normalize(eye + forward - eye);
-        var s = Vector3.Normalize(Vector3.Cross(f, up));
+        if (GameMath.LengthSquared(forward) <= 0f) return;
+        forward = GameMath.Normalize(forward);
+        up = GameMath.LengthSquared(up) > 0f ? GameMath.Normalize(up) : Vector3.UnitY;
+        var f = GameMath.Normalize(eye + forward - eye);
+        var s = GameMath.Normalize(Vector3.Cross(f, up));
         var u = Vector3.Cross(s, f);
         ApplyCameraBasis(s, u, f);
     }
