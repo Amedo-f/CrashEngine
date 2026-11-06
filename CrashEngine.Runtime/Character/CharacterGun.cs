@@ -79,18 +79,6 @@ public sealed class CharacterGun
         return true;
     }
 
-    public bool AddSecondCount_15F048(int n)
-    {
-        int c = SecondCount + n;
-        if ((uint)c < 10)
-        {
-            Word = (Word & ~0x1E00UL) | ((ulong)(c & 0xF) << 9);
-            return true;
-        }
-        Word = (Word & ~0x1E00UL) | (9UL << 9);
-        return false;
-    }
-
     public bool AddAmmo_15F0A0(int n)
     {
         int ammo = Ammo + n;

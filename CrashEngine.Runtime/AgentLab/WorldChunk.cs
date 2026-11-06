@@ -16,7 +16,6 @@ public sealed class WorldChunk
     public Matrix4x4 ToRoot { get; set; } = Matrix4x4.Identity;
     public Matrix4x4 ToAnchor { get; set; } = Matrix4x4.Identity;
     public Entity? Host { get; set; }
-    public object? MeshTables { get; set; }
     public readonly SceneSound[] Sounds = [SceneSound.Default, SceneSound.Default]; // Amedo 2026-10-05
     public int DrawFrame { get; set; } = -1; // Amedo
     public Physics.ChunkRigidBodies? RigidBodies_164; // Amedo
@@ -31,7 +30,6 @@ public sealed class WorldChunk
         Tree = null;
         Collision = null;
         Host = null;
-        MeshTables = null;
         RigidBodies_164 = null;
         Cells_160 = null;
     }
@@ -42,14 +40,6 @@ public sealed class WorldChunk
         if (SoundBoxes_198.Count == 7) return false;
         SoundBoxes_198.Add(box);
         return true;
-    }
-
-    // Amedo
-    public bool InSoundBox_1F1E68(Vector3 p)
-    {
-        foreach (var box in SoundBoxes_198)
-            if (box.Contains_1E4BE0(p)) return true;
-        return false;
     }
 
     // Amedo

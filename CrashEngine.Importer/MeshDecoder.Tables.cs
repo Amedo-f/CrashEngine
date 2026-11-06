@@ -1,31 +1,19 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
 using SysVec4 = System.Numerics.Vector4;
 using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items;
 using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
@@ -139,17 +127,6 @@ public static partial class MeshDecoder
         parent.AddChild(child);
         return child;
     }
-
-    private static readonly HashSet<SurfaceType> DeadlySurfaceTypes = new()
-    {
-        SurfaceType.SURF_LAVA, SurfaceType.SURF_GENERIC_INSTANT_DEATH, SurfaceType.SURF_FALL_THRU_DEATH,
-        SurfaceType.SURF_DROWNING_PLANE, SurfaceType.SURF_NONSOLID_ELECTRIC_DEATH,
-    };
-    private static readonly HashSet<SurfaceType> BlockingSurfaceTypes = new()
-    {
-        SurfaceType.SURF_GLASS_WALL, SurfaceType.SURF_CAMERA_BLOCKING,
-        SurfaceType.SURF_BLOCK_PLAYER, SurfaceType.SURF_BLOCK_AI_ONLY,
-    };
 
     public static List<SurfaceType>? BuildSurfaceTypeLookup(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2 = null)
     {

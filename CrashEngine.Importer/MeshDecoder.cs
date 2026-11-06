@@ -1,34 +1,19 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
-using SysVec4 = System.Numerics.Vector4;
 using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -48,6 +33,11 @@ public sealed class TransplantRecord
 
 public static partial class MeshDecoder // Amedo 2026-10-05
 {
+    // Amedo 2026-11-05
+    private static Random? _seededIds;
+    private static Random IdRandom => _seededIds ?? Random.Shared;
+    public static void SeedIds(int? seed) => _seededIds = seed is { } s ? new Random(s) : null;
+
     public static readonly SysVec3[] FogColors = // Amedo 2026-09-26
     {
         new( 52/255f,   0f,     247/255f),
@@ -350,15 +340,6 @@ public static partial class MeshDecoder // Amedo 2026-10-05
         return ResolveDefaultOgi(tables, obj, out _)?.Joints;
     }
 
-    public static List<(GpuMesh Mesh, Material Mat, Matrix4x4 JointLocal, bool IsSkinned)>? GetObjectMeshParts(
-        object tablesHandle, uint objectId)
-    {
-        if (tablesHandle is not RmTables tables) return null;
-        if (!tables.Objects.TryGetValue(objectId, out var obj)) return null;
-        if (ResolveDefaultOgi(tables, obj, out var parts) is null) return null;
-        return parts.Select(p => (p.Item1, p.Item2, p.Item3, p.Item4)).ToList();
-    }
-
     public static List<TwinJoint>? GetJointListByOgi(object tablesHandle, uint ogiId)
     {
         if (tablesHandle is not RmTables tables) return null;
@@ -372,21 +353,6 @@ public static partial class MeshDecoder // Amedo 2026-10-05
         if (!tables.OGIs.TryGetValue(ogiId, out var ogi)) return null;
         var built = BuildOgiMeshes(tables, ogi);
         return built.Count > 0 ? built.Select(p => (p.Item1, p.Item2, p.Item3, p.Item4)).ToList() : null;
-    }
-
-    public static List<(uint RmId, Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinModel Model, List<uint> MaterialIds)>?
-        GetObjectSourceModelsByOgi(object tablesHandle, uint ogiId)
-    {
-        if (tablesHandle is not RmTables tables) return null;
-        if (!tables.OGIs.TryGetValue(ogiId, out var ogi)) return null;
-        var result = new List<(uint, Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinModel, List<uint>)>();
-        foreach (var rmId in ogi.RigidModelIds)
-        {
-            if (!tables.RigidModels.TryGetValue(rmId, out var rm)) continue;
-            if (!tables.Models.TryGetValue(rm.Model, out var model)) continue;
-            result.Add((rmId, model, rm.Materials));
-        }
-        return result.Count > 0 ? result : null;
     }
 
     public static List<(uint RmId, ITwinModel Model, List<uint> MaterialIds)>? GetObjectSourceModelsByOgiDirect(
@@ -504,7 +470,6 @@ public static partial class MeshDecoder // Amedo 2026-10-05
         if (sourceOgi.SkinID == 0)
         { log = "this reskin has no regular Skin (BlendSkin-only characters aren't supported by Bone Mapping yet)"; return false; }
 
-        var code    = rm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
         var gfx     = rm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
         var skinSec = gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKINS_SECTION);
         if (skinSec is null) { log = "chunk has no Skins section"; return false; }
@@ -617,13 +582,35 @@ public static partial class MeshDecoder // Amedo 2026-10-05
             m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W);
     }
 
-    private static SysVec3 ExtractTranslation(Matrix4x4 m) =>
-        new(m.M14, m.M24, m.M34);
+    public static TwinMat4 ToTwinMat4(Matrix4x4 m) => new()
+    {
+        Column1 = new TwinVec4(m.M11, m.M12, m.M13, m.M14),
+        Column2 = new TwinVec4(m.M21, m.M22, m.M23, m.M24),
+        Column3 = new TwinVec4(m.M31, m.M32, m.M33, m.M34),
+        Column4 = new TwinVec4(m.M41, m.M42, m.M43, m.M44),
+    };
 
-    private static SysVec3 ExtractScale(Matrix4x4 m) => new(
-        GameMath.Length(new SysVec3(m.M11, m.M21, m.M31)),
-        GameMath.Length(new SysVec3(m.M12, m.M22, m.M32)),
-        GameMath.Length(new SysVec3(m.M13, m.M23, m.M33)));
+    public static TwinMat4 IdentityTwinMat4() => new()
+    {
+        Column1 = new TwinVec4(1f, 0f, 0f, 0f),
+        Column2 = new TwinVec4(0f, 1f, 0f, 0f),
+        Column3 = new TwinVec4(0f, 0f, 1f, 0f),
+        Column4 = new TwinVec4(0f, 0f, 0f, 1f),
+    };
+
+    public static TwinMat4 CloneTwinMat4(TwinMat4 m) => new()
+    {
+        Column1 = new TwinVec4(m.Column1.X, m.Column1.Y, m.Column1.Z, m.Column1.W),
+        Column2 = new TwinVec4(m.Column2.X, m.Column2.Y, m.Column2.Z, m.Column2.W),
+        Column3 = new TwinVec4(m.Column3.X, m.Column3.Y, m.Column3.Z, m.Column3.W),
+        Column4 = new TwinVec4(m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W),
+    };
+
+    public static TwinVec4[] CloneSceneryBox(TwinVec4[] bb) => new[]
+    {
+        new TwinVec4(bb[0].X, bb[0].Y, bb[0].Z, bb[0].W),
+        new TwinVec4(bb[1].X, bb[1].Y, bb[1].Z, bb[1].W),
+    };
 
     private static IEnumerable<Entity> AllEntities(Entity e)
     {

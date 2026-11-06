@@ -159,30 +159,7 @@ public static class ChunkExporter
                     leaf.BoundingBoxes.Add(bb);
                     Array.Copy(node.LightsEnabler, leaf.LightsEnabler, node.LightsEnabler.Length);
 
-                    var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-                    var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-                    bool any = false;
-                    for (int j = 0; j < node.MeshIDs.Count; j++)
-                    {
-                        var pos = new Vector3(node.MeshModelMatrices[j].Column4.X, node.MeshModelMatrices[j].Column4.Y, node.MeshModelMatrices[j].Column4.Z);
-                        var box = node.BoundingBoxes[j];
-                        var ra = pos + new Vector3(box[0].X, box[0].Y, box[0].Z);
-                        var rb = pos + new Vector3(box[1].X, box[1].Y, box[1].Z);
-                        min = Vector3.Min(min, Vector3.Min(ra, rb));
-                        max = Vector3.Max(max, Vector3.Max(ra, rb));
-                        any = true;
-                    }
-                    for (int j = 0; j < node.LodIDs.Count; j++)
-                    {
-                        var pos = new Vector3(node.LodModelMatrices[j].Column4.X, node.LodModelMatrices[j].Column4.Y, node.LodModelMatrices[j].Column4.Z);
-                        var box = node.BoundingBoxes[node.MeshIDs.Count + j];
-                        var ra = pos + new Vector3(box[0].X, box[0].Y, box[0].Z);
-                        var rb = pos + new Vector3(box[1].X, box[1].Y, box[1].Z);
-                        min = Vector3.Min(min, Vector3.Min(ra, rb));
-                        max = Vector3.Max(max, Vector3.Max(ra, rb));
-                        any = true;
-                    }
-                    if (any) MeshDecoder.ApplySceneryBounds(node, min, max);
+                    MeshDecoder.RefitSceneryBounds(node, withLods: true);
 
                     MeshDecoder.GraftIndependentSceneryLeaf(scenery, leaf, newPos + localMin, newPos + localMax);
                     tile.Node = leaf;

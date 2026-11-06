@@ -2,13 +2,8 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using ImGuiNET;
-using CrashEngine.Core;
-using CrashEngine.Importer;
 using Twinsanity.Libraries;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Archives;
-using PS2AnySound = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnySound;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -28,8 +23,6 @@ public sealed partial class GameScene
     private bool _customMusicNamesLoaded;
     private string?           _musicBankMbPath;
     private int                _musicBankInterleave;
-
-    private byte[]?            _lastPreviewWav;
 
     private bool     _musicPreviewPlaying;
     private string   _musicPreviewLabel = "";
@@ -250,7 +243,6 @@ public sealed partial class GameScene
 
         try
         {
-            _lastPreviewWav = d.Wav;
             bool ok = PlayPreviewWav(d.Wav); // Amedo 2026-09-21
             if (!ok)
             {
@@ -310,8 +302,7 @@ public sealed partial class GameScene
 
     private void EnsureMusicBankBackup(string mhPath, string mbPath)
     {
-        var backupDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build",
-                                       "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')));
+        var backupDir = DiscBackup.DirFor(_scriptOut, _extractedRoot);
         var mhBackup = Path.Combine(backupDir, "MUSIC.MH");
         var mbBackup = Path.Combine(backupDir, "MUSIC.MB");
         if (!File.Exists(mhBackup) || !File.Exists(mbBackup))
@@ -327,8 +318,7 @@ public sealed partial class GameScene
     {
         try
         {
-            var backupDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build",
-                                           "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')));
+            var backupDir = DiscBackup.DirFor(_scriptOut, _extractedRoot);
             var mhBackup = Path.Combine(backupDir, "MUSIC.MH");
             if (File.Exists(mhBackup))
             {
@@ -352,8 +342,7 @@ public sealed partial class GameScene
         {
             try
             {
-                var backupDir = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build",
-                                              "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')));
+                var backupDir = DiscBackup.DirFor(_scriptOut, _extractedRoot);
                 var mhBackupPath = Path.Combine(backupDir, "MUSIC.MH");
                 var mbBackupPath = Path.Combine(backupDir, "MUSIC.MB");
                 if (!File.Exists(mhBackupPath) || !File.Exists(mbBackupPath))

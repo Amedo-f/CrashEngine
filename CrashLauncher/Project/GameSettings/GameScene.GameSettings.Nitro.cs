@@ -1,14 +1,8 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -64,17 +58,6 @@ public sealed partial class GameScene
             cmd.Arguments[0] = BitConverter.SingleToUInt32Bits((_nitroOriginalBlastRadius ?? 10f) * _nitroBlastRadiusMultiplier);
             if (!own) chunkSource.GlobalRm2Dirty = true; // Amedo
         }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip("Scales command 117 (MakeNoise, 0x2549E0) in the idle hop of\n" + // Amedo
-                         "COM_NITRO_CRATE_DEFAULT (Startup\\Default.rm2): the radius of the\n" +
-                         "noise each hop makes. Agents inside it hear the crate (look at it /\n" +
-                         "get their noise message). It does NOT damage anything; the kill\n" +
-                         "radius is 'Crate Explosion Radius' below.\n" +
-                         "Shared script = every Nitro Crate; own script = this object only.\n" +
-                         "1.00x = original\n" +
-                         "(10.0 units). Save Chunk to persist.");
-        }
         ImGui.SameLine();
         if (ImGui.Button("Reset##nitroblastreset"))
         {
@@ -92,15 +75,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
-                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
-            freshDefault.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(GlobalRm2Path));
             var freshGraph = freshBehSec?.GetItem<PS2BehaviourGraph>(NitroCrateBehaviourId);
             if (freshGraph is null) return null;
 

@@ -38,7 +38,6 @@ public sealed class LayoutTrigger
     public (Vector3 Min, Vector3 Max) Bounds { get; }
     public int Index { get; init; }
     public int LastCheck;
-    public IReadOnlyList<AgentLabAgent> Inside => _inside;
     public Vector4 Force = new(0f, 0f, 0f, 1f); // Amedo 2026-09-29
     public bool ForceOn;
 

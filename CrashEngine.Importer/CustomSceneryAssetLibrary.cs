@@ -9,17 +9,6 @@ public static class CustomSceneryAssetLibrary
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public static List<string> ListFolders(string rootDir)
-    {
-        if (!Directory.Exists(rootDir)) return new List<string>();
-        return Directory.GetDirectories(rootDir)
-            .Select(Path.GetFileName)
-            .Where(n => !string.IsNullOrEmpty(n))
-            .Select(n => n!)
-            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
     public static List<(string FileName, CustomSceneryAssetEntry Entry)> ListEntries(string rootDir, string folder)
     {
         var dir = Path.Combine(rootDir, folder);
@@ -104,11 +93,6 @@ public static class CustomSceneryAssetLibrary
         if (File.Exists(jsonPath)) File.Delete(jsonPath);
         var sm2Path = Path.Combine(dir, Path.GetFileNameWithoutExtension(fileName) + ".sm2");
         if (File.Exists(sm2Path)) File.Delete(sm2Path);
-    }
-
-    public static void CreateFolder(string rootDir, string folder)
-    {
-        Directory.CreateDirectory(Path.Combine(rootDir, SanitizeFileName(folder)));
     }
 
 

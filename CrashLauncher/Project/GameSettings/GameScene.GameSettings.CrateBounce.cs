@@ -1,14 +1,7 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -74,14 +67,6 @@ public sealed partial class GameScene
             SetArgFloat(cmd, CrateBounceArgIndex, orig * mult);
             chunkSource.GlobalRm2Dirty = true;
         }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip($"Not yet live-tested — only affects {label}, every other crate type has\n" +
-                         "its own separate value. Original ≈ " + orig.ToString("0.###") + ".\n" +
-                         "Watch for a hard ceiling like the Cannon/Enemy Stomp had — going too\n" +
-                         "high may silently kill the bounce instead of making it bigger.\n" +
-                         "Save Chunk to persist, then Build ISO + test.");
-        }
         if (ImGui.Button($"Reset##cratebouncereset_{id:X}"))
         {
             _crateBounceMultipliers[id] = 1f;
@@ -93,15 +78,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
-                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
-            freshDefault.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(GlobalRm2Path));
             var freshCmds = FindApplyVelocityCommands(freshBehSec?.GetItem<PS2BehaviourGraph>(id));
             return freshCmds.Count > 0 ? GetArgFloat(freshCmds[0], CrateBounceArgIndex) : null;
         }

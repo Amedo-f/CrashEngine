@@ -1,13 +1,9 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
@@ -15,7 +11,6 @@ namespace CrashLauncher;
 public sealed partial class GameScene
 {
     private const uint CreateDamageCommandIndex = 514;
-    private const uint TriggerBalancedCrateFallingCommandIndex = 519;
     private const int  DamageAmountArgIndex     = 7;
     private const int  DamageTypeArgIndex       = 8;
     private const uint VanillaBlastAmount       = 0x00000320;
@@ -88,22 +83,6 @@ public sealed partial class GameScene
                     foreach (var cmd in FindAllCreateDamageCommands(explodeGraph))
                         cmd.Arguments[DamageTypeArgIndex] = PristineDamageType;
                     chunkSource.GlobalRm2Dirty = true;
-                }
-                if (ImGui.IsItemHovered())
-                {
-                    MaybeTooltip("Classic-games Aku Aku: getting hit by a Nitro or TNT Crate only\n" +
-                                 "kills you if you have NO Aku Aku masks — same as any other damage\n" +
-                                 "source, instead of always killing you outright regardless of masks.\n" +
-                                 "Shrinks the crate explosion's initial blast damage from 800 to 8\n" +
-                                 "(matching TheBetaM/CrateModLoader's real, decompiled fix — small\n" +
-                                 "enough for Aku Aku to actually absorb). Edits the shared Nitro/TNT\n" +
-                                 "explosion script (Startup\\Default.rm2) — affects every level.\n" +
-                                 "Also fixes the golden Aku Aku glow disappearing after Crash walks\n" +
-                                 "into another level (the glow now follows him), and the golden\n" +
-                                 "invincibility ending after an in-game cutscene (its timer now keeps\n" +
-                                 "running during the cutscene: the rest continues afterwards, or it\n" +
-                                 "ends on time mid-cutscene). Both applied on Build ISO.\n" +
-                                 "Save Chunk to persist, then Build ISO + test.");
                 }
 
                 if (!isClassic && !isVanilla)

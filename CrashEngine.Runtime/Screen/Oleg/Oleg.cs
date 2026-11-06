@@ -85,7 +85,7 @@ public sealed partial class Oleg : WidgetController
     public const int SliderGroup = 34, LivesGroup = 35, WumpaGroup = 36, PickupGroup = 37, AmmoGroup = 38, AllButOverlaysGroup = 42;
     public const int OptionsGroup = 9, ScreenPositionGroup = 10, MainMenuGroup = 11, PauseGroup = 12, DisableAutosaveGroup = 13, QuitGroup = 14; // Amedo
     public const int MainMenuMode = 8; // Amedo
-    public const int NoPadGroup = 15, DiscErrorGroup = 16, FirstLevelsGroup = 20, ExtrasGroup = 24, GalleryGroup = 25, GameOverGroup = 26; // Amedo
+    public const int NoPadGroup = 15, GalleryGroup = 25, GameOverGroup = 26; // Amedo
     public const int FlashGroup = 39, PictureGroup = 40, LoadingGroup = 41; // Amedo
     public const int DimmerGroup = 3, SaveMessageGroup = 27, SaveChoicesGroup = 28, SaveSlotsGroup = 29, AutosaveGroup = 30; // Amedo
     public IOlegGame? Game_3095C8; // Amedo
@@ -142,8 +142,6 @@ public sealed partial class Oleg : WidgetController
     public readonly SliderWidget Gauge_40C8;
     public readonly StringLabel WumpaText_4164, LivesText_42BC, AmmoText_458C;
     public readonly SpriteWidget WumpaIcon_4200, LivesIcon_4358, OneUp_4414, Pickup_44D0, AmmoIcon_4628;
-
-    public Action<string, int, string>? Unimplemented;
 
     // Amedo
     public Oleg(GameFont? font, GameProgress progress, GameTexts? codeTexts = null, IReadOnlyList<GameFont.Page?>? icons = null)

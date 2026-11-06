@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Importer;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -31,8 +30,6 @@ public sealed partial class AgentLabAgent
 
     private List<Trail>? _trails;
     private const ushort SandStepSystem = 0xF4; // Amedo 2026-09-30
-
-    public int TrailCount => _trails?.Count ?? 0;
 
     private void DoParticle(List<uint> a)
     {
@@ -119,7 +116,6 @@ public sealed partial class AgentLabAgent
         float F(int i) => BitConverter.UInt32BitsToSingle(W(i));
         TrailList(); // Amedo
         if (_trails.Count >= MaxTrails) return;
-        if ((W(0) & 0xF) == 5) _trailKind5_60 = true; // Amedo
         _trails.Add(new Trail
         {
             Flags     = W(0) | ((ulong)W(1) << 32),

@@ -1,46 +1,13 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
 using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
 using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
 using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
 namespace CrashLauncher;
 
@@ -178,23 +145,7 @@ public sealed partial class GameScene : Scene
                     }
                 }
 
-                var levels = new List<string>();
-                using (var lvlStream = pkg.OpenByPath(@"Startup\LevelSelect.txt"))
-                {
-                    if (lvlStream is not null)
-                    {
-                        using var sr = new StreamReader(lvlStream);
-                        foreach (var line in sr.ReadToEnd().Split('\n'))
-                        {
-                            var quoted = System.Text.RegularExpressions.Regex.Matches(line, "\"([^\"]*)\"");
-                            if (quoted.Count > 0)
-                            {
-                                var p = quoted[^1].Groups[1].Value;
-                                if (!string.IsNullOrWhiteSpace(p)) levels.Add(p);
-                            }
-                        }
-                    }
-                }
+                var levels = ReadLevelSelectPaths(pkg);
 
                 _fxGlobalLoadTotal = levels.Count;
                 for (int li = 0; li < levels.Count; li++)
@@ -233,23 +184,7 @@ public sealed partial class GameScene : Scene
             {
                 using var pkg = PackageReader.Open(_extractedRoot);
 
-                var levels = new List<string>();
-                using (var lvlStream = pkg.OpenByPath(@"Startup\LevelSelect.txt"))
-                {
-                    if (lvlStream is not null)
-                    {
-                        using var sr = new StreamReader(lvlStream);
-                        foreach (var line in sr.ReadToEnd().Split('\n'))
-                        {
-                            var quoted = System.Text.RegularExpressions.Regex.Matches(line, "\"([^\"]*)\"");
-                            if (quoted.Count > 0)
-                            {
-                                var p = quoted[^1].Groups[1].Value;
-                                if (!string.IsNullOrWhiteSpace(p)) levels.Add(p);
-                            }
-                        }
-                    }
-                }
+                var levels = ReadLevelSelectPaths(pkg);
 
                 foreach (var levelPath in levels)
                 {
@@ -277,6 +212,24 @@ public sealed partial class GameScene : Scene
             _emitterGlobalLoading = false;
             _browser.Log($"Ambient Emitters: loaded {_emitterGlobalCatalog.Count} placed effect group(s) across every level.");
         });
+    }
+
+    private static List<string> ReadLevelSelectPaths(PackageReader pkg)
+    {
+        var levels = new List<string>();
+        using var lvlStream = pkg.OpenByPath(@"Startup\LevelSelect.txt");
+        if (lvlStream is null) return levels;
+        using var sr = new StreamReader(lvlStream);
+        foreach (var line in sr.ReadToEnd().Split('\n'))
+        {
+            var quoted = System.Text.RegularExpressions.Regex.Matches(line, "\"([^\"]*)\"");
+            if (quoted.Count > 0)
+            {
+                var p = quoted[^1].Groups[1].Value;
+                if (!string.IsNullOrWhiteSpace(p)) levels.Add(p);
+            }
+        }
+        return levels;
     }
 
     private static string GetFxFamilyKey(string name)
@@ -337,11 +290,6 @@ public sealed partial class GameScene : Scene
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##fxFilter", "Search effects (e.g. NITRO, EXP, MIST)...", ref _fxFilter, 128);
         ImGui.TextDisabled($"{_fxGlobalCatalog.Count} particle system(s) across every level — preview = the game's own particle math."); // Amedo 2026-09-26
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("The preview runs the same simulation as the viewport: the game's emission cycle,\n" +
-                         "spawn shapes, gravity, the 64-sample shape/colour table, the real texture\n" +
-                         "rectangle and the real blend mode (see CrashEngine-Lab docs/re/particles-system.md).\n" +
-                         "Swatch = the effect's average colour weighted by its alpha curve.");
 
         ImGui.BeginChild("##fxList", new Vector2(-1f, 160f), ImGuiChildFlags.Border);
         foreach (var (name, level, texPage, swatchColor) in _fxGlobalCatalog) // Amedo 2026-09-26
@@ -407,10 +355,6 @@ public sealed partial class GameScene : Scene
                 }
 
                 if (ImGui.Checkbox("Burst##fxburst", ref _fxPrevBurst)) _fxPrevKey = null;
-                if (ImGui.IsItemHovered()) MaybeTooltip(
-                    "Off = runs forever, like a placed emitter in a level.\n" +
-                    "On = one emission cycle, like a script firing it (DoParticle), replayed\n" +
-                    "once every particle has died. Defaults to On for effects no level places.");
                 ImGui.SameLine();
                 if (ImGui.SmallButton("Restart##fxrestart")) _fxPrevWorld?.Reset();
 
@@ -434,11 +378,6 @@ public sealed partial class GameScene : Scene
             ImGui.EndDisabled();
             if (isSameLevel)
                 ImGui.TextDisabled("(already this level's own effect)");
-            if (ImGui.IsItemHovered()) MaybeTooltip(
-                "Copies this effect's real particle system definition(s) into the CURRENTLY\n" +
-                "loaded level's own data, so a script here CAN reference it by name (AgentLab's\n" +
-                "DoParticle). Does NOT itself make anything trigger it — no reliable link from\n" +
-                "object/script to particle system name was ever found (see the note above).");
         }
 
         ImGui.Separator();
@@ -469,12 +408,6 @@ public sealed partial class GameScene : Scene
                 ImGui.EndDisabled();
             }
             ImGui.EndChild();
-            if (ImGui.IsItemHovered()) MaybeTooltip(
-                "Adds ONE placed instance of this ambient effect to the currently-loaded\n" +
-                "level (at the camera's current position — drag it afterward with the normal\n" +
-                "gizmo, see \"Show Particle Emitters\" in the Scene panel). Also copies its\n" +
-                "underlying particle system definition if this level doesn't already have\n" +
-                "one by that name. This one really is always-on — no script needed.");
         }
     }
 
@@ -509,25 +442,7 @@ public sealed partial class GameScene : Scene
                 }
             }
 
-            var destData = chunkSource.Rm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
-            if (destData is null)
-            {
-                destData = new PS2AnyParticleData();
-                destData.SetID((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
-                chunkSource.Rm2.AddItem(destData);
-            }
-
-            static TwinParticleSystem CloneParticleSystem(TwinParticleSystem src)
-            {
-                using var ms = new MemoryStream();
-                using (var w = new BinaryWriter(ms)) src.Write(w);
-                var bytes = ms.ToArray();
-                var clone = new TwinParticleSystem(src.Version);
-                using var rs = new MemoryStream(bytes);
-                using var r = new BinaryReader(rs);
-                clone.Read(r, bytes.Length);
-                return clone;
-            }
+            var destData = GetOrAddParticleData(chunkSource.Rm2);
 
             int added = 0, alreadyPresent = 0, missing = 0;
             foreach (var memberName in memberNames)
@@ -552,6 +467,39 @@ public sealed partial class GameScene : Scene
         catch (Exception ex) { _browser.Log($"Import Effect failed: {ex.Message}"); }
     }
 
+    private static PS2AnyParticleData GetOrAddParticleData(PS2AnyTwinsanityRM2 rm2)
+    {
+        if (rm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM) is { } data) return data;
+        data = new PS2AnyParticleData();
+        data.SetID((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
+        rm2.AddItem(data);
+        return data;
+    }
+
+    private static TwinParticleSystem CloneParticleSystem(TwinParticleSystem src)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new BinaryWriter(ms)) src.Write(w);
+        var bytes = ms.ToArray();
+        var clone = new TwinParticleSystem(src.Version);
+        using var rs = new MemoryStream(bytes);
+        using var r = new BinaryReader(rs);
+        clone.Read(r, bytes.Length);
+        return clone;
+    }
+
+    private static TwinParticleEmitter CloneEmitter(TwinParticleEmitter src)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new BinaryWriter(ms)) src.Write(w);
+        var bytes = ms.ToArray();
+        var clone = new TwinParticleEmitter(src.Version);
+        using var rs = new MemoryStream(bytes);
+        using var r = new BinaryReader(rs);
+        clone.Read(r, bytes.Length);
+        return clone;
+    }
+
     private void ImportEmitterIntoCurrentLevel(string name, string sourceLevel)
     {
         var chunkRoot   = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
@@ -572,36 +520,7 @@ public sealed partial class GameScene : Scene
                 string.Equals(ParticleNames.Clean(em.Name), name, StringComparison.OrdinalIgnoreCase)); // Amedo 2026-09-26
             if (srcEmitter is null) { _browser.Log($"Add Ambient Effect: '{name}' not found in '{sourceLevel}'."); return; }
 
-            var destData = chunkSource.Rm2.GetItem<PS2AnyParticleData>((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
-            if (destData is null)
-            {
-                destData = new PS2AnyParticleData();
-                destData.SetID((uint)TwinConstants.LEVEL_PARTICLES_ITEM);
-                chunkSource.Rm2.AddItem(destData);
-            }
-
-            static TwinParticleSystem CloneParticleSystem(TwinParticleSystem src)
-            {
-                using var ms = new MemoryStream();
-                using (var w = new BinaryWriter(ms)) src.Write(w);
-                var bytes = ms.ToArray();
-                var clone = new TwinParticleSystem(src.Version);
-                using var rs = new MemoryStream(bytes);
-                using var r = new BinaryReader(rs);
-                clone.Read(r, bytes.Length);
-                return clone;
-            }
-            static TwinParticleEmitter CloneEmitter(TwinParticleEmitter src)
-            {
-                using var ms = new MemoryStream();
-                using (var w = new BinaryWriter(ms)) src.Write(w);
-                var bytes = ms.ToArray();
-                var clone = new TwinParticleEmitter(src.Version);
-                using var rs = new MemoryStream(bytes);
-                using var r = new BinaryReader(rs);
-                clone.Read(r, bytes.Length);
-                return clone;
-            }
+            var destData = GetOrAddParticleData(chunkSource.Rm2);
 
             bool templateExists = destData.ParticleSystems.Any(s =>
                 string.Equals(ParticleNames.Clean(s.Name), name, StringComparison.OrdinalIgnoreCase)); // Amedo 2026-09-26

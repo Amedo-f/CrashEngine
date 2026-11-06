@@ -7,7 +7,6 @@ using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
 
 namespace CrashEngine.Importer;
@@ -120,7 +119,7 @@ public static partial class MeshDecoder
         if (obj is null || local is null) { log = "make the object unique first (it must live in this level)"; return 0; }
 
         var closure = ObjectBehaviourClosure(rm2, globalRm2, obj);
-        var rng = new Random();
+        var rng = IdRandom; // Amedo 2026-11-05
         foreach (var oldId in closure)
         {
             if (oldId >= UniqueBehaviourIdFloor && local.ContainsItem(oldId)) continue;

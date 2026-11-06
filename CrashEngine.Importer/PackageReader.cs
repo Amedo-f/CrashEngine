@@ -1,5 +1,4 @@
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Archives;
 
 namespace CrashEngine.Importer;
 

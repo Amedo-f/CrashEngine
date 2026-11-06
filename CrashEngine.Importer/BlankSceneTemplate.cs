@@ -2,14 +2,10 @@ using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.RM2;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.RM2.Layout;
 using Twinsanity.TwinsanityInterchange.Interfaces;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items;
 
@@ -17,64 +13,6 @@ namespace CrashEngine.Importer;
 
 public static class BlankSceneTemplate
 {
-    public static PS2AnyTwinsanityRM2 CreateBlankRm2()
-    {
-        var rm2 = new PS2AnyTwinsanityRM2();
-
-        for (int lid = Constants.LEVEL_LAYOUT_1_SECTION; lid <= Constants.LEVEL_LAYOUT_8_SECTION; lid++)
-        {
-            var layout = new PS2AnyLayoutSection();
-            layout.SetID((uint)lid);
-            AddEmpty<PS2AnyTemplatesSection>(layout, Constants.LAYOUT_TEMPLATES_SECTION);
-            AddEmpty<PS2AnyAIPositionsSection>(layout, Constants.LAYOUT_AI_POSITIONS_SECTION);
-            AddEmpty<PS2AnyAIPathsSection>(layout, Constants.LAYOUT_AI_PATHS_SECTION);
-            AddEmpty<PS2AnyPositionsSection>(layout, Constants.LAYOUT_POSITIONS_SECTION);
-            AddEmpty<PS2AnyPathsSection>(layout, Constants.LAYOUT_PATHS_SECTION);
-            AddEmpty<PS2AnySurfacesSection>(layout, Constants.LAYOUT_SURFACES_SECTION);
-            AddEmpty<PS2AnyInstancesSection>(layout, Constants.LAYOUT_INSTANCES_SECTION);
-            AddEmpty<PS2AnyTriggersSection>(layout, Constants.LAYOUT_TRIGGERS_SECTION);
-            AddEmpty<PS2AnyCamerasSection>(layout, Constants.LAYOUT_CAMERAS_SECTION);
-            rm2.AddItem(layout);
-        }
-
-        var code = new PS2AnyCodeSection();
-        code.SetID((uint)Constants.LEVEL_CODE_SECTION);
-        AddEmpty<PS2AnyGameObjectsSection>(code, Constants.CODE_GAME_OBJECTS_SECTION);
-        AddEmpty<PS2AnyBehavioursSection>(code, Constants.CODE_BEHAVIOURS_SECTION);
-        AddEmpty<PS2AnyAnimationsSection>(code, Constants.CODE_ANIMATIONS_SECTION);
-        AddEmpty<PS2AnyOGIsSection>(code, Constants.CODE_OGIS_SECTION);
-        AddEmpty<PS2AnyBehaviourCommandsSequencesSection>(code, Constants.CODE_BEHAVIOUR_COMMANDS_SEQUENCES_SECTION);
-        { var unk = new BaseTwinItem(); unk.SetID((uint)Constants.CODE_UNK_ITEM); code.AddItem(unk); }
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_SOUND_EFFECTS_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_ENG_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_FRE_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_GER_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_SPA_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_ITA_SECTION);
-        AddEmpty<PS2AnySoundsSection>(code, Constants.CODE_LANG_JPN_SECTION);
-        rm2.AddItem(code);
-
-        var gfx = new PS2AnyGraphicsSection();
-        gfx.SetID((uint)Constants.LEVEL_GRAPHICS_SECTION);
-        AddEmpty<PS2AnyTexturesSection>(gfx, Constants.GRAPHICS_TEXTURES_SECTION);
-        AddEmpty<PS2AnyMaterialsSection>(gfx, Constants.GRAPHICS_MATERIALS_SECTION);
-        AddEmpty<PS2AnyModelsSection>(gfx, Constants.GRAPHICS_MODELS_SECTION);
-        AddEmpty<PS2AnyRigidModelsSection>(gfx, Constants.GRAPHICS_RIGID_MODELS_SECTION);
-        AddEmpty<PS2AnySkinsSection>(gfx, Constants.GRAPHICS_SKINS_SECTION);
-        AddEmpty<PS2AnyBlendSkinsSection>(gfx, Constants.GRAPHICS_BLEND_SKINS_SECTION);
-        AddEmpty<PS2AnyMeshesSection>(gfx, Constants.GRAPHICS_MESHES_SECTION);
-        rm2.AddItem(gfx);
-
-        var particles = new PS2AnyParticleData();
-        particles.SetID((uint)Constants.LEVEL_PARTICLES_ITEM);
-        rm2.AddItem(particles);
-
-        var coll = new PS2AnyCollisionData();
-        coll.SetID((uint)Constants.LEVEL_COLLISION_ITEM);
-        rm2.AddItem(coll);
-
-        return rm2;
-    }
 
     public static PS2AnyTwinsanitySM2 CreateBlankSm2(string sceneName)
     {
@@ -110,19 +48,6 @@ public static class BlankSceneTemplate
         var sec = new T();
         sec.SetID((uint)id);
         parent.AddItem(sec);
-    }
-
-    public static (PS2AnyTwinsanityRM2 Rm2, PS2AnyTwinsanitySM2 Sm2) CreateFromRealLevel(
-        PS2AnyTwinsanityRM2 sourceRm2, PS2AnyTwinsanitySM2 sourceSm2, string sceneName)
-    {
-        var rm2 = DeepClone<PS2AnyTwinsanityRM2>(sourceRm2);
-        var sm2 = DeepClone<PS2AnyTwinsanitySM2>(sourceSm2);
-
-        var scenery = sm2.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
-        if (scenery is not null)
-            scenery.Name = sceneName;
-
-        return (rm2, sm2);
     }
 
     private const uint CrashStateFlags        = 0x7D2Eu;

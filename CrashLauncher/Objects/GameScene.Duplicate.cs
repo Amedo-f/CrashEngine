@@ -1,15 +1,7 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
 using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
@@ -17,30 +9,8 @@ using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM
 using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
 using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
 using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
 using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
 
@@ -175,13 +145,7 @@ public sealed partial class GameScene : Scene
 
                 var node = tile.Node;
                 var origBbox = FindTileBoundingBox(tile);
-                var newBbox = origBbox is not null
-                    ? new[]
-                      {
-                          new TwinVec4(origBbox[0].X, origBbox[0].Y, origBbox[0].Z, origBbox[0].W),
-                          new TwinVec4(origBbox[1].X, origBbox[1].Y, origBbox[1].Z, origBbox[1].W),
-                      }
-                    : new[] { new TwinVec4(), new TwinVec4() };
+                var newBbox = origBbox is not null ? MeshDecoder.CloneSceneryBox(origBbox) : new[] { new TwinVec4(), new TwinVec4() };
 
                 const bool UseIndependentLeafForDuplicate = true;
 
@@ -227,26 +191,7 @@ public sealed partial class GameScene : Scene
                         origLeaf.BoundingBoxes.Add(origOwnBbox);
                         Array.Copy(node.LightsEnabler, origLeaf.LightsEnabler, node.LightsEnabler.Length);
 
-                        var oMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-                        var oMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-                        bool oAny = false;
-                        for (int j = 0; j < node.MeshIDs.Count; j++)
-                        {
-                            var p = new Vector3(node.MeshModelMatrices[j].Column4.X, node.MeshModelMatrices[j].Column4.Y, node.MeshModelMatrices[j].Column4.Z);
-                            var bx = node.BoundingBoxes[j];
-                            oMin = Vector3.Min(oMin, p + new Vector3(bx[0].X, bx[0].Y, bx[0].Z));
-                            oMax = Vector3.Max(oMax, p + new Vector3(bx[1].X, bx[1].Y, bx[1].Z));
-                            oAny = true;
-                        }
-                        for (int j = 0; j < node.LodIDs.Count; j++)
-                        {
-                            var p = new Vector3(node.LodModelMatrices[j].Column4.X, node.LodModelMatrices[j].Column4.Y, node.LodModelMatrices[j].Column4.Z);
-                            var bx = node.BoundingBoxes[node.MeshIDs.Count + j];
-                            oMin = Vector3.Min(oMin, p + new Vector3(bx[0].X, bx[0].Y, bx[0].Z));
-                            oMax = Vector3.Max(oMax, p + new Vector3(bx[1].X, bx[1].Y, bx[1].Z));
-                            oAny = true;
-                        }
-                        if (oAny) MeshDecoder.ApplySceneryBounds(node, oMin, oMax);
+                        MeshDecoder.RefitSceneryBounds(node, withLods: true);
 
                         var origPos = new Vector3(origMat.Column4.X, origMat.Column4.Y, origMat.Column4.Z);
                         var oa = origPos + new Vector3(origOwnBbox[0].X, origOwnBbox[0].Y, origOwnBbox[0].Z);
@@ -262,30 +207,7 @@ public sealed partial class GameScene : Scene
                     int insertAt = tile.IsLod ? node.BoundingBoxes.Count : node.MeshIDs.Count - 1;
                     node.BoundingBoxes.Insert(Math.Clamp(insertAt, 0, node.BoundingBoxes.Count), newBbox);
 
-                    var bMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-                    var bMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-                    bool any = false;
-                    for (int j = 0; j < node.MeshIDs.Count; j++)
-                    {
-                        var pos = new Vector3(node.MeshModelMatrices[j].Column4.X, node.MeshModelMatrices[j].Column4.Y, node.MeshModelMatrices[j].Column4.Z);
-                        var box = node.BoundingBoxes[j];
-                        var a = pos + new Vector3(box[0].X, box[0].Y, box[0].Z);
-                        var b = pos + new Vector3(box[1].X, box[1].Y, box[1].Z);
-                        bMin = Vector3.Min(bMin, Vector3.Min(a, b));
-                        bMax = Vector3.Max(bMax, Vector3.Max(a, b));
-                        any = true;
-                    }
-                    for (int j = 0; j < node.LodIDs.Count; j++)
-                    {
-                        var pos = new Vector3(node.LodModelMatrices[j].Column4.X, node.LodModelMatrices[j].Column4.Y, node.LodModelMatrices[j].Column4.Z);
-                        var box = node.BoundingBoxes[node.MeshIDs.Count + j];
-                        var a = pos + new Vector3(box[0].X, box[0].Y, box[0].Z);
-                        var b = pos + new Vector3(box[1].X, box[1].Y, box[1].Z);
-                        bMin = Vector3.Min(bMin, Vector3.Min(a, b));
-                        bMax = Vector3.Max(bMax, Vector3.Max(a, b));
-                        any = true;
-                    }
-                    if (any) MeshDecoder.ApplySceneryBounds(node, bMin, bMax);
+                    MeshDecoder.RefitSceneryBounds(node, withLods: true);
                     dupNode = node;
                 }
 
@@ -299,7 +221,6 @@ public sealed partial class GameScene : Scene
                 {
                     Parent = parent, Entity = newEntity, Node = dupNode,
                     IsLod = tile.IsLod, SourceId = tile.SourceId, Matrix = newMat, BoundingBox = newBbox,
-                    IndependentLeaf = scenery is not null, // Amedo 2026-09-21
                 };
 
                 actions.Add(sceneryAction);
@@ -311,13 +232,6 @@ public sealed partial class GameScene : Scene
                 var linkItem = sm2?.GetItem<PS2AnyLink>((uint)TwinConstants.SCENERY_LINK_ITEM);
                 if (sm2 is null || linkItem is null) continue;
 
-                static TwinMat4 CloneMat(TwinMat4 m) => new TwinMat4
-                {
-                    Column1 = new TwinVec4(m.Column1.X, m.Column1.Y, m.Column1.Z, m.Column1.W),
-                    Column2 = new TwinVec4(m.Column2.X, m.Column2.Y, m.Column2.Z, m.Column2.W),
-                    Column3 = new TwinVec4(m.Column3.X, m.Column3.Y, m.Column3.Z, m.Column3.W),
-                    Column4 = new TwinVec4(m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W),
-                };
                 static TwinMat4 OffsetMat(TwinMat4 m, Vector3 o) => new TwinMat4
                 {
                     Column1 = new TwinVec4(m.Column1.X + o.X, m.Column1.Y + o.Y, m.Column1.Z + o.Z, m.Column1.W),
@@ -335,9 +249,9 @@ public sealed partial class GameScene : Scene
                     UnkNum                  = orig.UnkNum,
                     IsLoadWallActive        = orig.IsLoadWallActive,
                     KeepLoaded              = orig.KeepLoaded,
-                    ObjectMatrix            = OffsetMat(CloneMat(orig.ObjectMatrix), offset),
-                    ChunkMatrix             = OffsetMat(CloneMat(orig.ChunkMatrix), offset),
-                    LoadingWall             = orig.LoadingWall is null ? null : OffsetMat(CloneMat(orig.LoadingWall), offset),
+                    ObjectMatrix            = OffsetMat(MeshDecoder.CloneTwinMat4(orig.ObjectMatrix), offset),
+                    ChunkMatrix             = OffsetMat(MeshDecoder.CloneTwinMat4(orig.ChunkMatrix), offset),
+                    LoadingWall             = orig.LoadingWall is null ? null : OffsetMat(MeshDecoder.CloneTwinMat4(orig.LoadingWall), offset),
                     ChunkLinksCollisionData = new(orig.ChunkLinksCollisionData),
                 };
                 linkItem.LinksList.Add(clone);

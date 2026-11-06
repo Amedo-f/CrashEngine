@@ -1,4 +1,3 @@
-using System.Numerics;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Camera;

@@ -1,4 +1,3 @@
-using System.Numerics;
 using CrashEngine.Runtime.Physics;
 
 namespace CrashEngine.Runtime.AgentLab;

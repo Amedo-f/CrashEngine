@@ -14,8 +14,6 @@ public sealed partial class AgentLabWorld
     public Action<AgentLabAgent, InstancePlace>? RestartGlobal_197428 { get; set; }
     public Action<AgentLabAgent>? ReleaseGlobal_197570 { get; set; }
 
-    public IReadOnlyList<AgentLabAgent> GlobalAgents => _global;
-
     // Amedo
     internal WorldChunk? ChunkNamed_1F0F58(string? name)
     {

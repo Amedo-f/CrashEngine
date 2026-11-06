@@ -16,7 +16,6 @@ public sealed partial class AgentLabAgent
     private Vector3 _boxMin;
     private Vector3 _boxMax;
     private bool _hasBox;
-    private bool _outOfScene;
 
     public uint Metric => _metric;
     public ushort ActivityExtra => _extra;

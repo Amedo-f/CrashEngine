@@ -39,9 +39,6 @@ public sealed class SaveManager : SaveCodeScreens
     public const string GameName = "crash twinsanity", Title = "Crash~Twinsanity", IconName = "Crash.ico", IconPath = @"StartUp\Crash.ico";
     public const string DirectoryName = "BASLUS-20909";
     public const int Slots = 4, DirectorySize = 0x800;
-
-    public readonly IconSysFile Header_68;
-    public readonly SaveFileSet Set_464;
     public readonly SaveDirectory Directory_470;
     public readonly BankFile[] Banks_580 = new BankFile[Slots];
     public readonly byte[] Buffer_30BBA8;
@@ -55,8 +52,6 @@ public sealed class SaveManager : SaveCodeScreens
     private SaveManager(Oleg oleg, SaveController controller, ISaveOptions game, GameTexts? texts, (SaveDevice Device, IconSysFile Header, SaveFileSet Set, SaveDirectory Directory, byte[] Buffer) parts)
         : base(GameName, oleg, parts.Device, texts)
     {
-        Header_68 = parts.Header;
-        Set_464 = parts.Set;
         Directory_470 = parts.Directory;
         Buffer_30BBA8 = parts.Buffer;
         for (int i = 0; i < Slots; i++)
@@ -91,7 +86,7 @@ public sealed class SaveManager : SaveCodeScreens
         var set = new SaveFileSet(3, header);
         var directory = new SaveDirectory(DirectoryName, Slots, 1, DirectorySize, buffer);
         var device = new SaveDevice(Slots, set, directory, root) { Log = log };
-        set.Add_2A80D0(new IconFile(IconPath, IconName, iconSize));
+        set.Add_2A80D0(new IconFile(IconName, iconSize));
         return (device, header, set, directory, buffer);
     }
 }

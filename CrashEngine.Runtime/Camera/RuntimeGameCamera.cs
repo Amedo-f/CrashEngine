@@ -174,7 +174,6 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     }
     public float Near { get; private set; } = 0.1f;
     public float Far { get; private set; } = 1500f;
-    public uint Controller => _comp + 0x30;
     public (uint Inst, uint Node, uint C, uint Motion, uint Comp, uint C9) Addresses => (_inst, _node, _c, _motion, _comp, _c9);
     public uint CurrentZone => Memory.U(_comp + 0x38);
     public ulong EyeFlags => Memory.Q(_comp + 0x50 + 0x2F0 + 0x40);

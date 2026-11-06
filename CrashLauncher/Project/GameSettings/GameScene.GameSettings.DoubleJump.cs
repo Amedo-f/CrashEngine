@@ -1,14 +1,4 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -34,9 +24,6 @@ public sealed partial class GameScene
             mask = single ? mask & ~0x44u : mask | 0x44;
             SetDoubleJumpMask(proj, mask);
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Original game: OFF (the normal jump, standing or running, allows a double jump).\n" +
-                         "Turn it on and the normal jump becomes a single jump.");
 
         bool slide = (mask & 0x20) != 0;
         if (ImGui.Checkbox("Allow double jump after slide jump##djslide", ref slide))
@@ -44,10 +31,6 @@ public sealed partial class GameScene
             mask = slide ? mask | 0x20 : mask & ~0x20u;
             SetDoubleJumpMask(proj, mask);
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Original game: OFF (the slide jump is a single jump).\n" +
-                         "The double jump after a slide jump also turns Crash to face the stick,\n" +
-                         "like a normal double jump.");
 
         bool spin = (mask & BuildIsoToPS2.DoubleJumpSpinBit) != 0;
         if (ImGui.Checkbox("Allow double jump while spinning##djspin", ref spin))
@@ -55,10 +38,6 @@ public sealed partial class GameScene
             mask = spin ? mask | BuildIsoToPS2.DoubleJumpSpinBit : mask & ~BuildIsoToPS2.DoubleJumpSpinBit;
             SetDoubleJumpMask(proj, mask);
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Original game: OFF (jumping while spinning is a single jump, and the spin keeps\n" +
-                         "the double jump blocked until Crash lands). Turn it on to allow a double jump\n" +
-                         "during and after the spin.");
 
         bool slideSpin = (mask & BuildIsoToPS2.SlideJumpSpinBit) != 0;
         if (ImGui.Checkbox("Allow spin during slide jump##spinslide", ref slideSpin))
@@ -66,8 +45,6 @@ public sealed partial class GameScene
             mask = slideSpin ? mask | BuildIsoToPS2.SlideJumpSpinBit : mask & ~BuildIsoToPS2.SlideJumpSpinBit;
             SetDoubleJumpMask(proj, mask);
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Original game: OFF (the spin is cancelled during a slide jump).");
 
         bool slideSlam = (mask & BuildIsoToPS2.SlideJumpBodySlamBit) != 0;
         if (ImGui.Checkbox("Allow body slam during slide jump##bsslide", ref slideSlam))
@@ -75,8 +52,6 @@ public sealed partial class GameScene
             mask = slideSlam ? mask | BuildIsoToPS2.SlideJumpBodySlamBit : mask & ~BuildIsoToPS2.SlideJumpBodySlamBit;
             SetDoubleJumpMask(proj, mask);
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Original game: OFF (the body slam button does nothing during a slide jump).");
 
         bool isDefault = mask == BuildIsoToPS2.DoubleJumpDefaultMask;
         ImGui.BeginDisabled(isDefault);

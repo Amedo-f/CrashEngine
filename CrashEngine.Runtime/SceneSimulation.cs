@@ -141,8 +141,6 @@ public sealed partial class SceneSimulation
         if (sim.BindPlayer() is { } character) // Amedo 2026-09-28
         {
             Mark("characters"); // Amedo 2026-10-02
-            world.StartHitPoints = character.HitPoints;
-            world.StartMatrix = world.Player!.GameMatrix;
             sim.StepStreaming(block: true); // Amedo 2026-09-28
             Mark("linked chunks"); // Amedo 2026-10-02
             if (chunkHost is not null && sim.Streamer is { Root: { } streamRoot } streamer)
@@ -289,7 +287,6 @@ public sealed partial class SceneSimulation
         c.GroundObjects = (a, b) => Physics.HullQueries.SegmentBodies_1F1740(
             world.QueryBodies(Vector3.Min(a, b), Vector3.Max(a, b), 0x15B010, 1, 0x10, agent, requireAll: true), a, b);
         c.OverlapQuery = (hull, m, mask) => world.QueryOverlap(hull, m, mask, 1, agent); // Amedo 2026-10-06
-        c.Unimplemented = world.Unimplemented;
         c.SphereQuery = (at, r, mask) => world.QuerySphere(at, r, mask, 1, agent);
         c.InstanceBox = () => agent.TreeBox;
         c.Collect = owner => { if (owner is AgentLabAgent picked) picked.CollectBy(agent); }; // Amedo 2026-10-06

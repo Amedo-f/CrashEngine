@@ -1,29 +1,10 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
-using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using PS2AnyAIPath = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPath;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinBoundingBoxBuilder = Twinsanity.TwinsanityInterchange.Common.TwinBoundingBoxBuilder;
 using TwinChunkLinkBoundingBoxBuilder = Twinsanity.TwinsanityInterchange.Common.TwinChunkLinkBoundingBoxBuilder;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
@@ -31,19 +12,8 @@ using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items
 using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
 using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
 using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
 using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 using TwinTrigger = Twinsanity.TwinsanityInterchange.Common.TwinTrigger;
 
 namespace CrashLauncher;
@@ -160,22 +130,13 @@ public sealed partial class GameScene : Scene
         foreach (var id in ids.Distinct())
         {
             if (existing.Contains(id)) continue;
-            for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
+            var p = Layouts(rm2).SelectMany(l => LayoutSectionItems<PS2AnyPosition>(l, TwinConstants.LAYOUT_POSITIONS_SECTION))
+                                .FirstOrDefault(x => x.GetID() == id);
+            if (p is not null)
             {
-                var layout = rm2.GetItem<BaseTwinSection>((uint)lid);
-                var posSec = layout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_POSITIONS_SECTION);
-                if (posSec is null) continue;
-                bool found = false;
-                for (int i = 0; i < posSec.GetItemsAmount(); i++)
-                {
-                    if (posSec.GetItem(i) is not PS2AnyPosition p || p.GetID() != id) continue;
-                    var posEnt = MakePointMarker(_positionsRoot, $"Position_{p.GetID():X4}", p.Position,
-                                    new Vector4(1f, 0.9f, 0.15f, 0.7f));
-                    posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
-                    found = true;
-                    break;
-                }
-                if (found) break;
+                var posEnt = MakePointMarker(_positionsRoot, $"Position_{p.GetID():X4}", p.Position,
+                                new Vector4(1f, 0.9f, 0.15f, 0.7f));
+                posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
             }
         }
     }
@@ -260,53 +221,38 @@ public sealed partial class GameScene : Scene
         }
 
         int triggers = 0, cameras = 0, positions = 0, aiPositions = 0;
-        for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
+        foreach (var layout in Layouts(rm2))
         {
-            var layout = rm2.GetItem<BaseTwinSection>((uint)lid);
-            if (layout is null) continue;
+            foreach (var t in LayoutSectionItems<PS2AnyTrigger>(layout, TwinConstants.LAYOUT_TRIGGERS_SECTION))
+            {
+                var trigEnt = MakeBoxMarker(triggersRoot, $"Trigger_{t.GetID():X4}", t.Trigger.Position, t.Trigger.Scale,
+                              new Vector4(0.2f, 0.85f, 0.3f, 0.35f), rotation: t.Trigger.Rotation);
+                trigEnt.Add(new CrashEngine.Importer.TriggerMarker { Source = t });
+                triggers++;
+            }
 
-            var trigSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_TRIGGERS_SECTION);
-            if (trigSec is not null)
-                for (int i = 0; i < trigSec.GetItemsAmount(); i++)
-                    if (trigSec.GetItem(i) is PS2AnyTrigger t)
-                    {
-                        var trigEnt = MakeBoxMarker(triggersRoot, $"Trigger_{t.GetID():X4}", t.Trigger.Position, t.Trigger.Scale,
-                                      new Vector4(0.2f, 0.85f, 0.3f, 0.35f), rotation: t.Trigger.Rotation);
-                        trigEnt.Add(new CrashEngine.Importer.TriggerMarker { Source = t });
-                        triggers++;
-                    }
+            foreach (var c in LayoutSectionItems<PS2AnyCamera>(layout, TwinConstants.LAYOUT_CAMERAS_SECTION))
+            {
+                var camEnt = MakeBoxMarker(camerasRoot, $"Camera_{c.GetID():X4}", c.CamTrigger.Position, c.CamTrigger.Scale,
+                              new Vector4(0.15f, 0.4f, 0.9f, 0.35f), rotation: c.CamTrigger.Rotation);
+                camEnt.Add(new CrashEngine.Importer.CameraMarker { Source = c });
+                cameras++;
+            }
 
-            var camSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_CAMERAS_SECTION);
-            if (camSec is not null)
-                for (int i = 0; i < camSec.GetItemsAmount(); i++)
-                    if (camSec.GetItem(i) is PS2AnyCamera c)
-                    {
-                        var camEnt = MakeBoxMarker(camerasRoot, $"Camera_{c.GetID():X4}", c.CamTrigger.Position, c.CamTrigger.Scale,
-                                      new Vector4(0.15f, 0.4f, 0.9f, 0.35f), rotation: c.CamTrigger.Rotation);
-                        camEnt.Add(new CrashEngine.Importer.CameraMarker { Source = c });
-                        cameras++;
-                    }
+            foreach (var p in LayoutSectionItems<PS2AnyPosition>(layout, TwinConstants.LAYOUT_POSITIONS_SECTION))
+            {
+                var posEnt = MakePointMarker(positionsRoot, $"Position_{p.GetID():X4}", p.Position,
+                                new Vector4(1f, 0.9f, 0.15f, 0.7f));
+                posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
+                positions++;
+            }
 
-            var posSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_POSITIONS_SECTION);
-            if (posSec is not null)
-                for (int i = 0; i < posSec.GetItemsAmount(); i++)
-                    if (posSec.GetItem(i) is PS2AnyPosition p)
-                    {
-                        var posEnt = MakePointMarker(positionsRoot, $"Position_{p.GetID():X4}", p.Position,
-                                        new Vector4(1f, 0.9f, 0.15f, 0.7f));
-                        posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
-                        positions++;
-                    }
-
-            var aiPosSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION);
-            if (aiPosSec is not null)
-                for (int i = 0; i < aiPosSec.GetItemsAmount(); i++)
-                    if (aiPosSec.GetItem(i) is PS2AnyAIPosition ap)
-                    {
-                        var aiPosEnt = MakeAiPositionMarker(aiPosRoot, $"AiPosition_{ap.GetID():X4}", ap.Position); // Amedo
-                        aiPosEnt.Add(new CrashEngine.Importer.AiPositionMarker { Source = ap });
-                        aiPositions++;
-                    }
+            foreach (var ap in LayoutSectionItems<PS2AnyAIPosition>(layout, TwinConstants.LAYOUT_AI_POSITIONS_SECTION))
+            {
+                var aiPosEnt = MakeAiPositionMarker(aiPosRoot, $"AiPosition_{ap.GetID():X4}", ap.Position); // Amedo
+                aiPosEnt.Add(new CrashEngine.Importer.AiPositionMarker { Source = ap });
+                aiPositions++;
+            }
         }
 
         // Amedo 2026-09-19
@@ -387,4 +333,18 @@ public sealed partial class GameScene : Scene
 			}
 		}
 	}
+
+    private static IEnumerable<BaseTwinSection> Layouts(PS2AnyTwinsanityRM2 rm2)
+    {
+        for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
+            if (rm2.GetItem<BaseTwinSection>((uint)lid) is { } layout) yield return layout;
+    }
+
+    private static IEnumerable<T> LayoutSectionItems<T>(BaseTwinSection layout, int sectionId) where T : class
+    {
+        var section = layout.GetItem<BaseTwinSection>((uint)sectionId);
+        if (section is null) yield break;
+        for (int i = 0; i < section.GetItemsAmount(); i++)
+            if (section.GetItem(i) is T item) yield return item;
+    }
 }

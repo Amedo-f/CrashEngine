@@ -20,9 +20,7 @@ public sealed class ButtonBindings
     // Amedo
     public sealed class Analog
     {
-        public readonly byte[] Axes_00 = new byte[4];
         public uint Word_04;
-        public float Low_08, Scale_0C;
     }
 
     public readonly Digital[] Digital_04;

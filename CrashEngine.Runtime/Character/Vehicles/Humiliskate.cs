@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -425,7 +424,7 @@ public sealed class Humiliskate : Vehicle
     private void TurnAboutUp(float radians)
     {
         var up = new Vector3(Board.M21, Board.M22, Board.M23);
-        var r = AxisAngle_18CEA8(up, GameMath.FromValue_11BFA0(radians, 0));
+        var r = GameMath.AxisAngle_18CEA8(up, GameMath.FromValue_11BFA0(radians, 0));
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();
@@ -695,26 +694,11 @@ public sealed class Humiliskate : Vehicle
         float kc = GameMath.InvLength_11C030(Eps, new Vector4(c, 1f));
         float dot = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
         c = new Vector3(c.X * kc, c.Y * kc, c.Z * kc);
-        var r = AxisAngle_18CEA8(c, GameMath.Acos_18B738(dot));
+        var r = GameMath.AxisAngle_18CEA8(c, GameMath.Acos_18B738(dot));
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();
         Board.Translation = t;
-    }
-
-    internal static Matrix4x4 AxisAngle_18CEA8(Vector3 axis, int angle) // Amedo
-    {
-        if (angle == 0) return Matrix4x4.Identity;
-        var (s, c) = GameMath.SinCos(angle * GameMath.UnitToRad);
-        float x = axis.X, y = axis.Y, z = axis.Z;
-        float t = 1f - c;
-        float tx = t * x, tz = t * z, ty = t * y;
-        float txz = tx * z, txy = tx * y, tyz = ty * z, tzz = tz * z, txx = tx * x, tyy = ty * y;
-        float sz = s * z, sx = s * x, sy = s * y;
-        return new Matrix4x4(txx + c, txy + sz, txz - sy, 0f,
-                             txy - sz, tyy + c, tyz + sx, 0f,
-                             txz + sy, tyz - sx, tzz + c, 0f,
-                             0f, 0f, 0f, 1f);
     }
 
     private void Suspension_158E48(float dt)

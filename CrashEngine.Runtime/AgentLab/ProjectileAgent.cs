@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using CrashEngine.Core;
 
@@ -33,11 +32,9 @@ public sealed class ProjectileAgent
     public AgentLabAgent? Shooter { get; set; }
     public ushort Message { get; set; } = 0xFFFF;
     public int State => (int)(_c0 & 0x1F);
-    public Vector3 Velocity => _velocity;
     private int SettingsIndex => (int)((_c0 >> 10) & 0x1F);
     private AgentLabWorld World => _owner.World;
     private Settings S => World.ProjectileSettings_10C448(SettingsIndex);
-    public bool TrailsActive => State is 2 or 3;
 
     public static int StateOf(ushort id)
     {

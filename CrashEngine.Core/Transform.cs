@@ -53,13 +53,4 @@ public class Transform
     public Vector3 Forward => GameMath.Normalize(Vector3.Transform(-Vector3.UnitZ, Rotation));
     public Vector3 Right   => GameMath.Normalize(Vector3.Transform( Vector3.UnitX, Rotation));
     public Vector3 Up      => GameMath.Normalize(Vector3.Transform( Vector3.UnitY, Rotation));
-
-    public void LookAt(Vector3 target)
-    {
-        var dir = GameMath.Normalize(target - Position);
-        if (dir == Vector3.Zero) return;
-        Rotation = Quaternion.CreateFromRotationMatrix(
-            Matrix4x4.CreateLookAt(Position, Position + dir, Vector3.UnitY) is var m
-                ? Matrix4x4.Transpose(m) : Matrix4x4.Identity);
-    }
 }

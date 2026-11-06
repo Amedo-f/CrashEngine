@@ -1,7 +1,6 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Linq;
 using System.Numerics;
 
 namespace CrashLauncher;
@@ -48,10 +47,6 @@ public sealed partial class GameScene
                 _arrayModeActive = true;
                 RebuildArrayPreview();
             }
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Blender-style array — shows a LIVE preview you can tweak before\n" +
-                             "committing anything real. Each step sits flush against the last,\n" +
-                             "automatically sized from the object's own real geometry.");
             return;
         }
 
@@ -92,12 +87,6 @@ public sealed partial class GameScene
             _arrayModeActive = false;
             ClearArrayPreview();
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Bakes real duplicates now (fresh graphics/instance ids, same proven\n" +
-                         "clone pipeline Ctrl+D uses) -- each step sits flush against the last\n" +
-                         "along the picked direction, plus Rotation×N tilt.\n" +
-                         "Not a live/re-editable modifier -- the PS2 formats have no such concept.\n" +
-                         "Undoable like any other duplicate. No collision auto-generated.");
         ImGui.SameLine();
         if (ImGui.Button("Cancel##cancelarray", new Vector2(-1f, 0f)))
         {

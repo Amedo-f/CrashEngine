@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -11,7 +10,6 @@ internal sealed class SplineFollower_121F48
     public Vector4 Offset = new(0f, 0f, 0f, 1f);
     public float Gain = 1f;
     public float Turn = 1f;
-    public float Param28;
     public float Slope;
 }
 
@@ -27,7 +25,6 @@ public sealed partial class AgentLabAgent
         f.Offset = new Vector4(FloatValueOf(Arg(0)), FloatValueOf(Arg(1)), FloatValueOf(Arg(2)), 1f);
         f.Gain = FloatValueOf(Arg(3));
         f.Turn = FloatValueOf(Arg(4));
-        f.Param28 = FloatValueOf(Arg(5));
         f.Slope = FloatValueOf(Arg(6));
     }
 

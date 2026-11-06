@@ -47,7 +47,6 @@ public sealed partial class AgentLabAgent
         }
         if (CachedTemplate() is not { } template) return;
         template.Entity.Active = false;
-        template._outOfScene   = true;
         template.LeaveTree(); // Amedo
         template.InChunk_A0 = false;
         Trace($"cached template {template.Entity.Name}");

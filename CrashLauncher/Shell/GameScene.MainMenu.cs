@@ -33,13 +33,9 @@ public sealed partial class GameScene
         ImGui.Separator();
         if (ImGui.MenuItem("Reload Level (keep saved edits)")) ReloadLevel(fromDiscOnly: false);
         if (ImGui.MenuItem("Reload Level from Disc (discard saved edits)")) ReloadLevel(fromDiscOnly: true);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Re-extracts just THIS level fresh from the real disc archive —\nignores SavedChunks entirely. Use this to recover from a broken\nsaved edit (e.g. a bad texture import) without redoing the whole\nCreate Project extraction. Any unsaved live edits on this level\nare lost too.");
         ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(1f, 0.45f, 0.45f, 1f));
         if (ImGui.MenuItem("Reset ALL Levels From Disc (delete all saved edits)...")) _openResetAllConfirmPopup = true;
         ImGui.PopStyleColor();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("PROJECT-WIDE, not just this level: permanently deletes the entire\nSavedChunks folder (every level's saved edits) so everything reads\nfresh from the real disc archive again. No backup, no Undo — asks\nfor confirmation first.");
         ImGui.Separator();
         if (ImGui.MenuItem("Build ISO (PS2)")) BuildIso();
         if (ImGui.BeginMenu("ISO Output Path"))
@@ -53,8 +49,6 @@ public sealed partial class GameScene
             ImGui.EndMenu();
         }
         if (ImGui.MenuItem(_buildingPc ? "Building PC..." : "Build to PC", null, false, !_buildingPc)) BuildPc();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Builds a Windows version of the game (demo) with the CrashGame player:\nit plays THIS level from this project's saved chunks + the extracted disc,\nwithout the editor. Output: <project>\\Build\\PC\\CrashGame.exe (runs without\ninstalling anything). Save Chunk first. Needs the .NET SDK (dotnet).\nIn the game: Esc quits, F1 shows/hides stats, F3 frame rate.");
         ImGui.EndDisabled();
         ImGui.Separator();
         if (ImGui.MenuItem("Import Object (OBJ + textures)..."))
@@ -65,14 +59,8 @@ public sealed partial class GameScene
                 if (modelPath != null) BakeExternalModel(modelPath, flipX);
             });
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Imports a mesh file (.obj + its .mtl + textures, or .glb/.fbx/etc.) as\na REAL PS2 RigidModel/OGI/Object, placed as a normal Instance at\nthe camera. Survives Save Chunk + Build ISO.");
         if (ImGui.MenuItem("Export Collision to OBJ...")) ExportCollisionToObj();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Writes this level's ENTIRE current collision to a plain .obj file — edit it\nin Blender, then use \"Import Collision from OBJ...\" to bring it back.\nVertex ORDER is preserved exactly — don't reorder/reindex vertices in Blender.");
         if (ImGui.MenuItem("Import Collision from OBJ...")) ImportCollisionFromObj();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Replaces this level's ENTIRE collision from a .obj file — use the SAME\nfile \"Export Collision to OBJ...\" wrote. Triggers are left untouched.\nSave Chunk + Build ISO to test.");
     }
 
     // Amedo
@@ -93,34 +81,24 @@ public sealed partial class GameScene
         ImGui.Separator();
         if (ImGui.MenuItem("Deselect")) SelectClicked(null, additive: false);
         if (ImGui.MenuItem("Delete Selected", "Del", false, _selectedSet.Count > 0)) DeleteSelected();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Only real PS2 objects/scenery tiles are removed from the archive —\ncubes just disappear from the editor.");
     }
 
     // Amedo
     private void DrawGameObjectMenu()
     {
         if (ImGui.MenuItem("Cube")) _pendingSpawn = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("A real, unit-sized (1x1x1) box baked as a genuine PS2 RigidModel/OGI/Object,\nplaced as a normal Instance at the camera. Import Texture (Inspector) can\nreplace its gray texture. Save Chunk to keep it, then Build ISO + test.");
         ImGui.Separator();
         if (ImGui.MenuItem("Crash (full, with scripts)...")) _showCrashPicker = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Crash is defined LOCALLY per-level — this does a real full transplant\n(object + OGIs + animations + behaviours/scripts + sounds) from a level\nthat already has a working Crash.");
         if (ImGui.MenuItem("Object (full, from another level)..."))
         {
             _objectTransplantLevelFilter = "";
             _showObjectTransplantLevelPicker = true;
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Full transplant of ANY object from ANY level — pick the source level,\nthen the object by name. Save Chunk to keep it, then Build ISO + test.");
         if (ImGui.MenuItem("Trigger (from another level)..."))
         {
             _triggerTransplantLevelFilter = "";
             _showTriggerTransplantLevelPicker = true;
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Copies a Trigger volume + its TriggerMessages from another level. Do Add Object\nfirst (same session) and the trigger is pointed at that object's new instance.");
         ImGui.Separator();
         if (ImGui.MenuItem("Model (real, as Object)..."))
         {
@@ -131,8 +109,6 @@ public sealed partial class GameScene
                 if (modelPath != null) BakeExternalModel(modelPath, flipX);
             });
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Bakes the mesh into a real PS2 RigidModel/OGI/Object placed as a normal\nInstance. One real PS2 texture per submesh. Save Chunk to keep it.");
         if (ImGui.MenuItem("Scenery (real)..."))
         {
             _importError = null;
@@ -142,43 +118,24 @@ public sealed partial class GameScene
                 if (modelPath != null) BakeExternalModelAsScenery(modelPath, flipX);
             });
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Bakes the mesh into real, independent PS2 SCENERY placed at the world origin.\nNo Object/Instance is created. Save Chunk to keep it.");
         ImGui.MenuItem("Flip X on import (fix mirror)", null, ref _flipModelX);
         ImGui.Separator();
         if (ImGui.MenuItem("AI Position")) AddAiPositionAt(System.Numerics.Vector3.Zero);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Drops a new AI position at the world origin. Enemies roam among nearby\nAI positions. Connect them with \"AI Path\". Save Chunk to keep.");
         if (ImGui.MenuItem("AI Path (link all selected)")) AddAiPathBetweenSelected();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Select ALL the AI positions to link (Ctrl+click): 2 -> one edge,\n3+ -> a closed loop. Save Chunk.");
     }
 
     // Amedo
     private void DrawCollisionMenu()
     {
         if (ImGui.MenuItem("Collision Box")) _pendingSpawnCollisionBox = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("A visible, resizable box that ALSO emits real PS2 collision geometry matching\nits position/scale. Synced into the real collision data on every Save Chunk.");
         if (ImGui.MenuItem("Cylinder Collision")) _pendingSpawnCollisionCylinder = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Flat-capped cylinder — Radius/Height/Segments editable in the Inspector.\nSame sync-on-Save-Chunk behaviour as Collision Box.");
         if (ImGui.MenuItem("Plane Collision")) _pendingSpawnCollisionPlane = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("A single flat, single-sided quad (Width x Length in the Inspector) for patching\na ramp/wall/ceiling. Same sync-on-Save-Chunk behaviour as Collision Box.");
         ImGui.Separator();
         if (ImGui.MenuItem("Show Collision", null, ref _showCollision)) SetCollisionVisible(_showCollision);
         if (ImGui.MenuItem("Show Object Collision", null, ref _showObjectCollision) && _objectCollisionRoot != null)
             _objectCollisionRoot.Active = _showObjectCollision;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("The game's collision parts of every object (OGI convex hulls on their joints):\n" +
-                         "green = Crash collides, yellow = Crash only touches it, grey = Crash ignores it.\n" +
-                         "Blue = character box. In Play, physics balls show their sphere, and orange spheres\n" +
-                         "= the movement sphere of walkers that use the physics controller.");
         ImGui.Separator();
         if (ImGui.MenuItem("Clear Collision Data (experimental)")) ClearCollisionData();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Empties this level's ground/world collision triangles — for testing whether\nthe real game falls through the world without them. Save Chunk + Build ISO to test.");
     }
 
     // Amedo
@@ -223,8 +180,6 @@ public sealed partial class GameScene
         ImGui.Separator();
         if (MenuToggle("Particle Effects", ref _showParticleEffects) && _particleEffectsRoot != null) _particleEffectsRoot.Active = _showParticleEffects;
         if (MenuToggle("Game Distance Culling", ref _particleDistanceGating) && _particleEffects != null) _particleEffects.DistanceGating = _particleDistanceGating;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Like the game: each effect only emits while the camera is between its\nmin and max emit distance, and vanishes outside it.\nOff = every effect runs no matter where the camera is.");
         if (RenderPipeline.Instance is { } pipeline)
         {
             ImGui.Separator();
@@ -232,12 +187,8 @@ public sealed partial class GameScene
             if (MenuToggle("Wireframe", ref wire)) pipeline.Wireframe = wire;
             bool lighting = GameLightingEnvironment.Enabled;
             if (MenuToggle("Game Lighting", ref lighting)) GameLightingEnvironment.Enabled = lighting;
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Lights objects exactly like the game: ambient + the 3 strongest lights of the\nlevel, per vertex, on lit materials only. Scenery stays unlit, like the game.");
             bool shadows = GameShadowPass.ShowShadows;
             if (MenuToggle("Game Shadows", ref shadows)) GameShadowPass.ShowShadows = shadows;
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Shadows exactly like the game: each object's own shadow shapes are extruded\nstraight down as volumes and darken what they touch.");
             DrawSunShadowsMenu(); // Amedo
         }
     }
@@ -248,8 +199,6 @@ public sealed partial class GameScene
         var s = GraphicsSettings.Current;
         bool sun = s.Shadows == ShadowMode.Sun;
         if (MenuToggle("Sun Shadows (PC)", ref sun)) GraphicsSettings.Set(s with { Shadows = sun ? ShadowMode.Sun : ShadowMode.Original });
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("PC only: a real sun lights the level and everything casts a shadow on everything\n(scenery, objects, Crash). Replaces Game Shadows while on. The PS2 build keeps the\noriginal shadows. Saved in this project's graphics settings (also GRAPHIC OPTIONS > SHADOWS).");
         if (!sun) return;
         if (ImGui.BeginMenu("Sun Settings"))
         {
@@ -258,7 +207,6 @@ public sealed partial class GameScene
             bool done = ImGui.IsItemDeactivatedAfterEdit();
             bool fromLevel = s.SunFromLevel;
             bool levelChanged = ImGui.Checkbox("Follow Level Sun", ref fromLevel);
-            if (ImGui.IsItemHovered()) MaybeTooltip("The shadows follow the sun (or moon) drawn in this level's sky, found automatically\n(if the sky has none: the level's first directional light). Turn off to set Direction / Height by hand.");
             changed |= levelChanged;
             done |= levelChanged;
             ImGui.BeginDisabled(fromLevel);
@@ -268,20 +216,16 @@ public sealed partial class GameScene
             done |= ImGui.IsItemDeactivatedAfterEdit();
             ImGui.EndDisabled();
             changed |= ImGui.SliderInt("Shadow Range", ref range, GraphicsSettings.SunRangeMin, GraphicsSettings.SunRangeMax);
-            if (ImGui.IsItemHovered()) MaybeTooltip("How far from the camera shadows are drawn. Sharp up to 150 m, coarser beyond that\n(keeps performance).");
             done |= ImGui.IsItemDeactivatedAfterEdit();
             changed |= ImGui.SliderInt("Softness", ref softness, GraphicsSettings.SunSoftnessMin, GraphicsSettings.SunSoftnessMax);
-            if (ImGui.IsItemHovered()) MaybeTooltip("How soft the shadow edges are (0 = hard).");
             done |= ImGui.IsItemDeactivatedAfterEdit();
             int shapeSoft = s.ShapeSoftness;
             changed |= ImGui.SliderInt("Shape Softness", ref shapeSoft, GraphicsSettings.ShapeSoftnessMin, GraphicsSettings.ShapeSoftnessMax);
-            if (ImGui.IsItemHovered()) MaybeTooltip("How much characters and objects are shaded by their overall shape instead of their\ntriangles (0 = surface only, 10 = fully rounded).");
             done |= ImGui.IsItemDeactivatedAfterEdit();
             ImGui.Separator();
             bool points = s.PointLights;
             int pointStrength = s.PointLightStrength;
             bool pointsChanged = ImGui.Checkbox("Point Lights", ref points);
-            if (ImGui.IsItemHovered()) MaybeTooltip("The level's own lamps/torches light the scenery and every object (Crash too) per pixel,\nand cast soft shadows (the nearest 4).");
             changed |= pointsChanged;
             done |= pointsChanged;
             ImGui.BeginDisabled(!points);
@@ -302,45 +246,27 @@ public sealed partial class GameScene
     {
         bool playerRunning = _playerProcess is { HasExited: false };
         if (ImGui.MenuItem("Launch Player", null, false, !playerRunning)) LaunchPlayer();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Runs the game outside the editor, exactly like the built game (same CrashGame player,\nsame project data): saves the open level first and starts in it. It uses its own\ntest copy in <project>\\LaunchPlayer (own saves) and never touches Build\\PC.\nEsc quits."); // Amedo
         if (ImGui.MenuItem("Stop Player", null, false, playerRunning)) StopPlayer();
         ImGui.Separator();
         if (ImGui.MenuItem("Show Scripts (names)...")) _showScriptsBrowser = true;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Lists every item in this chunk's CODE_BEHAVIOURS_SECTION with its real name\n(graphs, odd id); starters (even id) have no name.");
         if (ImGui.MenuItem("Copy All Ground Colors From Level..."))
         {
             _groundColorPickerFilter = "";
             _showGroundColorPicker = true;
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Copies vertex colors for EVERY scenery mesh in this chunk that shares the\nsame mesh id with the chosen level. Tiles with no matching id are untouched.");
         ImGui.Separator();
         if (ImGui.MenuItem("Delete Linked Scenery (test)")) DeleteLinkedScenery();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Clears this chunk's whole LinksList in-memory only. Reload Level from Disc\nto undo (not on the undo stack). Save Chunk to persist.");
         if (ImGui.MenuItem("Delete Skydome (test)")) DeleteSkydome();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Clears this chunk's skydome in-memory only. Reload Level from Disc to undo\n(not on the undo stack). Save Chunk to persist.");
     }
 
     // Amedo
     private void DrawWindowMenu()
     {
         ImGui.MenuItem("Game Settings", null, ref _showGameSettings);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Gameplay-rule toggles — real script edits to shared behaviour\ngraphs (Startup\\Default.rm2), not per-object Inspector tweaks.");
         ImGui.MenuItem("UI Browser", null, ref _showUiBrowser);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Browse the game's own loading screens, icons, decals, and fonts —\nreal assets decoded straight from disc.");
         ImGui.MenuItem("Default.rm2 Data", null, ref _showGlobalData);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Browse Startup\\Default.rm2's own shared objects/behaviours/sounds by list.");
         ImGui.Separator();
         if (ImGui.MenuItem("Reset Layout")) ResetWorkspaceLayout();
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Restore this workspace's default panel layout.");
     }
 
     // Amedo

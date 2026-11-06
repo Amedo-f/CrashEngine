@@ -7,7 +7,6 @@ using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using ITwinObject = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
@@ -33,9 +32,6 @@ public sealed partial class GameScene
     }
 
     // Amedo
-    private static List<TwinShader> CrateShaders(ChunkSource src) => GameShadowDefs.CrateShaders(src.Rm2, src.GlobalRm2);
-
-    // Amedo
     private void DrawCratesReceiveShadows(ChunkSource src)
     {
         if (GetGameProject() is not { } proj) return;
@@ -53,11 +49,6 @@ public sealed partial class GameScene
             _browser.Log($"Crates Receive Shadows: {(on ? "on" : "off")} ({changed} crate material layer(s) changed in the loaded levels). " +
                          "Every level applies it when it loads (editor, Play, PC build); Save Chunk writes it into this level and Default.rm2 for Build ISO.");
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Lets Crash's and the objects' shadows fall on every crate (basic, Nitro, TNT, Iron, spring, checkpoint, Aku Aku...).\n" +
-                         "The original game marks crate materials as non-receivers (shader FBA bit off); this sets the same bit\n" +
-                         "that scenery uses. It is a project setting: every level gets it when it loads (each level carries its own\n" +
-                         "copy of the crate materials). For the PS2 (Build ISO): Default.rm2 and every level you saved get it.");
     }
 
     // Amedo
@@ -88,10 +79,6 @@ public sealed partial class GameScene
             if (ChunkSourceFor(e) is { } src) src.GlobalRm2Dirty = true;
             RefreshShadowReceivers();
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Shadows of Crash and the objects fall on this object (the material's FBA bit, read by the game itself,\n" +
-                         "so it also works on PS2). Materials are shared: every object using the same material changes too\n" +
-                         "(Unique Object -> Own Model & Textures to keep it to this one). Save Chunk to persist.");
     }
 
     // Amedo

@@ -1,12 +1,6 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
 using CrashEngine.Renderer;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
-using TwinJoint = Twinsanity.TwinsanityInterchange.Common.TwinJoint;
 
 namespace CrashLauncher;
 
@@ -177,10 +171,6 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=Y
 			uint text = ImGui.GetColorU32(colors[(int)(on ? ImGuiCol.Text : ImGuiCol.TextDisabled)]);
 			DrawWorkspaceIcon(dl, ws, new Vector2(x + 17f, origin.Y + WorkspaceTabHeight * 0.5f), text);
 			dl.AddText(new Vector2(x + 30f, origin.Y + (WorkspaceTabHeight - ImGui.GetFontSize()) * 0.5f), text, label);
-			if (hovered)
-				MaybeTooltip(Simulating && !on ? "Stop Play Scene to switch workspaces."
-					: ws == Workspace.Scene ? "Scene workspace — the level, the Hierarchy, the Inspector, Assets and Output."
-					: "Animation workspace — one character on its own, its skeleton, skins and animations, with a timeline.\nRight-drag orbits, the wheel zooms, middle-drag pans, Esc goes back to the Scene.");
 			x += w + 1f;
 		}
 		if (_workspace == Workspace.Scene)

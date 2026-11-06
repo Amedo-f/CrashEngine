@@ -1,46 +1,12 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
 using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
 using PS2AnyPath = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPath;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
 using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
 namespace CrashLauncher;
@@ -72,12 +38,7 @@ public sealed partial class GameScene : Scene
         {
             try
             {
-                using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-                using var stream = pkg.OpenByPath(_rm2) ?? throw new FileNotFoundException(_rm2);
-                using var reader = new BinaryReader(stream);
-                var fresh = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2();
-                fresh.Read(reader, (int)stream.Length);
-                _pristineRm2ForRecovery = fresh;
+                _pristineRm2ForRecovery = ReadPristineRm2(_rm2);
             }
             catch (Exception ex)
             {
@@ -106,12 +67,6 @@ public sealed partial class GameScene : Scene
         ImGui.Separator();
         if (ImGui.Button("Add Behaviour From Object...##addbeh", new Vector2(-1f, 0f)))
             OpenAddBehaviourFromObject(inst.ObjectId);
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("Copy selected behaviours from another object (e.g. an enemy) onto THIS\n" +
-                         "object — pick a source level, a source object, then tick which behaviours.\n" +
-                         "EXPERIMENTAL: a behaviour that drives its source object's own animations/\n" +
-                         "sounds may not work here (static/different object). Save Chunk + Build ISO\n" +
-                         "to test; Reload Level from Disc to revert if it breaks.");
 
         ImGui.Separator();
         if (ImGui.CollapsingHeader("Swap Object##swap"))
@@ -142,13 +97,6 @@ public sealed partial class GameScene : Scene
                     : MeshDecoder.GetObjectCatalog(swapChunkSrc.MeshTables);
 
                 ImGui.Checkbox("Full swap (bring scripts, AI, physics too)##swapfull", ref _swapObjectFull);
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Off (default): only the mesh/texture changes, same as before —\n" +
-                                      "fine for a crate becoming a Wumpa fruit, etc.\n" +
-                                      "On: also brings the target's full script/behaviour graph AND\n" +
-                                      "its own native physics/jump-power/spawn tuning — turn this on\n" +
-                                      "when swapping to another PLAYABLE character (Nina, Cortex...),\n" +
-                                      "not just a different-looking prop.");
 
                 ImGui.SetNextItemWidth(-1f);
                 ImGui.InputTextWithHint("##swapFilter", "Search objects...", ref _swapObjectFilter, 128);
@@ -186,15 +134,6 @@ public sealed partial class GameScene : Scene
                 {
                     if (ImGui.Button("Reset to Original##resetskin", new Vector2(-1f, 0f)))
                         ResetCharacterSkin(e, inst);
-                    if (ImGui.IsItemHovered())
-                        MaybeTooltip("Puts this object's ORIGINAL mesh/texture back —\n" +
-                                          "picking this object as its own \"Swap Object\" target\n" +
-                                          "does NOT do this (that just re-confirms the same\n" +
-                                          "ObjectId, which still resolves to the reskin).\n" +
-                                          "Keeps the reskin (and any Bone Mapping on it) around\n" +
-                                          "unreferenced, so picking the same source again later\n" +
-                                          "brings it right back — use \"Discard Reskin\" instead\n" +
-                                          "to actually forget it.");
 
                     if (ImGui.Button("Discard Reskin##discardskin", new Vector2(-1f, 0f)))
                     {
@@ -202,13 +141,6 @@ public sealed partial class GameScene : Scene
                         _reskinCloneOgi.Remove(inst.ObjectId);
                         _reskinJointMaps.Remove(inst.ObjectId);
                     }
-                    if (ImGui.IsItemHovered())
-                        MaybeTooltip("Puts the original mesh back AND forgets this reskin\n" +
-                                          "entirely (including any Bone Mapping on it) — picking\n" +
-                                          "a source afterward always starts a completely fresh\n" +
-                                          "clone. Use this when you actually want to switch to a\n" +
-                                          "genuinely different character, not just temporarily\n" +
-                                          "preview the original.");
 
                     bool haveSource = reskinInfo.SourceOgiId != 0;
                     if (!haveSource) ImGui.BeginDisabled();
@@ -230,16 +162,7 @@ public sealed partial class GameScene : Scene
                     if (!haveSource)
                     {
                         ImGui.EndDisabled();
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("This reskin was recovered from an earlier session —\n" +
-                                              "the original source object/level is no longer known,\n" +
-                                              "so Bone Mapping has no source skeleton to compare\n" +
-                                              "against. Re-pick a source below to re-enable it.");
                     }
-                    else if (ImGui.IsItemHovered())
-                        MaybeTooltip("Fixes deformed limbs when the reskin source has a\n" +
-                                          "different bone layout — manually map each source\n" +
-                                          "bone to the matching target bone in a 3D preview.");
                 }
 
                 ImGui.TextDisabled("Source Level:");
@@ -320,18 +243,7 @@ public sealed partial class GameScene : Scene
         if (full)
         {
             var searchRm2 = sourceRm2 ?? chunkSource.Rm2;
-            PS2AnyInstance? srcInst = null;
-            for (int lid = 0; lid <= 7 && srcInst is null; lid++)
-            {
-                var srcLayout  = searchRm2.GetItem<BaseTwinSection>((uint)lid);
-                var srcInstSec = srcLayout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_INSTANCES_SECTION);
-                if (srcInstSec is null) continue;
-                for (int i = 0; i < srcInstSec.GetItemsAmount(); i++)
-                {
-                    var cand = (PS2AnyInstance)srcInstSec.GetItem(i);
-                    if (cand.ObjectId == (ushort)newObjectId) { srcInst = cand; break; }
-                }
-            }
+            var srcInst = FindLayoutInstance(searchRm2, c => c.ObjectId == (ushort)newObjectId);
 
             if (srcInst is null)
             {

@@ -22,7 +22,6 @@ public abstract class Vehicle
 
     public abstract int Kind { get; }
     public virtual bool HasBody => false;
-    public virtual bool KeepsLimbs => false;
     public virtual bool AllowsLook => false;
     public virtual bool KeepsGun => false; // Amedo
     public virtual (Vector3 Min, Vector3 Max) Box => (new Vector3(-1f), new Vector3(1f));

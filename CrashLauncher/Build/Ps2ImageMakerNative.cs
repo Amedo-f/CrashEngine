@@ -21,7 +21,6 @@ internal static class Ps2ImageMakerNative
         public float         ProgressPercentage;
         public bool          Finished;
         public bool          NewState;
-        public bool          NewFile;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
@@ -52,7 +51,6 @@ internal static class Ps2ImageMakerNative
             ProgressPercentage = c.progress,
             Finished           = c.finished != 0,
             NewState           = c.new_state != 0,
-            NewFile            = c.new_file != 0,
         };
     }
 

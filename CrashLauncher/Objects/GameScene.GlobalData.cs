@@ -171,10 +171,6 @@ public sealed partial class GameScene : Scene
                         ImGui.SetNextItemWidth(150f);
                         if (ImGui.SliderFloat("Volume (gain)##gsndgain", ref gain, 0.1f, 3f, "%.2fx"))
                         { ApplySoundEffectGain(snd, sid, gain, GlobalRm2Path); chunkSource!.GlobalRm2Dirty = true; }
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("Digital gain applied to this sound's own waveform before re-encoding — " +
-                                         "always computed from the ORIGINAL audio, never compounds. Save Chunk to persist.\n" +
-                                         "⚠ This is a GLOBAL sound — every level that references this object shares it.");
                     }
                     ImGui.PopID();
                 }

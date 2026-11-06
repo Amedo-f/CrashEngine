@@ -7,7 +7,6 @@ public sealed class Mpeg2Frame
     public readonly int MbWidth, MbHeight; // Amedo
     public readonly byte[] Y, Cb, Cr;
     public readonly byte[] Quant; // Amedo
-    public int PictureType, TemporalReference;
 
     public Mpeg2Frame(int mbWidth, int mbHeight, int width, int height)
     {
@@ -29,7 +28,6 @@ public sealed class Mpeg2Decoder
 {
     public int Width { get; private set; }
     public int Height { get; private set; }
-    public int AspectCode { get; private set; }
     public int FrameRateCode { get; private set; }
     public bool Mpeg2 { get; private set; }
     public int Errors { get; private set; }
@@ -43,7 +41,7 @@ public sealed class Mpeg2Decoder
     private Mpeg2Frame? _forward, _backward, _current;
     private readonly List<Mpeg2Frame> _pool = new();
 
-    private int _picType, _temporalRef, _dcPrecision, _picStructure = 3, _framePredFrameDct = 1, _concealment, _qScaleType, _intraVlc, _altScan;
+    private int _picType, _dcPrecision, _picStructure = 3, _framePredFrameDct = 1, _concealment, _qScaleType, _intraVlc, _altScan;
     private readonly int[,] _fCode = new int[2, 2];
     private bool _havePicture;
 
@@ -59,7 +57,7 @@ public sealed class Mpeg2Decoder
     private int _lastType, _lastMotionType;
     private readonly int[] _block = new int[64];
 
-    private const int MotionField = 1, MotionFrame = 2, MotionDualPrime = 3;
+    private const int MotionField = 1, MotionFrame = 2;
 
     // Amedo
     public void Decode(byte[] data, int offset, int count)
@@ -156,7 +154,7 @@ public sealed class Mpeg2Decoder
     private void SequenceHeader()
     {
         int w = (int)Read(12), h = (int)Read(12);
-        AspectCode = (int)Read(4);
+        Read(4);
         FrameRateCode = (int)Read(4);
         Read(18);
         Read(1);
@@ -225,7 +223,7 @@ public sealed class Mpeg2Decoder
     {
         EndPicture();
         if (_pool.Count == 0) return;
-        _temporalRef = (int)Read(10);
+        Read(10);
         _picType = (int)Read(3);
         Read(16);
         if (_picType is 2 or 3)
@@ -260,8 +258,6 @@ public sealed class Mpeg2Decoder
             _backward = _current;
         }
         if (_current is null) return;
-        _current.PictureType = _picType;
-        _current.TemporalReference = _temporalRef;
         _havePicture = true;
     }
 

@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Importer;
-using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using CrashEngine.Core;
 
@@ -20,7 +19,7 @@ public sealed class GrapleRope : MeshDecoder.IJointControllers, MeshDecoder.IJoi
     private int _start, _duration;
     public Vector4 Start = new(0f, 0f, 0f, 1f), Head = new(0f, -1f, 0f, 1f);
     public float RestLength = 1f;
-    public readonly float Stiffness = 10000f, Damping = 100f, HeadMass = 1f;
+    public readonly float Damping = 100f;
     private Matrix4x4 _node = Matrix4x4.Identity, _toNode = Matrix4x4.Identity;
 
     public GrapleRope(AgentLabAgent hand) => _hand = hand;

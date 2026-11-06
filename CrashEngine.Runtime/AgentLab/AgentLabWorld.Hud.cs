@@ -1,4 +1,3 @@
-using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Screen;
 using CrashEngine.Runtime.Screen.Oleg;
 using Twinsanity.TwinsanityInterchange.Enumerations;
@@ -124,7 +123,6 @@ public sealed partial class AgentLabWorld
 
     public int BossHealthNow => Progress.BossHealthNow; // Amedo
     public int BossHealthMax => Progress.BossHealthMax; // Amedo
-    public float BossIconWidth => Progress.BossIconWidth_74; // Amedo
 
     public void EnableBossMode_176D40(float iconWidth, int health, ushort iconOgi)
     {

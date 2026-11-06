@@ -1,4 +1,3 @@
-using System.Numerics;
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;

@@ -191,12 +191,11 @@ public sealed class SplineCamera : SubCamera
     private readonly float[] _lengths, _steps;
     private readonly uint _flags;
 
-    private Vector3 _target, _cur;
+    private Vector3 _target;
     private float _bestDist, _bestU;
     private int _seg = -1;
 
     private Vector3 _fd0, _fd1, _fd2, _fd3;
-    private Vector3 _hitPoint;
     private float _hitDist, _hitU;
     private int _hitSeg;
 
@@ -349,7 +348,6 @@ public sealed class SplineCamera : SubCamera
         float h = _steps[seg];
         Differences_18A980(h, 2 * seg);
         _target = target;
-        _cur = _fd0;
         _seg = seg;
         _bestU = 0f;
         _bestDist = GameMath.DistanceSq(target, _fd0);
@@ -357,7 +355,6 @@ public sealed class SplineCamera : SubCamera
         float dEnd = GameMath.DistanceSq(target, end);
         if (dEnd < _bestDist)
         {
-            _cur = end;
             _bestDist = dEnd;
             _bestU = 1f;
         }
@@ -380,11 +377,9 @@ public sealed class SplineCamera : SubCamera
                 float h10 = (h11 - x2) + x;
                 cur = Blend_18A228(2 * seg, c + 1f, h10, -c, h11);
                 _bestU = x;
-                _cur = cur;
                 _bestDist = fx;
                 if (fx < _hitDist)
                 {
-                    _hitPoint = cur;
                     found = true;
                     _hitDist = _bestDist;
                     _hitU = _bestU;
@@ -397,7 +392,6 @@ public sealed class SplineCamera : SubCamera
                 {
                     found = true;
                     _hitDist = d;
-                    _hitPoint = cur;
                     _hitU = u;
                 }
             }

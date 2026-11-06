@@ -1,34 +1,18 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
 using SysVec4 = System.Numerics.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
-using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -122,6 +106,154 @@ public static partial class MeshDecoder
         Connection = new List<bool>(), GroupSizes = new List<int>(), UnusedBlob = Array.Empty<byte>(),
     };
 
+    private const uint NitroCrateReferenceMaterialId = 0xEE85EFBC;
+
+    private static PS2AnyMaterial? FindSimpleMaterialTemplate(BaseTwinSection sec)
+    {
+        for (int i = 0; i < sec.GetItemsAmount(); i++)
+            if (sec.GetItem(i) is PS2AnyMaterial cand && cand.Shaders.Count == 1 &&
+                cand.Shaders[0].ShaderType is TwinShader.Type.StandardLit or TwinShader.Type.StandardUnlit)
+                return cand;
+        return null;
+    }
+
+    private static PS2AnyMaterial? ImportMaterialTemplate(BaseTwinSection? globalMatSec, BaseTwinSection ownMatSec) =>
+        (globalMatSec?.GetItem<PS2AnyMaterial>(NitroCrateReferenceMaterialId)) ??
+        (globalMatSec is not null ? FindSimpleMaterialTemplate(globalMatSec) : null) ??
+        FindSimpleMaterialTemplate(ownMatSec);
+
+    private static PS2AnyOGI? FindSimpleStaticOgiTemplate(BaseTwinSection sec)
+    {
+        for (int i = 0; i < sec.GetItemsAmount(); i++)
+            if (sec.GetItem(i) is PS2AnyOGI cand && cand.SkinID == 0 && cand.BlendSkinID == 0)
+                return cand;
+        return null;
+    }
+
+    private static PS2AnyOGI? ImportOgiTemplate(BaseTwinSection? globalOgiSec, BaseTwinSection ownOgiSec) =>
+        (globalOgiSec is not null ? FindSimpleStaticOgiTemplate(globalOgiSec) : null) ?? FindSimpleStaticOgiTemplate(ownOgiSec);
+
+    private static (uint Id, Texture2D? Gpu) BakeImportTexture(GL gl, CrashEngine.Assets.RawSubmesh raw,
+        PS2AnyTexturesSection texSec, Dictionary<uint, Texture2D> texCache)
+    {
+        bool ownTexture = raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0;
+        if (!ownTexture)
+        {
+            const int whiteSize = 128;
+            var white = new byte[whiteSize * whiteSize * 4];
+            Array.Fill(white, (byte)255);
+            raw.DiffusePixelsRGBA = white; raw.TexWidth = whiteSize; raw.TexHeight = whiteSize;
+        }
+
+        var tex = new PS2AnyTexture();
+        uint texId = NewGraphicsLocalId(texSec);
+        tex.SetID(texId);
+        int tw = raw.TexWidth, th = raw.TexHeight;
+        { int p = 1; while (p < Math.Min(tw, 256)) p <<= 1; tw = Math.Clamp(p, 8, 256); }
+        { int p = 1; while (p < Math.Min(th, 256)) p <<= 1; th = Math.Clamp(p, 8, 256); }
+        byte[] pixels = ResampleRGBA(raw.DiffusePixelsRGBA!, raw.TexWidth, raw.TexHeight, tw, th);
+        var colors = new List<Twinsanity.TwinsanityInterchange.Common.Color>(tw * th);
+        for (int p = 0; p < tw * th; p++)
+            colors.Add(new Twinsanity.TwinsanityInterchange.Common.Color(
+                pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2], pixels[p * 4 + 3]));
+        tex.FromBitmap(colors, tw,
+            Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE,
+            Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32);
+        texSec.AddItem(tex);
+        if (ownTexture) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA!, raw.TexWidth, raw.TexHeight);
+        var t2d = ChunkImporter.DecodeTexture(gl, tex);
+        if (t2d is not null) texCache[texId] = t2d;
+        return (texId, t2d);
+    }
+
+    private static uint BakeImportMaterial(PS2AnyMaterial template, BaseTwinSection matSec, CrashEngine.Assets.RawSubmesh raw,
+        uint texId, TwinShader.Type? shaderType)
+    {
+        var mat = CloneItem(template);
+        uint matId = NewGraphicsLocalId(matSec);
+        mat.SetID(matId);
+        var sh = mat.Shaders[0];
+        sh.TextureId = texId;
+        if (raw.DiffusePixelsRGBA is not null)
+            sh.TxtMapping = TwinShader.TextureMapping.ON;
+        if (shaderType is { } type)
+            sh.ShaderType = type;
+        if (raw.CeAlphaBlend.HasValue)
+            sh.ABlending = raw.CeAlphaBlend.Value ? TwinShader.AlphaBlending.ON : TwinShader.AlphaBlending.OFF;
+        ApplyImportAlphaTest(sh, raw.AlphaCutoff);
+        sh.AlphaCorrectionValue = true;
+        sh.XScrollSettings = TwinShader.XScrollFormula.Disabled;
+        sh.YScrollSettings = TwinShader.YScrollFormula.Disabled;
+        sh.UvScrollSpeed   = new TwinVec4(0f, 0f, 0f, 0f);
+        sh.Animation       = null;
+        matSec.AddItem(mat);
+        return matId;
+    }
+
+    private static List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> BuildImportSubModels(
+        CrashEngine.Assets.RawSubmesh raw, float neutral, ref SysVec3 min, ref SysVec3 max)
+    {
+        var sub = NewImportSubModel();
+        var subs = new List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> { sub };
+
+        int triCount = raw.Indices.Length / 3;
+        int inGroup = 0;
+        for (int t = 0; t < triCount; t++)
+        {
+            if (MaxImportSubModelVerts < sub.Vertexes.Count + 3)
+            {
+                if (inGroup > 0) sub.GroupSizes.Add(inGroup);
+                sub.Compile();
+                subs.Add(sub = NewImportSubModel());
+                inGroup = 0;
+            }
+            if (inGroup + 3 > 36) { sub.GroupSizes.Add(inGroup); inGroup = 0; }
+            for (int k = 0; k < 3; k++)
+            {
+                uint vi = raw.Indices[t * 3 + k];
+                if (vi >= raw.Positions.Length) { vi = 0; }
+                var p = raw.Positions[vi]; var n = raw.Normals[vi]; var uv = raw.UVs[vi];
+                sub.Vertexes.Add(new TwinVec4(p.X, p.Y, p.Z, 1f));
+                sub.Normals.Add(new TwinVec4(n.X, n.Y, n.Z, 1f));
+                sub.UVW.Add(new TwinVec4(uv.X, uv.Y, 1f, 1f));
+                sub.Colors.Add(ImportVertexColor(raw, vi, neutral, 1f));
+                sub.EmitColor.Add(new TwinVec4(neutral, neutral, neutral, 0.937f));
+                sub.Connection.Add(k == 2);
+                inGroup++;
+
+                min = SysVec3.Min(min, p); max = SysVec3.Max(max, p);
+            }
+        }
+        if (inGroup > 0) sub.GroupSizes.Add(inGroup);
+        sub.Compile();
+        return subs;
+    }
+
+    private static uint AddImportedObject(RmTables tables, BaseTwinSection ogiSec, BaseTwinSection objSec,
+        BaseTwinSection? globalOgiSec, BaseTwinSection? globalObjSec, PS2AnyOGI ogi, string namePrefix, out uint ogiId)
+    {
+        ogiId = 0;
+        while (ogiSec.ContainsItem(ogiId) || (globalOgiSec?.ContainsItem(ogiId) ?? false)) ogiId++;
+        ogi.SetID(ogiId);
+        ogiSec.AddItem(ogi);
+        tables.OGIs[ogiId] = ogi;
+
+        uint objId = 0;
+        while (objSec.ContainsItem(objId) || (globalObjSec?.ContainsItem(objId) ?? false)) objId++;
+        var obj = new PS2AnyObject
+        {
+            Type = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject.ObjectType.GenericObject,
+            Name = $"{namePrefix}_{objId:X4}",
+            BehaviourPack = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommandPack(),
+        };
+        obj.OGISlots.Add((ushort)ogiId);
+        obj.AnimationSlots.Add(0xFFFF);
+        obj.SetID(objId);
+        objSec.AddItem(obj);
+        tables.Objects[objId] = obj;
+        return objId;
+    }
+
     public static ExternalModelBakeRecord? BakeExternalModelAsObject(GL gl,
         PS2AnyTwinsanityRM2 destRm2, object destTablesHandle, Dictionary<uint, Texture2D> destTexCache,
         PS2AnyTwinsanityRM2? globalRm2, List<CrashEngine.Assets.RawSubmesh> submeshes, string objectName, out string log)
@@ -129,57 +261,18 @@ public static partial class MeshDecoder
         if (destTablesHandle is not RmTables destTables) { log = "destination chunk has no mesh tables"; return null; }
         if (submeshes.Count == 0) { log = "no meshes found in the imported file"; return null; }
 
-        var destCode     = destRm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
-        var destObjSec   = destCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
-        var destOgiSec   = destCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_OGIS_SECTION);
-        var destGfx      = destRm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
-        var destRmSec    = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_RIGID_MODELS_SECTION);
-        var destMeshSec  = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MESHES_SECTION);
-        var destModelSec = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MODELS_SECTION);
-        var destMatSec   = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-        var destTexSec   = destGfx?.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
-        if (destObjSec is null || destOgiSec is null || destGfx is null || destRmSec is null ||
-            destModelSec is null || destMatSec is null || destTexSec is null)
+        var dest = Rm2Sections.Of(destRm2);
+        if (dest.Objects is null || dest.Ogis is null || dest.Gfx is null || dest.RigidModels is null ||
+            dest.Models is null || dest.Materials is null || dest.Textures is null)
         { log = "destination level is missing a required CODE/GRAPHICS section"; return null; }
 
-        static uint NewGraphicsId(BaseTwinSection section, params BaseTwinSection?[] alsoAvoid)
-        {
-            var rng = new Random();
-            uint id;
-            do { id = (uint)rng.Next(0x10000, 0x7FFFFFF); }
-            while (id == 0 || section.ContainsItem(id) || alsoAvoid.Any(s => s?.ContainsItem(id) == true));
-            return id;
-        }
+        var global = globalRm2 is null ? default : Rm2Sections.Of(globalRm2);
 
-        var globalCode    = globalRm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
-        var globalOgiSec  = globalCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_OGIS_SECTION);
-        var globalObjSec  = globalCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
-        var globalGfx     = globalRm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
-        var globalMatSec  = globalGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-
-        static PS2AnyMaterial? FindSimpleMaterialTemplate(BaseTwinSection sec)
-        {
-            for (int i = 0; i < sec.GetItemsAmount(); i++)
-                if (sec.GetItem(i) is PS2AnyMaterial cand && cand.Shaders.Count == 1 &&
-                    cand.Shaders[0].ShaderType is TwinShader.Type.StandardLit or TwinShader.Type.StandardUnlit)
-                    return cand;
-            return null;
-        }
-        const uint NitroCrateReferenceMaterialId = 0xEE85EFBC;
-        var matTemplate = (globalMatSec?.GetItem<PS2AnyMaterial>(NitroCrateReferenceMaterialId)) ??
-                          (globalMatSec is not null ? FindSimpleMaterialTemplate(globalMatSec) : null) ??
-                          FindSimpleMaterialTemplate(destMatSec);
+        var matTemplate = ImportMaterialTemplate(global.Materials, dest.Materials);
         if (matTemplate is null)
         { log = "could not find a simple single-shader Material to use as a structural template (in the global material set or this level's own)"; return null; }
 
-        static PS2AnyOGI? FindSimpleStaticOgiTemplate(BaseTwinSection sec)
-        {
-            for (int i = 0; i < sec.GetItemsAmount(); i++)
-                if (sec.GetItem(i) is PS2AnyOGI cand && cand.SkinID == 0 && cand.BlendSkinID == 0)
-                    return cand;
-            return null;
-        }
-        var ogiTemplate = (globalOgiSec is not null ? FindSimpleStaticOgiTemplate(globalOgiSec) : null) ?? FindSimpleStaticOgiTemplate(destOgiSec);
+        var ogiTemplate = ImportOgiTemplate(global.Ogis, dest.Ogis);
         if (ogiTemplate is null)
         { log = "could not find a simple non-skinned OGI to use as a structural template (in the global object set or this level's own)"; return null; }
 
@@ -190,107 +283,30 @@ public static partial class MeshDecoder
         foreach (var raw in submeshes)
         {
             if (raw.Indices.Length < 3 || raw.Positions.Length == 0) continue;
-            bool ownTexture = raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0; // Amedo
 
-            if (raw.DiffusePixelsRGBA is null || raw.TexWidth <= 0 || raw.TexHeight <= 0)
-            {
-                const int whiteSize = 128;
-                var white = new byte[whiteSize * whiteSize * 4];
-                Array.Fill(white, (byte)255);
-                raw.DiffusePixelsRGBA = white; raw.TexWidth = whiteSize; raw.TexHeight = whiteSize;
-            }
+            var (texId, _) = BakeImportTexture(gl, raw, dest.Textures, destTexCache);
+            rec.TextureCount++;
+            rec.TextureIds.Add(texId);
 
-            uint texId = matTemplate.Shaders[0].TextureId;
-            if (raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0)
-            {
-                var tex = new PS2AnyTexture();
-                uint newTexId = NewGraphicsId(destTexSec);
-                tex.SetID(newTexId);
-                int tw = raw.TexWidth, th = raw.TexHeight;
-                { int p = 1; while (p < Math.Min(tw, 256)) p <<= 1; tw = Math.Clamp(p, 8, 256); }
-                { int p = 1; while (p < Math.Min(th, 256)) p <<= 1; th = Math.Clamp(p, 8, 256); }
-                byte[] pixels = ResampleRGBA(raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight, tw, th);
-                var colors = new List<Twinsanity.TwinsanityInterchange.Common.Color>(tw * th);
-                for (int p = 0; p < tw * th; p++)
-                    colors.Add(new Twinsanity.TwinsanityInterchange.Common.Color(
-                        pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2], pixels[p * 4 + 3]));
-                tex.FromBitmap(colors, tw,
-                    Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE,
-                    Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32);
-                destTexSec.AddItem(tex);
-                if (ownTexture) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo
-                var t2d = ChunkImporter.DecodeTexture(gl, tex);
-                if (t2d is not null) destTexCache[newTexId] = t2d;
-                texId = newTexId;
-                rec.TextureCount++;
-                rec.TextureIds.Add(newTexId); // Amedo 2026-09-20
-            }
+            TwinShader.Type? shaderType = raw.CeUnlit.HasValue
+                ? (raw.CeUnlit.Value ? TwinShader.Type.StandardUnlit : TwinShader.Type.StandardLit) : null;
+            uint newMatId = BakeImportMaterial(matTemplate, dest.Materials, raw, texId, shaderType);
+            rec.MaterialIds.Add(newMatId);
 
-            var mat = CloneItem(matTemplate);
-            uint newMatId = NewGraphicsId(destMatSec);
-            mat.SetID(newMatId);
-            mat.Shaders[0].TextureId = texId;
-            if (raw.DiffusePixelsRGBA is not null)
-                mat.Shaders[0].TxtMapping = TwinShader.TextureMapping.ON;
-            if (raw.CeUnlit.HasValue)
-                mat.Shaders[0].ShaderType = raw.CeUnlit.Value ? TwinShader.Type.StandardUnlit : TwinShader.Type.StandardLit;
-            if (raw.CeAlphaBlend.HasValue)
-                mat.Shaders[0].ABlending = raw.CeAlphaBlend.Value ? TwinShader.AlphaBlending.ON : TwinShader.AlphaBlending.OFF;
-            ApplyImportAlphaTest(mat.Shaders[0], raw.AlphaCutoff); // Amedo
-            mat.Shaders[0].AlphaCorrectionValue = true; // Amedo
-            mat.Shaders[0].XScrollSettings = TwinShader.XScrollFormula.Disabled;
-            mat.Shaders[0].YScrollSettings = TwinShader.YScrollFormula.Disabled;
-            mat.Shaders[0].UvScrollSpeed   = new TwinVec4(0f, 0f, 0f, 0f);
-            mat.Shaders[0].Animation       = null;
-            destMatSec.AddItem(mat);
-            rec.MaterialIds.Add(newMatId); // Amedo 2026-09-20
-
-            var sub = NewImportSubModel(); // Amedo 2026-10-02
-            var subs = new List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> { sub };
-
-            int triCount = raw.Indices.Length / 3;
-            int inGroup = 0;
-            for (int t = 0; t < triCount; t++)
-            {
-                if (MaxImportSubModelVerts < sub.Vertexes.Count + 3) // Amedo 2026-10-02
-                {
-                    if (inGroup > 0) sub.GroupSizes.Add(inGroup);
-                    sub.Compile();
-                    subs.Add(sub = NewImportSubModel());
-                    inGroup = 0;
-                }
-                if (inGroup + 3 > 36) { sub.GroupSizes.Add(inGroup); inGroup = 0; }
-                for (int k = 0; k < 3; k++)
-                {
-                    uint vi = raw.Indices[t * 3 + k];
-                    if (vi >= raw.Positions.Length) { vi = 0; }
-                    var p = raw.Positions[vi]; var n = raw.Normals[vi]; var uv = raw.UVs[vi];
-                    sub.Vertexes.Add(new TwinVec4(p.X, p.Y, p.Z, 1f));
-                    sub.Normals.Add(new TwinVec4(n.X, n.Y, n.Z, 1f));
-                    sub.UVW.Add(new TwinVec4(uv.X, uv.Y, 1f, 1f));
-                    sub.Colors.Add(ImportVertexColor(raw, vi, 0.498f, 1f)); // Amedo
-                    sub.EmitColor.Add(new TwinVec4(0.498f, 0.498f, 0.498f, 0.937f));
-                    sub.Connection.Add(k == 2);
-                    inGroup++;
-
-                    minPos = SysVec3.Min(minPos, p); maxPos = SysVec3.Max(maxPos, p);
-                }
-            }
-            if (inGroup > 0) sub.GroupSizes.Add(inGroup);
-            sub.Compile();
+            var subs = BuildImportSubModels(raw, 0.498f, ref minPos, ref maxPos);
 
             var model = new PS2AnyModel();
-            model.SubModels.AddRange(subs); // Amedo 2026-10-02
-            uint newModelId = NewGraphicsId(destModelSec);
+            model.SubModels.AddRange(subs);
+            uint newModelId = NewGraphicsLocalId(dest.Models);
             model.SetID(newModelId);
-            destModelSec.AddItem(model);
-            rec.ModelIds.Add(newModelId); // Amedo 2026-09-20
+            dest.Models.AddItem(model);
+            rec.ModelIds.Add(newModelId);
 
             var rm = new PS2AnyRigidModel { Model = newModelId };
-            foreach (var _ in subs) rm.Materials.Add(newMatId); // Amedo 2026-10-02
-            uint newRmId = NewGraphicsId(destRmSec, destMeshSec);
+            foreach (var _ in subs) rm.Materials.Add(newMatId);
+            uint newRmId = NewGraphicsLocalId(dest.RigidModels, dest.Meshes);
             rm.SetID(newRmId);
-            destRmSec.AddItem(rm);
+            dest.RigidModels.AddItem(rm);
             destTables.RigidModels[newRmId] = rm;
             rigidModelIds.Add(newRmId);
             rec.RigidModelIds.Add(newRmId); // Amedo 2026-09-20
@@ -313,30 +329,12 @@ public static partial class MeshDecoder
         ogi.BoundingBox[0] = new TwinVec4(minPos.X, minPos.Y, minPos.Z, 1f);
         ogi.BoundingBox[1] = new TwinVec4(maxPos.X, maxPos.Y, maxPos.Z, 1f);
 
-        uint newOgiId = 0;
-        while (destOgiSec.ContainsItem(newOgiId) || (globalOgiSec?.ContainsItem(newOgiId) ?? false)) newOgiId++;
-        ogi.SetID(newOgiId);
-        destOgiSec.AddItem(ogi);
-        destTables.OGIs[newOgiId] = ogi;
-
-        uint newObjId = 0;
-        while (destObjSec.ContainsItem(newObjId) || (globalObjSec?.ContainsItem(newObjId) ?? false)) newObjId++;
-        var obj = new PS2AnyObject
-        {
-            Type = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject.ObjectType.GenericObject,
-            Name = $"CE_ImportedModel_{objectName}_{newObjId:X4}",
-            BehaviourPack = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommandPack(),
-        };
-        obj.OGISlots.Add((ushort)newOgiId);
-        obj.AnimationSlots.Add(0xFFFF);
-        obj.SetID(newObjId);
-        destObjSec.AddItem(obj);
-        destTables.Objects[newObjId] = obj;
+        uint newObjId = AddImportedObject(destTables, dest.Ogis, dest.Objects, global.Ogis, global.Objects, ogi,
+            $"CE_ImportedModel_{objectName}", out uint newOgiId);
         rec.ObjectId = newObjId;
-        rec.OgiIds.Add(newOgiId); // Amedo 2026-09-20
+        rec.OgiIds.Add(newOgiId);
 
-        var modelById2 = BuildModelLookup(destGfx);
-        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
+        RebuildMeshGpu(gl, dest.Gfx, destTables, destTexCache);
 
         log = $"baked {rec.SubmeshCount} submesh(es), {rec.VertexCount} vert(s) as new object 0x{newObjId:X4} " +
               $"(OGI 0x{newOgiId:X4}, +{rec.TextureCount} Texture) — real PS2 RigidModel/OGI/Object, not a preview. " +
@@ -410,29 +408,9 @@ public static partial class MeshDecoder
         if (gfx is null || meshSec is null || modelSec is null || matSec is null || texSec is null)
         { log = "this chunk's scenery (SM2) is missing a required GRAPHICS sub-section"; return null; }
 
-        static uint NewGraphicsId(BaseTwinSection section, params BaseTwinSection?[] alsoAvoid)
-        {
-            var rng = new Random();
-            uint id;
-            do { id = (uint)rng.Next(0x10000, 0x7FFFFFF); }
-            while (id == 0 || section.ContainsItem(id) || alsoAvoid.Any(s => s?.ContainsItem(id) == true));
-            return id;
-        }
-
-        static PS2AnyMaterial? FindSimpleMaterialTemplate(BaseTwinSection sec)
-        {
-            for (int i = 0; i < sec.GetItemsAmount(); i++)
-                if (sec.GetItem(i) is PS2AnyMaterial cand && cand.Shaders.Count == 1 &&
-                    cand.Shaders[0].ShaderType is TwinShader.Type.StandardLit or TwinShader.Type.StandardUnlit)
-                    return cand;
-            return null;
-        }
         var globalGfx    = globalRm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
         var globalMatSec = globalGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-        const uint NitroCrateReferenceMaterialId = 0xEE85EFBC;
-        var matTemplate = (globalMatSec?.GetItem<PS2AnyMaterial>(NitroCrateReferenceMaterialId)) ??
-                          (globalMatSec is not null ? FindSimpleMaterialTemplate(globalMatSec) : null) ??
-                          FindSimpleMaterialTemplate(matSec);
+        var matTemplate = ImportMaterialTemplate(globalMatSec, matSec);
         if (matTemplate is null)
         { log = "could not find a simple single-shader Material to use as a structural template"; return null; }
 
@@ -445,97 +423,19 @@ public static partial class MeshDecoder
         foreach (var raw in submeshes)
         {
             if (raw.Indices.Length < 3 || raw.Positions.Length == 0) continue;
-            bool ownTexture = raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0; // Amedo
 
-            if (raw.DiffusePixelsRGBA is null || raw.TexWidth <= 0 || raw.TexHeight <= 0)
-            {
-                const int whiteSize = 128;
-                var white = new byte[whiteSize * whiteSize * 4];
-                Array.Fill(white, (byte)255);
-                raw.DiffusePixelsRGBA = white; raw.TexWidth = whiteSize; raw.TexHeight = whiteSize;
-            }
+            var (texId, _) = BakeImportTexture(gl, raw, texSec, destSceneryTexCache);
+            rec.TextureCount++;
+            rec.TextureIds.Add(texId);
 
-            uint texId = matTemplate.Shaders[0].TextureId;
-            if (raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0)
-            {
-                var tex = new PS2AnyTexture();
-                uint newTexId = NewGraphicsId(texSec);
-                tex.SetID(newTexId);
-                int tw = raw.TexWidth, th = raw.TexHeight;
-                { int p = 1; while (p < Math.Min(tw, 256)) p <<= 1; tw = Math.Clamp(p, 8, 256); }
-                { int p = 1; while (p < Math.Min(th, 256)) p <<= 1; th = Math.Clamp(p, 8, 256); }
-                byte[] pixels = ResampleRGBA(raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight, tw, th);
-                var colors = new List<Twinsanity.TwinsanityInterchange.Common.Color>(tw * th);
-                for (int p = 0; p < tw * th; p++)
-                    colors.Add(new Twinsanity.TwinsanityInterchange.Common.Color(
-                        pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2], pixels[p * 4 + 3]));
-                tex.FromBitmap(colors, tw,
-                    Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE,
-                    Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32);
-                texSec.AddItem(tex);
-                if (ownTexture) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo
-                var t2d = ChunkImporter.DecodeTexture(gl, tex);
-                if (t2d is not null) destSceneryTexCache[newTexId] = t2d;
-                texId = newTexId;
-                rec.TextureCount++;
-                rec.TextureIds.Add(newTexId); // Amedo 2026-09-20
-            }
-
-            var mat = CloneItem(matTemplate);
-            uint newMatId = NewGraphicsId(matSec);
-            mat.SetID(newMatId);
-            mat.Shaders[0].TextureId = texId;
-            if (raw.DiffusePixelsRGBA is not null)
-                mat.Shaders[0].TxtMapping = TwinShader.TextureMapping.ON;
-            mat.Shaders[0].AlphaCorrectionValue = true; // Amedo
-            mat.Shaders[0].XScrollSettings = TwinShader.XScrollFormula.Disabled;
-            mat.Shaders[0].YScrollSettings = TwinShader.YScrollFormula.Disabled;
-            mat.Shaders[0].UvScrollSpeed   = new TwinVec4(0f, 0f, 0f, 0f);
-            mat.Shaders[0].Animation       = null;
-            mat.Shaders[0].ShaderType = (raw.CeUnlit ?? true)
-                ? TwinShader.Type.StandardUnlit : TwinShader.Type.StandardLit;
-            if (raw.CeAlphaBlend.HasValue)
-                mat.Shaders[0].ABlending = raw.CeAlphaBlend.Value ? TwinShader.AlphaBlending.ON : TwinShader.AlphaBlending.OFF;
-            ApplyImportAlphaTest(mat.Shaders[0], raw.AlphaCutoff); // Amedo
-            matSec.AddItem(mat);
-            rec.MaterialIds.Add(newMatId); // Amedo 2026-09-20
-
-            var sub = NewImportSubModel(); // Amedo 2026-10-02
-            var subs = new List<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel> { sub };
+            uint newMatId = BakeImportMaterial(matTemplate, matSec, raw, texId,
+                (raw.CeUnlit ?? true) ? TwinShader.Type.StandardUnlit : TwinShader.Type.StandardLit);
+            rec.MaterialIds.Add(newMatId);
 
             var subMin = new SysVec3(float.MaxValue); var subMax = new SysVec3(float.MinValue);
-            int triCount = raw.Indices.Length / 3;
-            int inGroup = 0;
-            for (int t = 0; t < triCount; t++)
-            {
-                if (MaxImportSubModelVerts < sub.Vertexes.Count + 3) // Amedo 2026-10-02
-                {
-                    if (inGroup > 0) sub.GroupSizes.Add(inGroup);
-                    sub.Compile();
-                    subs.Add(sub = NewImportSubModel());
-                    inGroup = 0;
-                }
-                if (inGroup + 3 > 36) { sub.GroupSizes.Add(inGroup); inGroup = 0; }
-                for (int k = 0; k < 3; k++)
-                {
-                    uint vi = raw.Indices[t * 3 + k];
-                    if (vi >= raw.Positions.Length) { vi = 0; }
-                    var p = raw.Positions[vi]; var n = raw.Normals[vi]; var uv = raw.UVs[vi];
-                    sub.Vertexes.Add(new TwinVec4(p.X, p.Y, p.Z, 1f));
-                    sub.Normals.Add(new TwinVec4(n.X, n.Y, n.Z, 1f));
-                    sub.UVW.Add(new TwinVec4(uv.X, uv.Y, 1f, 1f));
-                    sub.Colors.Add(ImportVertexColor(raw, vi, 1f, 1f)); // Amedo
-                    sub.EmitColor.Add(new TwinVec4(1f, 1f, 1f, 0.937f));
-                    sub.Connection.Add(k == 2);
-                    inGroup++;
+            var subs = BuildImportSubModels(raw, 1f, ref subMin, ref subMax);
 
-                    subMin = SysVec3.Min(subMin, p); subMax = SysVec3.Max(subMax, p);
-                }
-            }
-            if (inGroup > 0) sub.GroupSizes.Add(inGroup);
-            sub.Compile();
-
-            model.SubModels.AddRange(subs); // Amedo 2026-10-02
+            model.SubModels.AddRange(subs);
             foreach (var _ in subs) rm.Materials.Add(newMatId);
             combMin = SysVec3.Min(combMin, subMin); combMax = SysVec3.Max(combMax, subMax);
             rec.SubmeshCount++;
@@ -544,13 +444,13 @@ public static partial class MeshDecoder
 
         if (rec.SubmeshCount == 0) { log = "no usable triangles found in the imported file"; return null; }
 
-        uint newModelId = NewGraphicsId(modelSec);
+        uint newModelId = NewGraphicsLocalId(modelSec);
         model.SetID(newModelId);
         modelSec.AddItem(model);
         rec.ModelIds.Add(newModelId); // Amedo 2026-09-20
 
         rm.Model = newModelId;
-        uint newMeshId = NewGraphicsId(meshSec);
+        uint newMeshId = NewGraphicsLocalId(meshSec);
         rm.SetID(newMeshId);
         meshSec.AddItem(rm);
 
@@ -587,42 +487,18 @@ public static partial class MeshDecoder
         var srcModel = srcModelSec.GetItem<PS2AnyModel>(srcRm.Model);
         if (srcModel is null) { log = $"scenery mesh's own Model (0x{srcRm.Model:X}) not found"; return null; }
 
-        var destCode     = destRm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
-        var destObjSec   = destCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
-        var destOgiSec   = destCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_OGIS_SECTION);
-        var destGfx      = destRm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
-        var destRmSec    = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_RIGID_MODELS_SECTION);
-        var destMeshSec  = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MESHES_SECTION);
-        var destModelSec = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MODELS_SECTION);
-        var destMatSec   = destGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-        var destTexSec   = destGfx?.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
-        if (destObjSec is null || destOgiSec is null || destGfx is null || destRmSec is null ||
+        var dest = Rm2Sections.Of(destRm2);
+        var destRmSec    = dest.RigidModels;
+        var destModelSec = dest.Models;
+        var destMatSec   = dest.Materials;
+        var destTexSec   = dest.Textures;
+        if (dest.Objects is null || dest.Ogis is null || dest.Gfx is null || destRmSec is null ||
             destModelSec is null || destMatSec is null || destTexSec is null)
         { log = "destination level is missing a required CODE/GRAPHICS section"; return null; }
 
-        static uint NewGraphicsId(BaseTwinSection section, params BaseTwinSection?[] alsoAvoid)
-        {
-            var rng = new Random();
-            uint id;
-            do { id = (uint)rng.Next(0x10000, 0x7FFFFFF); }
-            while (id == 0 || section.ContainsItem(id) || alsoAvoid.Any(s => s?.ContainsItem(id) == true));
-            return id;
-        }
+        var global = globalRm2 is null ? default : Rm2Sections.Of(globalRm2);
 
-        var globalCode   = globalRm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION);
-        var globalOgiSec = globalCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_OGIS_SECTION);
-        var globalObjSec = globalCode?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
-        var globalGfx    = globalRm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
-        var globalMatSec = globalGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-
-        static PS2AnyOGI? FindSimpleStaticOgiTemplate(BaseTwinSection sec)
-        {
-            for (int i = 0; i < sec.GetItemsAmount(); i++)
-                if (sec.GetItem(i) is PS2AnyOGI cand && cand.SkinID == 0 && cand.BlendSkinID == 0)
-                    return cand;
-            return null;
-        }
-        var ogiTemplate = (globalOgiSec is not null ? FindSimpleStaticOgiTemplate(globalOgiSec) : null) ?? FindSimpleStaticOgiTemplate(destOgiSec);
+        var ogiTemplate = ImportOgiTemplate(global.Ogis, dest.Ogis);
         if (ogiTemplate is null)
         { log = "could not find a simple non-skinned OGI to use as a structural template (in the global object set or this level's own)"; return null; }
 
@@ -635,7 +511,7 @@ public static partial class MeshDecoder
             var srcTex = srcTexSec!.GetItem<PS2AnyTexture>(srcTexId);
             if (srcTex is null) return 0;
             var clone = CloneItem(srcTex);
-            uint newId = NewGraphicsId(destTexSec);
+            uint newId = NewGraphicsLocalId(destTexSec);
             clone.SetID(newId);
             destTexSec.AddItem(clone);
             var t2d = ChunkImporter.DecodeTexture(gl, clone);
@@ -653,7 +529,7 @@ public static partial class MeshDecoder
             var clone = CloneItem(srcMat);
             foreach (var sh in clone.Shaders)
                 if (sh.TextureId != 0) sh.TextureId = CloneTexture(sh.TextureId);
-            uint newId = NewGraphicsId(destMatSec);
+            uint newId = NewGraphicsLocalId(destMatSec);
             clone.SetID(newId);
             destMatSec.AddItem(clone);
             matIdMap[srcMatId] = newId;
@@ -683,7 +559,7 @@ public static partial class MeshDecoder
             }
         }
 
-        uint newModelId = NewGraphicsId(destModelSec);
+        uint newModelId = NewGraphicsLocalId(destModelSec);
         modelClone.SetID(newModelId);
         destModelSec.AddItem(modelClone);
         destTables.Models[newModelId] = modelClone;
@@ -692,7 +568,7 @@ public static partial class MeshDecoder
         rmClone.Model = newModelId;
         for (int i = 0; i < rmClone.Materials.Count; i++)
             rmClone.Materials[i] = CloneMaterial(rmClone.Materials[i]);
-        uint newRmId = NewGraphicsId(destRmSec, destMeshSec);
+        uint newRmId = NewGraphicsLocalId(destRmSec, dest.Meshes);
         rmClone.SetID(newRmId);
         destRmSec.AddItem(rmClone);
         destTables.RigidModels[newRmId] = rmClone;
@@ -707,29 +583,11 @@ public static partial class MeshDecoder
         ogi.BoundingBox[0] = bboxMin;
         ogi.BoundingBox[1] = bboxMax;
 
-        uint newOgiId = 0;
-        while (destOgiSec.ContainsItem(newOgiId) || (globalOgiSec?.ContainsItem(newOgiId) ?? false)) newOgiId++;
-        ogi.SetID(newOgiId);
-        destOgiSec.AddItem(ogi);
-        destTables.OGIs[newOgiId] = ogi;
-
-        uint newObjId = 0;
-        while (destObjSec.ContainsItem(newObjId) || (globalObjSec?.ContainsItem(newObjId) ?? false)) newObjId++;
-        var obj = new PS2AnyObject
-        {
-            Type = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject.ObjectType.GenericObject,
-            Name = $"CE_ConvertedScenery_{objectName}_{newObjId:X4}",
-            BehaviourPack = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommandPack(),
-        };
-        obj.OGISlots.Add((ushort)newOgiId);
-        obj.AnimationSlots.Add(0xFFFF);
-        obj.SetID(newObjId);
-        destObjSec.AddItem(obj);
-        destTables.Objects[newObjId] = obj;
+        uint newObjId = AddImportedObject(destTables, dest.Ogis, dest.Objects, global.Ogis, global.Objects, ogi,
+            $"CE_ConvertedScenery_{objectName}", out uint newOgiId);
         rec.ObjectId = newObjId;
 
-        var modelById2 = BuildModelLookup(destGfx);
-        foreach (var kv in BuildMeshLookup(destGfx, modelById2, gl, destTexCache, destTables.GlobalSource)) destTables.ModelGpu[kv.Key] = kv.Value; // Amedo
+        RebuildMeshGpu(gl, dest.Gfx, destTables, destTexCache);
 
         log = $"reused real scenery mesh 0x{meshId:X} as new object 0x{newObjId:X4} (OGI 0x{newOgiId:X4}, " +
               $"+1 Model, +{matIdMap.Count} Material, +{rec.TextureCount} Texture) — same compiled geometry, " +

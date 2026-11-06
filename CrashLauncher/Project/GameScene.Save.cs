@@ -1,48 +1,17 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using TwinAmbientLight = Twinsanity.TwinsanityInterchange.Common.Lights.AmbientLight;
 using TwinDirectionalLight = Twinsanity.TwinsanityInterchange.Common.Lights.DirectionalLight;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
 using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
 using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
 using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
 using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
 using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
 namespace CrashLauncher;
 
@@ -99,6 +68,12 @@ public sealed partial class GameScene : Scene
         var delta = Matrix4x4.CreateFromQuaternion(rootRot) * Matrix4x4.CreateTranslation(rootPos);
         static Vector3 Mirror(Vector3 v) => new(-v.X, v.Y, v.Z);
         Vector3 BakePoint(Vector3 rawOld) => Mirror(Vector3.Transform(Mirror(rawOld), delta));
+        TwinVec4 BakeVec(TwinVec4 v)
+        {
+            var p = BakePoint(new Vector3(v.X, v.Y, v.Z));
+            v.X = p.X; v.Y = p.Y; v.Z = p.Z;
+            return v;
+        }
 
         int instCount = 0, tileCount = 0, linkCount = 0, wallCount = 0;
         void BakeEntity(Entity ent)
@@ -136,58 +111,31 @@ public sealed partial class GameScene : Scene
         }
 
         int layoutTrigCount = 0, camCount = 0, posCount = 0, aiCount = 0;
-        for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
+        foreach (var layout in Layouts(rm2))
         {
-            var layout = rm2.GetItem<BaseTwinSection>((uint)lid);
-            if (layout is null) continue;
+            foreach (var t in LayoutSectionItems<PS2AnyTrigger>(layout, TwinConstants.LAYOUT_TRIGGERS_SECTION))
+            {
+                t.Trigger.Position = BakeVec(t.Trigger.Position);
+                layoutTrigCount++;
+            }
 
-            var trigSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_TRIGGERS_SECTION);
-            if (trigSec is not null)
-                for (int i = 0; i < trigSec.GetItemsAmount(); i++)
-                    if (trigSec.GetItem(i) is PS2AnyTrigger t)
-                    {
-                        var p = BakePoint(new Vector3(t.Trigger.Position.X, t.Trigger.Position.Y, t.Trigger.Position.Z));
-                        var tp = t.Trigger.Position; // Amedo
-                        tp.X = p.X; tp.Y = p.Y; tp.Z = p.Z;
-                        t.Trigger.Position = tp; // Amedo
-                        layoutTrigCount++;
-                    }
+            foreach (var c in LayoutSectionItems<PS2AnyCamera>(layout, TwinConstants.LAYOUT_CAMERAS_SECTION))
+            {
+                c.CamTrigger.Position = BakeVec(c.CamTrigger.Position);
+                camCount++;
+            }
 
-            var camSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_CAMERAS_SECTION);
-            if (camSec is not null)
-                for (int i = 0; i < camSec.GetItemsAmount(); i++)
-                    if (camSec.GetItem(i) is PS2AnyCamera c)
-                    {
-                        var p = BakePoint(new Vector3(c.CamTrigger.Position.X, c.CamTrigger.Position.Y, c.CamTrigger.Position.Z));
-                        var cp = c.CamTrigger.Position; // Amedo
-                        cp.X = p.X; cp.Y = p.Y; cp.Z = p.Z;
-                        c.CamTrigger.Position = cp; // Amedo
-                        camCount++;
-                    }
+            foreach (var p0 in LayoutSectionItems<PS2AnyPosition>(layout, TwinConstants.LAYOUT_POSITIONS_SECTION))
+            {
+                p0.Position = BakeVec(p0.Position);
+                posCount++;
+            }
 
-            var posSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_POSITIONS_SECTION);
-            if (posSec is not null)
-                for (int i = 0; i < posSec.GetItemsAmount(); i++)
-                    if (posSec.GetItem(i) is PS2AnyPosition p0)
-                    {
-                        var p = BakePoint(new Vector3(p0.Position.X, p0.Position.Y, p0.Position.Z));
-                        var pp = p0.Position; // Amedo
-                        pp.X = p.X; pp.Y = p.Y; pp.Z = p.Z;
-                        p0.Position = pp; // Amedo
-                        posCount++;
-                    }
-
-            var aiSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION);
-            if (aiSec is not null)
-                for (int i = 0; i < aiSec.GetItemsAmount(); i++)
-                    if (aiSec.GetItem(i) is PS2AnyAIPosition ap)
-                    {
-                        var p = BakePoint(new Vector3(ap.Position.X, ap.Position.Y, ap.Position.Z));
-                        var aq = ap.Position; // Amedo
-                        aq.X = p.X; aq.Y = p.Y; aq.Z = p.Z;
-                        ap.Position = aq; // Amedo
-                        aiCount++;
-                    }
+            foreach (var ap in LayoutSectionItems<PS2AnyAIPosition>(layout, TwinConstants.LAYOUT_AI_POSITIONS_SECTION))
+            {
+                ap.Position = BakeVec(ap.Position);
+                aiCount++;
+            }
         }
 
         chunkRoot.Transform.Position = Vector3.Zero;
@@ -255,8 +203,7 @@ public sealed partial class GameScene : Scene
 
         try
         {
-            var buildDir  = Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build");
-            var backupDir = Path.Combine(buildDir, "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')));
+            var backupDir = DiscBackup.DirFor(_scriptOut, _extractedRoot);
             var backupBd  = Path.Combine(backupDir, "Crash.BD");
             var backupBh  = Path.Combine(backupDir, "Crash.BH");
             var liveBd    = Path.Combine(_extractedRoot, "Crash6", "Crash.BD");

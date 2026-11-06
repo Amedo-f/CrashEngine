@@ -232,15 +232,6 @@ public sealed class SaveSummary
         stream.WriteInt_FC(TimePlayed_1C);
         WriteBase_2A74A0(stream);
     }
-
-    // Amedo
-    public string Text_29F9B8()
-    {
-        static string Pad(byte v) => (v < 10 ? ":0" : ":") + v.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
-        return Name_08 + " - " + Date_00[4].ToString(inv) + Pad(Date_00[5]) + Pad(Date_00[6]) + " " + Date_00[0].ToString(inv) + "/" +
-               Date_00[1].ToString(inv) + "/" + BitConverter.ToUInt16(Date_00, 2).ToString(inv);
-    }
 }
 
 // Amedo
@@ -296,14 +287,9 @@ public sealed class IconSysFile : SaveFile
 {
     public const int Size = 0x3C4;
 
-    public readonly string Title_38;
-    public readonly string Icon;
-
     // Amedo
     public IconSysFile(string title, string icon) : base("icon.sys", 0, Size, null)
     {
-        Title_38 = title;
-        Icon = icon;
     }
 
     public override bool Delivery => true;
@@ -312,10 +298,9 @@ public sealed class IconSysFile : SaveFile
 // Amedo
 public sealed class IconFile : SaveFile
 {
-    public readonly string DiscPath;
 
     // Amedo
-    public IconFile(string discPath, string name, int size) : base(name, 0, size, null) => DiscPath = discPath;
+    public IconFile(string name, int size) : base(name, 0, size, null) { }
 
     public override bool Delivery => true;
     public override bool BeginRead_2A7C00() => false;

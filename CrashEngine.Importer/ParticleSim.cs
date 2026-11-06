@@ -337,7 +337,6 @@ public sealed class ParticleEmitterSim
     public Vector3 DrawOrigin => WorldSpace ? Vector3.Zero : Origin; // Amedo 2026-09-27
 
     public bool Finished { get; private set; }
-    public float LastDistance { get; private set; } = 1e7f;
     public Particle[] Ring => _ring;
 
     private Particle[] _ring = Array.Empty<Particle>();
@@ -388,7 +387,6 @@ public sealed class ParticleEmitterSim
         _cyclesLeft = BurstCycles;
         _emitting = BurstCycles > 0;
         _spin144 = _spin146 = 0;
-        LastDistance = 1e6f; // Amedo
         int wait = 0;
         int period = Def.OnFrames + Def.OffFrames;
         if ((Def.OnRand | Def.OffRand) == 0) // Amedo
@@ -434,7 +432,6 @@ public sealed class ParticleEmitterSim
 
     internal void Process(ParticleWorld world, float dist, bool distanceGating)
     {
-        LastDistance = dist;
         if (_released || world.Frame < _nextFrame) return; // Amedo 2026-09-29
 
         float maxDist = IgnoreDistance ? 0f : Def.EmitMaxDist; // Amedo 2026-09-27

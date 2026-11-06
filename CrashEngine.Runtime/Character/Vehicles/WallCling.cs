@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -11,7 +10,7 @@ public sealed class WallCling : Vehicle
     private Matrix4x4 _place;
     private Vector3 _velocity;
     public Vector3 WallNormal;
-    private Matrix4x4 _driver = Matrix4x4.Identity, _partner = Matrix4x4.Identity;
+    private Matrix4x4 _driver = Matrix4x4.Identity;
     private readonly ConvexHull _box = CharacterController.Box(1.8f, 0.29f);
 
     public WallCling(CharacterController owner) : base(owner, null, true) => Start_160880();
@@ -31,7 +30,6 @@ public sealed class WallCling : Vehicle
     {
         Frame = Matrix4x4.Identity;
         _driver = Matrix4x4.Identity;
-        _partner = Matrix4x4.Identity;
         Owner.Body5 = null;
         UpdateFrames();
     }
@@ -40,7 +38,6 @@ public sealed class WallCling : Vehicle
 
     private bool Place_160A70()
     {
-        _partner = _place;
         _driver = _place;
         Frame = _place;
         return true;
@@ -110,7 +107,7 @@ public sealed class WallCling : Vehicle
         if (!(5e-5f < axis.X * axis.X + axis.Y * axis.Y + axis.Z * axis.Z)) return;
         axis *= GameMath.InverseLength(axis);
         float dot = z.X * n.X + z.Y * n.Y + z.Z * n.Z;
-        var r = CrashEngine.Runtime.Character.Vehicles.Humiliskate.AxisAngle_18CEA8(axis, GameMath.Acos_18B738(dot));
+        var r = GameMath.AxisAngle_18CEA8(axis, GameMath.Acos_18B738(dot));
         var p = _place.Translation;
         _place *= r;
         _place.Translation = p;

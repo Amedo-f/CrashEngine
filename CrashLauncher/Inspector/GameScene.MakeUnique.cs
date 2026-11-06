@@ -127,11 +127,6 @@ public sealed partial class GameScene
                               (global ? " and by every level (it lives in Default.rm2)." : "."));
             int group = _selectedSet.Contains(e) ? _selectedSet.Count(x => x.Get<InstanceData>()?.ObjectId == inst.ObjectId) : 1;
             if (ImGui.Button($"Make Unique ({group} placement{(group == 1 ? "" : "s")})##makeunique")) MakeSelectionUnique(e);
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Gives the selected placement(s) their own copy of this object.\n" +
-                             "Select several placements first to make them one group sharing a single copy.\n" +
-                             "Scripts, model and textures stay shared until you press 'Own Scripts' /\n" +
-                             "'Own Model & Textures' (or edit a per-object setting like the explosion radius).");
         }
         else
         {

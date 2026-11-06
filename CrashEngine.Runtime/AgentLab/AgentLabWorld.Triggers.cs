@@ -16,7 +16,6 @@ public sealed partial class AgentLabWorld
 
     public List<LayoutTrigger> Triggers { get; } = new();
     public bool TraceTriggers { get; set; }
-    public IReadOnlyList<LayoutTrigger> PlayerTriggers => _playerTriggers;
 
     private int Ticks => (int)(Now * 9000.0);
 

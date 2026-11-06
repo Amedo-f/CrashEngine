@@ -372,7 +372,6 @@ public sealed partial class AgentLabAgent
         if (OwnCharacter is { } c)
         {
             c.LastDamage.Kind = 0;
-            c.LastDamage.Amount = 0;
             c.LastDamage.Source = new Vector4(0f, 0f, 0f, c.LastDamage.Source.W);
             return;
         }

@@ -1,7 +1,6 @@
 using Assimp;
 using SysMat = System.Numerics.Matrix4x4;
 using SysQuat = System.Numerics.Quaternion;
-using SysVec3 = System.Numerics.Vector3;
 
 namespace CrashEngine.Assets;
 

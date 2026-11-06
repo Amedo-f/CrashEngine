@@ -53,16 +53,6 @@ public abstract class Widget
     public virtual void WhileDisappearing(int elapsed) { }
 
     // Amedo
-    public virtual void Hide_259FD8()
-    {
-        Fade_10 = 0;
-        Start_0C = 0;
-        State_00 = (State_00 & 0xFFFFFF0Fu) | 0x110;
-        Hold_14 = 0;
-        Progress_18 = 0f;
-    }
-
-    // Amedo
     public void CopyStateFrom(Widget old, int clockShift)
     {
         State_00 = old.State_00;
@@ -453,12 +443,6 @@ public class WidgetController
             for (Widget? a = Widgets_208[i], b = old.Widgets_208[i]; a is not null && b is not null && a.GetType() == b.GetType() && steps < 256; a = a.Next_1C, b = b.Next_1C, steps++)
                 a.CopyStateFrom(b, clockShift);
         }
-    }
-
-    // Amedo
-    public void HideAll_259CF8()
-    {
-        foreach (var w in Widgets_208) w?.Hide_259FD8();
     }
 
     // Amedo

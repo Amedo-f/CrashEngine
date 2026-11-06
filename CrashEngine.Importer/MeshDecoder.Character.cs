@@ -1,4 +1,3 @@
-using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -24,14 +23,6 @@ public static partial class MeshDecoder
     public const int SkinGroupJoints = 16;
     public const int SkinSubVerts = 3600;
     public static readonly TwinVec4 SkinVertexColor = new(0.498f, 0.498f, 0.498f, 0.467f);
-
-    public static TwinMat4 ToTwinMat4(Matrix4x4 m) => new()
-    {
-        Column1 = new TwinVec4(m.M11, m.M12, m.M13, m.M14),
-        Column2 = new TwinVec4(m.M21, m.M22, m.M23, m.M24),
-        Column3 = new TwinVec4(m.M31, m.M32, m.M33, m.M34),
-        Column4 = new TwinVec4(m.M41, m.M42, m.M43, m.M44),
-    };
 
     public static TransplantRecord? BakeExternalCharacterAsObject(GL gl,
         PS2AnyTwinsanityRM2 destRm2, object destTablesHandle, Dictionary<uint, Texture2D> destTexCache,
@@ -59,14 +50,6 @@ public static partial class MeshDecoder
         var globalGfx    = globalRm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
         var globalMatSec = globalGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
         var globalSkinSec = globalGfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKINS_SECTION);
-
-        static uint NewGraphicsId(BaseTwinSection section)
-        {
-            var rng = new Random();
-            uint id;
-            do { id = (uint)rng.Next(0x10000, 0x7FFFFFF); } while (id == 0 || section.ContainsItem(id));
-            return id;
-        }
 
         static PS2AnyMaterial? SkinMaterialTemplate(BaseTwinSection? skins, BaseTwinSection? mats)
         {
@@ -100,33 +83,12 @@ public static partial class MeshDecoder
         {
             var raw = sm.Mesh;
             if (raw.Indices.Length < 3 || raw.Positions.Length == 0) continue;
-            bool ownTexture = raw.DiffusePixelsRGBA is not null && raw.TexWidth > 0 && raw.TexHeight > 0; // Amedo
-            if (raw.DiffusePixelsRGBA is null || raw.TexWidth <= 0 || raw.TexHeight <= 0)
-            {
-                const int whiteSize = 128;
-                var white = new byte[whiteSize * whiteSize * 4];
-                Array.Fill(white, (byte)255);
-                raw.DiffusePixelsRGBA = white; raw.TexWidth = whiteSize; raw.TexHeight = whiteSize;
-            }
 
-            var tex = new PS2AnyTexture();
-            uint texId = NewGraphicsId(destTexSec);
-            tex.SetID(texId);
-            int tw = raw.TexWidth, th = raw.TexHeight;
-            { int p = 1; while (p < Math.Min(tw, 256)) p <<= 1; tw = Math.Clamp(p, 8, 256); }
-            { int p = 1; while (p < Math.Min(th, 256)) p <<= 1; th = Math.Clamp(p, 8, 256); }
-            byte[] pixels = ResampleRGBA(raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight, tw, th);
-            var colors = new List<Color>(tw * th);
-            for (int p = 0; p < tw * th; p++) colors.Add(new Color(pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2], pixels[p * 4 + 3]));
-            tex.FromBitmap(colors, tw, ITwinTextureFunction(), ITwinTexturePsm());
-            destTexSec.AddItem(tex);
-            if (ownTexture) ChunkImporter.SaveHd(tex, raw.DiffusePixelsRGBA, raw.TexWidth, raw.TexHeight); // Amedo
-            var t2d = ChunkImporter.DecodeTexture(gl, tex);
-            if (t2d is not null) destTexCache[texId] = t2d;
+            var (texId, t2d) = BakeImportTexture(gl, raw, destTexSec, destTexCache);
             rec.TextureIds.Add(texId);
 
             var mat = CloneItem(matTemplate);
-            uint matId = NewGraphicsId(destMatSec);
+            uint matId = NewGraphicsLocalId(destMatSec);
             mat.SetID(matId);
             mat.Shaders[0].TextureId = texId;
             mat.Shaders[0].TxtMapping = TwinShader.TextureMapping.ON;
@@ -203,7 +165,7 @@ public static partial class MeshDecoder
         }
         if (skin.SubSkins.Count == 0) { log = "no usable triangles found in the imported file"; return null; }
 
-        uint skinId = NewGraphicsId(destSkinSec);
+        uint skinId = NewGraphicsLocalId(destSkinSec);
         skin.SetID(skinId);
         destSkinSec.AddItem(skin);
         rec.SkinIds.Add(skinId);
@@ -263,12 +225,6 @@ public static partial class MeshDecoder
               $"{animIds.Count} animation(s) (OGI 0x{ogiId:X4}, skin 0x{skinId:X8}, material template 0x{matTemplate.GetID():X8}, OGI template 0x{ogiTemplate.GetID():X4})";
         return rec;
     }
-
-    private static Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction ITwinTextureFunction() =>
-        Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TextureFunction.MODULATE;
-
-    private static Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat ITwinTexturePsm() =>
-        Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture.TexturePixelFormat.PSMCT32;
 
     public const float SkinRawLimit = 32000f;
 

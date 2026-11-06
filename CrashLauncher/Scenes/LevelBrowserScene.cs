@@ -1,17 +1,9 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinBoundingBoxBuilder = Twinsanity.TwinsanityInterchange.Common.TwinBoundingBoxBuilder;
-using TwinChunkLinkBoundingBoxBuilder = Twinsanity.TwinsanityInterchange.Common.TwinChunkLinkBoundingBoxBuilder;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -25,12 +17,10 @@ public sealed class LevelBrowserScene : Scene
 
     private readonly object _logLock = new();
     private readonly List<string> _log = new();
-    private bool _autoScroll = true;
 
     private string _newSceneName = "";
     private string? _createError;
     private string _createTemplatePath = NewSceneTemplatePath;
-    private string _createTemplateFilter = "";
     private bool _createBlank = false;
     private string? _pendingLoadPath;
     private string? _pendingAddCrashFrom;
@@ -802,12 +792,10 @@ public sealed class LevelBrowserScene : Scene
         Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot,
             _project is { IsNewGame: true } ? "CollisionMarkers_NewGame" : "CollisionMarkers");
 
-    private string BackupBdPath =>
-        Path.Combine(Path.GetDirectoryName(_scriptOut) ?? _extractedRoot, "Build",
-                     "original_backup_" + Path.GetFileName(_extractedRoot.TrimEnd('\\', '/')), "Crash.BD");
+    private string BackupBdPath => DiscBackup.BdPath(_scriptOut, _extractedRoot);
     private string BackupBhPath => Path.ChangeExtension(BackupBdPath, ".BH");
 
-    private string PristineArchiveSource => File.Exists(BackupBdPath) ? BackupBdPath : _extractedRoot;
+    private string PristineArchiveSource => DiscBackup.PristineSource(_scriptOut, _extractedRoot);
 
     private bool TryRestoreOriginalArchive(out string? error)
     {

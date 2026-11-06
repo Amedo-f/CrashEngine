@@ -11,7 +11,7 @@ public sealed class GameFont
     public readonly record struct Quad(float X, float Y, float W, float H, float U, float V0, float UW, float V1, int Page);
     public readonly record struct Page(int Width, int Height, byte[] Rgba)
     {
-        public const int BlendMix = 0, BlendAdd = 1; // Amedo
+        public const int BlendAdd = 1; // Amedo
         public int Blend { get; init; } // Amedo
     }
     public readonly record struct Item(float Advance, float DrawX, float DrawW, float Height, float Baseline, float U, float V0, float UW, float V1, int Page);

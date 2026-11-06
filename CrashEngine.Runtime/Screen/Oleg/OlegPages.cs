@@ -103,14 +103,12 @@ public sealed class PausePage : OlegPage
 
     public readonly SaveGamePage Save_50;
     public readonly LoadGamePage Load_A4;
-    public readonly QuitPage Quit_F8;
 
     // Amedo
     public PausePage(Oleg oleg, GameTexts? texts) : base(oleg, 0x18, Exit_3B6B50, texts)
     {
-        Save_50 = new SaveGamePage(oleg, this, texts);
-        Load_A4 = new LoadGamePage(oleg, this, texts);
-        Quit_F8 = new QuitPage(oleg, this, texts);
+        Save_50 = new SaveGamePage(oleg, texts);
+        Load_A4 = new LoadGamePage(oleg, texts);
         var options = new ActionItem(oleg, 0xB, OptionsItem, 1);
         var save = new LinkItem(0x19, SaveItem, Save_50, 1);
         var load = new LinkItem(0xA, LoadItem, Load_A4, 1);
@@ -146,8 +144,8 @@ public sealed class MainMenuPage : OlegPage
     // Amedo
     public MainMenuPage(Oleg oleg, GameTexts? texts) : base(oleg, "crash twinsanity", Exit_3B6B50, texts)
     {
-        NewGame_50 = new NewGamePage(oleg, this, texts);
-        Load_A4 = new LoadGamePage(oleg, this, texts);
+        NewGame_50 = new NewGamePage(oleg, texts);
+        Load_A4 = new LoadGamePage(oleg, texts);
         var newGame = new LinkItem(9, NewGameItem, NewGame_50, 1);
         var load = new LinkItem(10, LoadItem, Load_A4, 1);
         var options = new ActionItem(oleg, 0xB, OptionsItem, 1);
@@ -160,10 +158,8 @@ public sealed class MainMenuPage : OlegPage
 // Amedo
 public sealed class NewGamePage : OlegPage
 {
-    public readonly MenuPage Owner_50;
-
     // Amedo
-    public NewGamePage(Oleg oleg, MenuPage owner, GameTexts? texts) : base(oleg, 9, null, texts) => Owner_50 = owner;
+    public NewGamePage(Oleg oleg, GameTexts? texts) : base(oleg, 9, null, texts) { }
 
     // Amedo
     public override void Entered(int col, int mode) => Oleg_3095C8.Game_3095C8?.NewGame_17BEB0();
@@ -172,10 +168,8 @@ public sealed class NewGamePage : OlegPage
 // Amedo
 public sealed class SaveGamePage : OlegPage
 {
-    public readonly PausePage Owner_50;
-
     // Amedo
-    public SaveGamePage(Oleg oleg, PausePage owner, GameTexts? texts) : base(oleg, 0x19, null, texts) => Owner_50 = owner;
+    public SaveGamePage(Oleg oleg, GameTexts? texts) : base(oleg, 0x19, null, texts) { }
 
     // Amedo
     public override void Entered(int col, int mode) => Oleg_3095C8.Game_3095C8?.SaveFromPause_17BF88();
@@ -184,10 +178,8 @@ public sealed class SaveGamePage : OlegPage
 // Amedo
 public sealed class LoadGamePage : OlegPage
 {
-    public readonly MenuPage Owner_50;
-
     // Amedo
-    public LoadGamePage(Oleg oleg, MenuPage owner, GameTexts? texts) : base(oleg, 0xA, null, texts) => Owner_50 = owner;
+    public LoadGamePage(Oleg oleg, GameTexts? texts) : base(oleg, 0xA, null, texts) { }
 
     // Amedo
     public override void Entered(int col, int mode) => Oleg_3095C8.Game_3095C8?.LoadFromPause_17BDD8();

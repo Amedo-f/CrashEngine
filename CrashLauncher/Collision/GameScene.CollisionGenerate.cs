@@ -1,54 +1,16 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
 using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
 namespace CrashLauncher;
 
 public sealed partial class GameScene : Scene
 {
-    private void SpawnCollisionBoxesMatchingScenery()
+    private List<Entity> CollectSelectedCollisionTiles(Func<Entity, bool> isTile)
     {
-        bool UnderLinkedScenery(Entity e)
+        static bool UnderLinkedScenery(Entity e)
         {
             for (var p = e; p is not null; p = p.Parent)
                 if (p.Name == "LinkedScenery") return true;
@@ -56,14 +18,19 @@ public sealed partial class GameScene : Scene
         }
 
         var tiles = new List<Entity>();
-        void CollectSelectedTiles(Entity e)
+        void Collect(Entity e)
         {
             if (UnderLinkedScenery(e)) return;
-            if (IsStaticGeometryEntity(e)) tiles.Add(e);
-            foreach (var c in e.Children) CollectSelectedTiles(c);
+            if (isTile(e)) tiles.Add(e);
+            foreach (var c in e.Children) Collect(c);
         }
-        foreach (var sel in _selectedSet) CollectSelectedTiles(sel);
-        tiles = tiles.Distinct().ToList();
+        foreach (var sel in _selectedSet) Collect(sel);
+        return tiles.Distinct().ToList();
+    }
+
+    private void SpawnCollisionBoxesMatchingScenery()
+    {
+        var tiles = CollectSelectedCollisionTiles(IsStaticGeometryEntity);
         if (tiles.Count == 0) { _browser.Log("Collision Box (match bounds): no Scenery tile or Object instance selected."); return; }
 
         int made = 0;
@@ -131,23 +98,7 @@ public sealed partial class GameScene : Scene
         var coll = rm2.GetItem<PS2AnyCollisionData>((uint)TwinConstants.LEVEL_COLLISION_ITEM);
         if (coll is null) { _browser.Log("Generate Mesh Collision: this level has no collision data."); return; }
 
-        bool UnderLinkedScenery(Entity e)
-        {
-            for (var p = e; p is not null; p = p.Parent)
-                if (p.Name == "LinkedScenery") return true;
-            return false;
-        }
-
-        var tiles = new List<Entity>();
-        void CollectSelectedTiles(Entity e)
-        {
-            if (UnderLinkedScenery(e)) return;
-            if (e.Get<CrashEngine.Importer.MeshRenderer>() is not null) tiles.Add(e);
-            foreach (var c in e.Children) CollectSelectedTiles(c);
-        }
-        foreach (var sel in _selectedSet) CollectSelectedTiles(sel);
-        tiles = tiles.Distinct().ToList();
-
+        var tiles = CollectSelectedCollisionTiles(e => e.Get<CrashEngine.Importer.MeshRenderer>() is not null);
         if (tiles.Count == 0)
         {
             _browser.Log("Generate Mesh Collision: select one or more Scenery tiles or Object " +
@@ -167,9 +118,7 @@ public sealed partial class GameScene : Scene
         if (_collisionTileMap is null || _collisionTileMap.Count != coll.Triangles.Count)
             BuildCollisionTileMap(chunkRoot!);
 
-        var surfTypes = MeshDecoder.BuildSurfaceTypeLookup(rm2, chunkRoot?.Get<ChunkSource>()?.GlobalRm2);
-        int defaultSurfaceIndex = surfTypes?.IndexOf(SurfaceType.SURF_DEFAULT) ?? -1;
-        if (defaultSurfaceIndex < 0) defaultSurfaceIndex = 0;
+        int defaultSurfaceIndex = DefaultCollisionSurfaceIndex(chunkRoot!, rm2);
 
         const int MaxPackedIndex = 0x3FFFF;
         const float MergeQuantum = 0.02f;
@@ -256,7 +205,7 @@ public sealed partial class GameScene : Scene
 
             var directCubeRenderer = markerEntity.Add(new DirectCubeRenderer
             {
-                Mesh = BuildGeneratedCollisionMesh(Engine.Instance.GL, localVerts, localTris),
+                Mesh = BuildMeshFromTopology(Engine.Instance.GL, localVerts, localTris),
                 Color = CollisionDebugColor,
                 OwnsMesh = true,
             });
@@ -293,21 +242,5 @@ public sealed partial class GameScene : Scene
             _selected = newSelection[0];
             _revealSelectionInTree = true;
         }
-    }
-
-    private static GpuMesh BuildGeneratedCollisionMesh(GL gl, List<Vector3> localVerts, List<(int A, int B, int C)> localTris)
-    {
-        var verts = new GpuMesh.Vertex[localTris.Count * 3];
-        int vi = 0;
-        foreach (var (a, b, c) in localTris)
-        {
-            var pa = localVerts[a]; var pb = localVerts[b]; var pc = localVerts[c];
-            var n = Vector3.Cross(pb - pa, pc - pa);
-            n = n.LengthSquared() > 1e-12f ? Vector3.Normalize(n) : Vector3.UnitY;
-            verts[vi++] = new GpuMesh.Vertex { Position = pa, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-            verts[vi++] = new GpuMesh.Vertex { Position = pb, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-            verts[vi++] = new GpuMesh.Vertex { Position = pc, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-        }
-        return new GpuMesh(gl, verts, PrimitiveType.Triangles);
     }
 }

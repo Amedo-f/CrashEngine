@@ -17,8 +17,6 @@ public sealed partial class AgentLabWorld
     public AgentLabAgent? RespawnAgent { get; private set; }
     public string? RespawnChunkName { get; private set; } // Amedo 2026-09-29
     public Matrix4x4 RespawnToAnchor { get; private set; } = Matrix4x4.Identity;
-    public Matrix4x4? StartMatrix { get; set; }
-    public int StartHitPoints { get; set; }
     public float FadeAlpha => 0f; // Amedo
     public int RespawnMode => GameMode is ModeResetFade or ModeReset ? GameMode : 0; // Amedo
     public int Respawns { get; private set; }
@@ -330,7 +328,6 @@ public sealed partial class AgentLabWorld
         _byInstance.Clear();
         Player = null;
         Crash = null; // Amedo
-        PlayerSupport = null;
         PlayerCharacter = null;
         Current = null;
         _nextPhase = 0;

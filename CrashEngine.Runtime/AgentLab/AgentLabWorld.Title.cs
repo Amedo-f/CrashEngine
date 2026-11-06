@@ -97,7 +97,6 @@ public sealed partial class AgentLabWorld
         PictureHold_14 = 0;
         if (player is null)
         {
-            MovieSkipped = false;
             return true;
         }
         if (Frame == _modeEnteredFrame)
@@ -114,26 +113,22 @@ public sealed partial class AgentLabWorld
             PictureHold_14 = Frame;
             Oleg.Hide_259BC0(Oleg.Groups_08[Oleg.FlashGroup], fadeTicks, 0);
             if (player.Start_2AFB18(name, track, (flags & 1) != 0, (int)((flags >> 4) & 0xFFF), (int)((flags >> 16) & 0xFFF))) return false;
-            MovieSkipped = false;
             Oleg.Show_259B20(Oleg.Groups_08[Oleg.FlashGroup], 0, 0);
             return true;
         }
         PictureHold_14 = hold;
         if (!player.Playing)
         {
-            MovieSkipped = false;
             Oleg.Show_259B20(Oleg.Groups_08[Oleg.FlashGroup], 0, 0);
             return true;
         }
         if (!allowSkip || !(Pad1?.GetButtonState_2B3548(CrossButton, true) ?? false)) return false;
-        MovieSkipped = true;
         Oleg.Show_259B20(Oleg.Groups_08[Oleg.FlashGroup], 0, 0);
         player.Stop_2AFBC8();
         return true;
     }
 
     public Video.MoviePlayer? MoviePlayer_309720 { get; set; } // Amedo
-    public bool MovieSkipped { get; private set; } // Amedo
     public int AudioTrack_309754 { get; set; } // Amedo
 
     // Amedo

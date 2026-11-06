@@ -1,50 +1,11 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnySound = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnySound;
 using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
 using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PointLight = Twinsanity.TwinsanityInterchange.Common.Lights.PointLight;
-using NegativeLight = Twinsanity.TwinsanityInterchange.Common.Lights.NegativeLight;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
-using ITwinCamera = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Layout.ITwinCamera;
 
 namespace CrashLauncher;
 
@@ -67,35 +28,7 @@ public sealed partial class GameScene : Scene
                     if (!string.IsNullOrEmpty(mat.ShaderType))
                         ImGui.TextDisabled($"PS2 Shader: {mat.ShaderType}");
 
-                    string[] cullLabels = { "Front", "Back", "Both" };
-                    int cullIdx = (int)mat.Culling;
-                    ImGui.SetNextItemWidth(-1f);
-                    if (ImGui.Combo("Cull Mode##mr", ref cullIdx, cullLabels, cullLabels.Length))
-                        mat.Culling = (Material.CullMode)cullIdx;
-
-                    bool unlit = mat.Unlit;
-                    if (ImGui.Checkbox("Unlit##mr", ref unlit))
-                    {
-                        mat.Unlit = unlit;
-                        mat.UnlitToggledByUser = true;
-                    }
-
-                    bool ab = mat.AlphaBlend;
-                    if (ImGui.Checkbox("Alpha Blend##mr", ref ab))
-                        mat.AlphaBlend = ab;
-
-                    if (mat.AlphaBlend)
-                    {
-                        string[] blendLabels = { "Standard", "Additive", "Subtractive" };
-                        int blendIdx = (int)mat.Blend;
-                        ImGui.SetNextItemWidth(-1f);
-                        if (ImGui.Combo("Blend Mode##mr", ref blendIdx, blendLabels, blendLabels.Length))
-                            mat.Blend = (Material.BlendMode)blendIdx;
-                    }
-
-                    bool fog = mat.FogEnabled;
-                    if (ImGui.Checkbox("Fog##mr", ref fog))
-                        mat.FogEnabled = fog;
+                    DrawMaterialCullBlendFog(mat, "mr", "Blend Mode##mr");
 
                     var scroll = mat.UvScrollSpeed;
                     if (scroll.X != 0f || scroll.Y != 0f)
@@ -113,9 +46,6 @@ public sealed partial class GameScene : Scene
 
                         if (ImGui.Button("Import Texture...##mrimport", new Vector2(-1f, 0f)))
                             ImportTextureOverMaterial(mat);
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("Replaces this PS2 texture (re-encoded, kept for Save/Build) —\n" +
-                                              "every object using the same texture updates together.");
 
                         if (ImGui.Button("Import From Level...##mrimportlevel", new Vector2(-1f, 0f)))
                         {
@@ -123,21 +53,9 @@ public sealed partial class GameScene : Scene
                             _texturePickerLevel = null;
                             _showTexturePicker = true;
                         }
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("Browse a DIFFERENT level's own real textures and pick one to\n" +
-                                              "copy here — automatically resized/re-encoded to match this\n" +
-                                              "texture's own real slot (same safe path as Import Texture).\n" +
-                                              "If this is a scenery texture, also auto-finds EVERY live tile\n" +
-                                              "in the current scene using this same texture slot and pulls\n" +
-                                              "along that source mesh's vertex colours onto all of them — no\n" +
-                                              "manual selection needed, texture alone isn't the real color.");
 
                         if (ImGui.Button("Reset Texture to Original##mrreset", new Vector2(-1f, 0f)))
                             ResetTextureToOriginal(mat);
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("Re-reads this texture fresh from the real disc archive\n" +
-                                              "(ignores any imported/saved edit) — a safety net if an\n" +
-                                              "import went wrong or looks broken.");
                     }
                     else
                     {
@@ -152,12 +70,6 @@ public sealed partial class GameScene : Scene
                             _vertexColorPickerLevel = null;
                             _showVertexColorPicker = true;
                         }
-                        if (ImGui.IsItemHovered())
-                            MaybeTooltip("This mesh's actual colour comes from PER-VERTEX data baked\n" +
-                                              "into the geometry, not the texture — browse another level's\n" +
-                                              "scenery meshes and copy its vertex colours onto this one.\n" +
-                                              "1:1 if vertex counts match, otherwise broadcasts the source's\n" +
-                                              "average colour uniformly. Rebuilds this tile's visuals live.");
 
                         var sceneryTargets = _selectedSet.Where(x => x.Parent?.Get<SceneryTile>() is not null).ToList();
                         if (sceneryTargets.Count > 1)
@@ -168,11 +80,6 @@ public sealed partial class GameScene : Scene
                                 _vertexColorPickerLevel = null;
                                 _showVertexColorPicker = true;
                             }
-                            if (ImGui.IsItemHovered())
-                                MaybeTooltip("Ctrl+Click multiple scenery tiles first (e.g. every visible\n" +
-                                                  "ground patch) — applies the same picked source mesh to every\n" +
-                                                  "DISTINCT underlying mesh id in the selection at once, instead\n" +
-                                                  "of repeating the single-tile button per ground variant.");
                         }
                     }
 
@@ -213,6 +120,32 @@ public sealed partial class GameScene : Scene
         }
     }
 
+    private static void DrawMaterialCullBlendFog(Material mat, string id, string blendLabel)
+    {
+        string[] cullLabels = { "Front", "Back", "Both" };
+        int cullIdx = (int)mat.Culling;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.Combo($"Cull Mode##{id}", ref cullIdx, cullLabels, cullLabels.Length))
+            mat.Culling = (Material.CullMode)cullIdx;
+
+        bool unlit = mat.Unlit;
+        if (ImGui.Checkbox($"Unlit##{id}", ref unlit)) { mat.Unlit = unlit; mat.UnlitToggledByUser = true; }
+
+        bool ab = mat.AlphaBlend;
+        if (ImGui.Checkbox($"Alpha Blend##{id}", ref ab)) mat.AlphaBlend = ab;
+        if (mat.AlphaBlend)
+        {
+            string[] blendLabels = { "Standard", "Additive", "Subtractive" };
+            int blendIdx = (int)mat.Blend;
+            ImGui.SetNextItemWidth(-1f);
+            if (ImGui.Combo(blendLabel, ref blendIdx, blendLabels, blendLabels.Length))
+                mat.Blend = (Material.BlendMode)blendIdx;
+        }
+
+        bool fog = mat.FogEnabled;
+        if (ImGui.Checkbox($"Fog##{id}", ref fog)) mat.FogEnabled = fog;
+    }
+
     private void DrawInspectorRendererMesh(Entity e, CrashEngine.Renderer.MeshRenderer? rmr)
     {
         if (rmr is not null)
@@ -226,28 +159,7 @@ public sealed partial class GameScene : Scene
                 if (ImGui.ColorEdit4("Base Color##rmr", ref col))
                     mat.BaseColor = col;
 
-                string[] cullLabels = { "Front", "Back", "Both" };
-                int cullIdx = (int)mat.Culling;
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.Combo("Cull Mode##rmr", ref cullIdx, cullLabels, cullLabels.Length))
-                    mat.Culling = (Material.CullMode)cullIdx;
-
-                bool unlit = mat.Unlit;
-                if (ImGui.Checkbox("Unlit##rmr", ref unlit)) { mat.Unlit = unlit; mat.UnlitToggledByUser = true; }
-
-                bool ab = mat.AlphaBlend;
-                if (ImGui.Checkbox("Alpha Blend##rmr", ref ab)) mat.AlphaBlend = ab;
-                if (mat.AlphaBlend)
-                {
-                    string[] blendLabels = { "Standard", "Additive", "Subtractive" };
-                    int blendIdx = (int)mat.Blend;
-                    ImGui.SetNextItemWidth(-1f);
-                    if (ImGui.Combo("Blend Mode##rmr", ref blendIdx, blendLabels, blendLabels.Length))
-                        mat.Blend = (Material.BlendMode)blendIdx;
-                }
-
-                bool fog = mat.FogEnabled;
-                if (ImGui.Checkbox("Fog##rmr", ref fog)) mat.FogEnabled = fog;
+                DrawMaterialCullBlendFog(mat, "rmr", "Blend Mode##rmr");
 
                 bool aot = mat.AlwaysOnTop;
                 if (ImGui.Checkbox("Always On Top##rmr", ref aot)) mat.AlwaysOnTop = aot;
@@ -350,28 +262,7 @@ public sealed partial class GameScene : Scene
                 var col = cm.BaseColor;
                 if (ImGui.ColorEdit4("Color##dcr", ref col)) cm.BaseColor = col;
 
-                string[] cullLabels = { "Front", "Back", "Both" };
-                int cullIdx = (int)cm.Culling;
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.Combo("Cull Mode##dcr", ref cullIdx, cullLabels, cullLabels.Length))
-                    cm.Culling = (Material.CullMode)cullIdx;
-
-                bool unlit = cm.Unlit;
-                if (ImGui.Checkbox("Unlit##dcr", ref unlit)) { cm.Unlit = unlit; cm.UnlitToggledByUser = true; }
-
-                bool ab = cm.AlphaBlend;
-                if (ImGui.Checkbox("Alpha Blend##dcr", ref ab)) cm.AlphaBlend = ab;
-                if (cm.AlphaBlend)
-                {
-                    string[] blendLabels = { "Standard", "Additive", "Subtractive" };
-                    int bi = (int)cm.Blend;
-                    ImGui.SetNextItemWidth(-1f);
-                    if (ImGui.Combo("Blend##dcr", ref bi, blendLabels, blendLabels.Length))
-                        cm.Blend = (Material.BlendMode)bi;
-                }
-
-                bool fog = cm.FogEnabled;
-                if (ImGui.Checkbox("Fog##dcr", ref fog)) cm.FogEnabled = fog;
+                DrawMaterialCullBlendFog(cm, "dcr", "Blend##dcr");
 
                 bool aot = cm.AlwaysOnTop;
                 if (ImGui.Checkbox("Always on Top##dcr", ref aot)) cm.AlwaysOnTop = aot;
@@ -410,11 +301,6 @@ public sealed partial class GameScene : Scene
                         e.RemoveComponent<CollisionBoxMarker>();
                     }
                 }
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("When on, this cube's current position/scale is written as\n" +
-                                      "real PS2 collision geometry on every Save Chunk (like Unity's\n" +
-                                      "BoxCollider). Turning it off retracts any collision a previous\n" +
-                                      "save already wrote for it.");
 
                 ImGui.Spacing();
                 ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.15f, 0.15f, 1f));

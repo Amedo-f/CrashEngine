@@ -1,12 +1,7 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
-using TwinJoint = Twinsanity.TwinsanityInterchange.Common.TwinJoint;
 
 namespace CrashLauncher;
 
@@ -65,7 +60,6 @@ public sealed partial class GameScene
 			if (on) ImGui.PushStyleColor(ImGuiCol.Button, active);
 			if (ImGui.SmallButton($"{label}##shade{mode}")) ApplyShading(mode);
 			if (on) ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered()) MaybeTooltip(tip);
 			ImGui.SameLine();
 		}
 		if (_workspace == Workspace.Animation)
@@ -75,7 +69,6 @@ public sealed partial class GameScene
 			if (_showArmature) ImGui.PushStyleColor(ImGuiCol.Button, active);
 			if (ImGui.SmallButton("Bones##showarmature")) _showArmature = !_showArmature;
 			if (_showArmature) ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered()) MaybeTooltip("Show Armature — the skeleton drawn over the character, from each joint to its child\n(the game keeps joints only, no bone shapes). Click a bone to pick it.");
 			ImGui.SameLine();
 		}
 		ImGui.NewLine();
@@ -94,18 +87,6 @@ public sealed partial class GameScene
 		if (_camera?.OrbitTarget is { } orbit) return orbit;
 		if (_workspace == Workspace.Scene && _selected is not null) return _selected.Transform.World.Translation;
 		return (_camera?.Transform.Position ?? Vector3.Zero) + (_camera?.Forward ?? -Vector3.UnitZ) * 20f;
-	}
-
-	private string ViewName()
-	{
-		if (_camera is null || !_camera.Orthographic) return "Perspective";
-		var f = _camera.Forward;
-		foreach (var (axis, label, _) in ViewAxes)
-		{
-			if (Vector3.Dot(f, -axis) > 0.999f) return $"Ortho · from +{label}";
-			if (Vector3.Dot(f, axis) > 0.999f) return $"Ortho · from -{label}";
-		}
-		return "Ortho";
 	}
 
 	private void DrawViewGizmo()
@@ -190,7 +171,6 @@ public sealed partial class GameScene
 			if (_camera.Orthographic) _camera.Orthographic = false;
 			else _camera.SnapTo(_camera.Forward, ViewPivot());
 		}
-		if (ImGui.IsItemHovered()) MaybeTooltip($"{ViewName()} — click to switch between perspective (3D) and orthographic (2D).\nNumpad 1/3/7 = view along Z/X/Y (Ctrl = the other side), Numpad 5 = switch.");
 		ImGui.End();
 
 		if (!ImGui.GetIO().WantTextInput && !TextTyping)

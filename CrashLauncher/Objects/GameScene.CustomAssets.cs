@@ -3,7 +3,6 @@ using CrashEngine.Importer;
 using CrashEngine.Renderer;
 using ImGuiNET;
 using System.Numerics;
-using PS2AnyTwinsanitySM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanitySM2;
 using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
 using Constants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
@@ -318,7 +317,7 @@ public sealed partial class GameScene
                 ParamList3            = new List<uint>(cfg.ParamList3),
             };
 
-            var instRoot = chunkRoot.Children.FirstOrDefault(c => c.Name == "Instances") ?? chunkRoot;
+            var instRoot = InstancesRoot(chunkRoot);
             var newEntity = AddOrReuseInstance(section, newInst, instRoot, chunkSource);
             SelectClicked(newEntity, false);
             _browser.Log($"Assets: imported object '{entry.Name}' (0x{entry.ObjectId:X4}) at the origin (0,0,0). Save Chunk to keep it.");

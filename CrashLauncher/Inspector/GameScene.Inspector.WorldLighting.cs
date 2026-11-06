@@ -1,50 +1,13 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnySound = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnySound;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
 using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
 using PointLight = Twinsanity.TwinsanityInterchange.Common.Lights.PointLight;
 using NegativeLight = Twinsanity.TwinsanityInterchange.Common.Lights.NegativeLight;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
-using ITwinCamera = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Layout.ITwinCamera;
+using Light = Twinsanity.TwinsanityInterchange.Common.Lights.Light;
 
 namespace CrashLauncher;
 
@@ -64,12 +27,6 @@ public sealed partial class GameScene : Scene
                 ImGui.SetNextItemWidth(-1f);
                 if (ImGui.SliderFloat("Intensity##wli", ref intensity, 0f, 5f))
                     lighting.Intensity = intensity;
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Per-level brightness multiplier on the real ambient + directional\n" +
-                                      "lights. Your value is remembered for this level (persists on exit/\n" +
-                                      "reload) and baked into the real colours only when building the ISO,\n" +
-                                      "so it never compounds. Use it to fix levels the devs left too dark\n" +
-                                      "or too bright.");
 
                 var sceneryBrightness = lighting.SceneryBrightness;
                 ImGui.SetNextItemWidth(-1f);
@@ -79,12 +36,6 @@ public sealed partial class GameScene : Scene
                     var chunkRootForLight = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
                     if (chunkRootForLight is not null) ApplySceneryBrightness(chunkRootForLight, lighting);
                 }
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Scales scenery's OWN real, static per-vertex colours (separate from\n" +
-                                      "the Intensity slider above, which only affects Instances' real-time\n" +
-                                      "ambient/directional lighting — scenery has no equivalent runtime\n" +
-                                      "lighting path). Always scales from the ORIGINAL colours, never\n" +
-                                      "compounds across repeated drags. Save Chunk to persist.");
 
                 var chunkRootForLinked = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
                 bool hasLinks = chunkRootForLinked?.Get<ChunkSource>()?.Sm2
@@ -94,24 +45,12 @@ public sealed partial class GameScene : Scene
                 if (ImGui.Button("Apply to Linked Scenes", new Vector2(-1f, 0f)))
                     ApplyToLinkedScenes(chunkRootForLinked!, lighting);
                 ImGui.EndDisabled();
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Pushes the CURRENT Scenery Brightness + World Lighting values out\n" +
-                                      "to every level THIS one directly links to — real saves to their\n" +
-                                      "own files, no need to open them yourself. Click once after settling\n" +
-                                      "on the values you want (repeated clicks keep multiplying from\n" +
-                                      "whatever those levels already have, not their true original).");
 
                 ImGui.Separator();
                 int fogIdx = lighting.FogColorIndex;
                 ImGui.SetNextItemWidth(-1f);
                 if (ImGui.Combo("Fog Color##wlfog", ref fogIdx, CrashEngine.Importer.MeshDecoder.FogColorNames, CrashEngine.Importer.MeshDecoder.FogColorNames.Length))
                     lighting.FogColorIndex = fogIdx;
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("The game's own fog pass: every pixel farther than ~25 units from the\n" + // Amedo 2026-09-26
-                                      "camera (sky included) is blended 29.7% toward this colour, taken\n" +
-                                      "from the game's per-index fog palettes. 'None' turns the fog off.\n" +
-                                      "Only these 7 values exist in the game. Updates live; Save Chunk\n" +
-                                      "to persist.");
 
                 var ambient = lighting.AmbientColor;
                 if (ImGui.ColorEdit3("Ambient##wl", ref ambient)) lighting.AmbientColor = ambient;
@@ -206,81 +145,58 @@ public sealed partial class GameScene : Scene
     {
         ImGui.Separator();
 
-        if (ImGui.TreeNode($"Point Lights ({scenery.PointLights.Count})##ptlights"))
-        {
-            int removeAt = -1;
-            for (int i = 0; i < scenery.PointLights.Count; i++)
-            {
-                ImGui.PushID(i);
-                var pl = scenery.PointLights[i];
-                ImGui.Text($"Point light {i + 1}");
-                ImGui.SameLine();
-                if (ImGui.SmallButton("Select##ptsel")) SelectLightMarkerFor(pl);
-                ImGui.SameLine();
-                if (ImGui.SmallButton("Remove##ptrm")) removeAt = i;
-
-                var col = new Vector3(pl.Color.X, pl.Color.Y, pl.Color.Z);
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.ColorEdit3("Color##pc", ref col)) { pl.Color.X = col.X; pl.Color.Y = col.Y; pl.Color.Z = col.Z; }
-                float r = pl.Radius;
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.DragFloat("Radius##pr", ref r, 0.05f, 0f, float.MaxValue)) pl.Radius = r;
-                ImGui.PopID();
-                ImGui.Spacing();
-            }
-            if (removeAt >= 0) { var rm = scenery.PointLights[removeAt]; scenery.PointLights.RemoveAt(removeAt); RemoveLightMarkerFor(rm); }
-            ImGui.BeginDisabled(!scenery.HasLighting);
-            if (ImGui.SmallButton("+ Add Point Light##addpt"))
-            {
-                var pl = MakeEditorPointLight(scenery, new TwinVec4(0f, 0f, 0f, 1f));
-                scenery.PointLights.Add(pl);
-                EnableAddedSceneryLights(scenery); // Amedo 2026-09-26
-                var m = AddOneLightMarker(pl, false, $"PointLight_{scenery.PointLights.Count - 1}");
-                if (m is not null) SelectClicked(m, false);
-            }
-            ImGui.EndDisabled();
-            if (!scenery.HasLighting) { ImGui.SameLine(); ImGui.TextDisabled("(lighting disabled for this level)"); }
-            ImGui.TreePop();
-        }
-
-        if (ImGui.TreeNode($"Negative Lights ({scenery.NegativeLights.Count})##neglights"))
-        {
-            int removeAt = -1;
-            for (int i = 0; i < scenery.NegativeLights.Count; i++)
-            {
-                ImGui.PushID(1000 + i);
-                var nl = scenery.NegativeLights[i];
-                ImGui.Text($"Negative light {i + 1}");
-                ImGui.SameLine();
-                if (ImGui.SmallButton("Select##ngsel")) SelectLightMarkerFor(nl);
-                ImGui.SameLine();
-                if (ImGui.SmallButton("Remove##ngrm")) removeAt = i;
-
-                var col = new Vector3(nl.Color.X, nl.Color.Y, nl.Color.Z);
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.ColorEdit3("Color##nc", ref col)) { nl.Color.X = col.X; nl.Color.Y = col.Y; nl.Color.Z = col.Z; }
-                float r = nl.Radius;
-                ImGui.SetNextItemWidth(-1f);
-                if (ImGui.DragFloat("Radius##nr", ref r, 0.05f, 0f, float.MaxValue)) nl.Radius = r;
-                ImGui.PopID();
-                ImGui.Spacing();
-            }
-            if (removeAt >= 0) { var rm = scenery.NegativeLights[removeAt]; scenery.NegativeLights.RemoveAt(removeAt); RemoveLightMarkerFor(rm); }
-            ImGui.BeginDisabled(!scenery.HasLighting);
-            if (ImGui.SmallButton("+ Add Negative Light##addng"))
-            {
-                var nl = MakeEditorNegativeLight(scenery, new TwinVec4(0f, 0f, 0f, 1f));
-                scenery.NegativeLights.Add(nl);
-                EnableAddedSceneryLights(scenery); // Amedo 2026-09-26
-                var m = AddOneLightMarker(nl, true, $"NegLight_{scenery.NegativeLights.Count - 1}");
-                if (m is not null) SelectClicked(m, false);
-            }
-            ImGui.EndDisabled();
-            if (!scenery.HasLighting) { ImGui.SameLine(); ImGui.TextDisabled("(lighting disabled for this level)"); }
-            ImGui.TreePop();
-        }
+        DrawSceneryLightList(scenery, scenery.PointLights, false, MakeEditorPointLight, PointLightLabels);
+        DrawSceneryLightList(scenery, scenery.NegativeLights, true, MakeEditorNegativeLight, NegativeLightLabels);
 
         ImGui.TextDisabled("Point/Negative lights update live on lit objects (Game Lighting);\nscenery stays unlit, like the game. Save Chunk to persist.");
+    }
+
+    private sealed record LightListLabels(string Title, string TreeId, int IdBase, string Item, string Select, string Remove,
+                                          string Color, string Radius, string Add, string MarkerPrefix);
+
+    private static readonly LightListLabels PointLightLabels = new("Point Lights", "ptlights", 0, "Point light", "Select##ptsel",
+        "Remove##ptrm", "Color##pc", "Radius##pr", "+ Add Point Light##addpt", "PointLight");
+
+    private static readonly LightListLabels NegativeLightLabels = new("Negative Lights", "neglights", 1000, "Negative light", "Select##ngsel",
+        "Remove##ngrm", "Color##nc", "Radius##nr", "+ Add Negative Light##addng", "NegLight");
+
+    private void DrawSceneryLightList<T>(PS2AnyScenery scenery, List<T> lights, bool negative,
+                                         Func<PS2AnyScenery, TwinVec4, T> make, LightListLabels l) where T : Light
+    {
+        if (!ImGui.TreeNode($"{l.Title} ({lights.Count})##{l.TreeId}")) return;
+        int removeAt = -1;
+        for (int i = 0; i < lights.Count; i++)
+        {
+            ImGui.PushID(l.IdBase + i);
+            var light = lights[i];
+            ImGui.Text($"{l.Item} {i + 1}");
+            ImGui.SameLine();
+            if (ImGui.SmallButton(l.Select)) SelectLightMarkerFor(light);
+            ImGui.SameLine();
+            if (ImGui.SmallButton(l.Remove)) removeAt = i;
+
+            var col = new Vector3(light.Color.X, light.Color.Y, light.Color.Z);
+            ImGui.SetNextItemWidth(-1f);
+            if (ImGui.ColorEdit3(l.Color, ref col)) { light.Color.X = col.X; light.Color.Y = col.Y; light.Color.Z = col.Z; }
+            float r = light.Radius;
+            ImGui.SetNextItemWidth(-1f);
+            if (ImGui.DragFloat(l.Radius, ref r, 0.05f, 0f, float.MaxValue)) light.Radius = r;
+            ImGui.PopID();
+            ImGui.Spacing();
+        }
+        if (removeAt >= 0) { var rm = lights[removeAt]; lights.RemoveAt(removeAt); RemoveLightMarkerFor(rm); }
+        ImGui.BeginDisabled(!scenery.HasLighting);
+        if (ImGui.SmallButton(l.Add))
+        {
+            var light = make(scenery, new TwinVec4(0f, 0f, 0f, 1f));
+            lights.Add(light);
+            EnableAddedSceneryLights(scenery);
+            var m = AddOneLightMarker(light, negative, $"{l.MarkerPrefix}_{lights.Count - 1}");
+            if (m is not null) SelectClicked(m, false);
+        }
+        ImGui.EndDisabled();
+        if (!scenery.HasLighting) { ImGui.SameLine(); ImGui.TextDisabled("(lighting disabled for this level)"); }
+        ImGui.TreePop();
     }
 
     // Amedo 2026-09-19

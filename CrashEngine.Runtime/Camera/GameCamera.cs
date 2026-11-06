@@ -31,8 +31,6 @@ public sealed partial class GameCamera
     }
 
     public uint Now => M.U(TimeStruct + 4);
-    public uint DtTicks => M.U(TimeStruct + 8);
-    public float DtSeconds(uint time) => M.I(time + 8) * M.F(SecondsPerTick);
 
     public void SetTime(uint nowTicks, uint dtTicks)
     {

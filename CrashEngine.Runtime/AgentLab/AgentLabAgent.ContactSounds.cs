@@ -13,8 +13,6 @@ public sealed partial class AgentLabAgent
     private bool _noSurfaceSound41;
     private int _contactTicks170;
 
-    public (int First, int Last, float Threshold, bool NoSurfaceSound) ContactSounds => (_contactFirst168, _contactLast169, _contactThreshold16C, _noSurfaceSound41);
-
     // Amedo
     private void SetContactSounds_224BA8(uint arg0, uint arg1)
     {

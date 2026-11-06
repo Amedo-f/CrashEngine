@@ -88,13 +88,4 @@ public sealed class SoundGroups
         _baseL[g] = (int)l;
         _mixer.SetGroup_1E7CB8(g + 1, (int)(l * _scale[g]), (int)(r * _scale[g]));
     }
-
-    public void Reset_1E5F18()
-    {
-        for (int g = 0; g < 4; g++)
-        {
-            _scale[g] = 1f;
-            _mixer.SetGroup_1E7CB8(g + 1, _baseL[g], _baseR[g]);
-        }
-    }
 }

@@ -16,9 +16,6 @@ public sealed partial class AgentLabWorld
     private readonly HashSet<(string Chunk, uint Id)> _lifeStates = new();
     private readonly ConditionalWeakTable<BaseTwinSection, string> _stateChunks = new();
 
-    public int KeptStateCount => _keptStates.Count;
-    public int LifeStateCount => _lifeStates.Count;
-
     private HashSet<(string Chunk, uint Id)>? StatesOf(AgentLabAgent agent, out (string Chunk, uint Id) key)
     {
         var (section, id) = agent.StateSlot_16(); // Amedo

@@ -1,23 +1,10 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
 using PS2AnyAnimation = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyAnimation;
 using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
 using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformation = Twinsanity.TwinsanityInterchange.Common.Animation.Transformation;
-using TwinAnimatedTransformation = Twinsanity.TwinsanityInterchange.Common.Animation.AnimatedTransformation;
-using TransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using static CrashLauncher.AnimChannelOps;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2BehaviourCommand = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommand;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using CrashEngine.Runtime.AgentLab;
-using CrashEngine.Runtime.Physics;
 
 namespace CrashLauncher;
 
@@ -42,12 +29,10 @@ public sealed partial class GameScene
 	private static readonly uint[] GizmoSolid = { 4282401023u, 4282449728u, 4294918208u, 4292927712u };
 	private static readonly uint[] GizmoFaint = { 1614823679u, 1614872384u, 1627340864u, 2162221280u };
 
-	private static readonly (GizmoMode Mode, string Id, string Label, string Tip)[] GizmoModeButtons =
+	private static readonly (GizmoMode Mode, string Id, string Label)[] GizmoModeButtons =
 	{
-		(GizmoMode.Move, "##movegizmo", "Position",
-			"Position (W) — arrows on the picked bone, along its parent bone's axes: each arrow is one Location channel.\nDrag the ball at an arrow's tip to set a key at this frame. Ctrl snaps 0.05, Esc / right-click cancels."),
-		(GizmoMode.Rotate, "##rotgizmo", "Rotation",
-			"Rotation (E) — rings on the picked bone, one per Rotation channel (Gimbal: the game turns X, then Y, then Z).\nThe white ring turns it toward the screen (sets X, Y and Z together). Ctrl snaps 5°, Esc / right-click cancels."),
+		(GizmoMode.Move, "##movegizmo", "Position"),
+		(GizmoMode.Rotate, "##rotgizmo", "Rotation"),
 	};
 
 	private sealed class GizmoDrag
@@ -80,7 +65,7 @@ public sealed partial class GameScene
 		ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4f, 4f));
 		for (int i = 0; i < GizmoModeButtons.Length; i++)
 		{
-			var (mode, id, label, tip) = GizmoModeButtons[i];
+			var (mode, id, label) = GizmoModeButtons[i];
 			var tex = mode == GizmoMode.Move ? _moveIconTexture : _rotateIconTexture;
 			bool on = _gizmoMode == mode;
 			if (on) ImGui.PushStyleColor(ImGuiCol.Button, activeCol);
@@ -88,11 +73,7 @@ public sealed partial class GameScene
 				? ImGui.ImageButton(id, (nint)tex.GlId, new Vector2(icon, icon), Vector2.Zero, Vector2.One, Vector4.Zero, Vector4.One)
 				: ImGui.SmallButton(label + id);
 			if (on) ImGui.PopStyleColor();
-			if (ImGui.IsItemHovered())
-			{
-				if (_workspace == Workspace.Animation) MaybeTooltip(tip);
-				else ImGui.SetTooltip(label);
-			}
+			if (_workspace != Workspace.Animation && ImGui.IsItemHovered()) ImGui.SetTooltip(label);
 			if (clicked) _gizmoMode = mode;
 		}
 		ImGui.PopStyleVar();

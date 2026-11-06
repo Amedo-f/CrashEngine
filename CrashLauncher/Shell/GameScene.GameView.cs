@@ -35,7 +35,6 @@ public sealed partial class GameScene
             if (ImGui.Selectable("Simulator", _simulatorOn)) _simulatorOn = SimDevice is not null;
             ImGui.EndCombo();
         }
-        if (ImGui.IsItemHovered()) MaybeTooltip("Game: the view fills the scene window (or keeps the aspect picked next to it).\nSimulator: the view takes a phone's screen (size, rounded corners, camera cutout) with the touch buttons on it;\nduring Play, clicking the buttons presses them.");
         ImGui.SameLine();
         if (SimulatorActive) DrawSimulatorToolbarItems();
         else
@@ -71,7 +70,6 @@ public sealed partial class GameScene
         ImGui.SameLine(0f, 2f);
         ImGui.SetNextItemWidth(70f);
         if (ImGui.SliderFloat("##simvolume", ref _simVolume, 0f, 1.5f, "%.2f") && _simulation is { } sim) sim.Volume = _simVolume;
-        if (ImGui.IsItemHovered()) MaybeTooltip("Volume of the objects' sound effects and the music.");
         ImGui.SameLine();
         if (ToolbarToggle("Game Camera##simgamecam", ref _simGameCamera,
                 "Views the scene through the game's own camera behind Crash (follow, camera zones, walls, right stick, L1/R1 recenter).\n" +
@@ -96,7 +94,6 @@ public sealed partial class GameScene
         ImGui.PushStyleColor(ImGuiCol.Button, value ? colors[(int)ImGuiCol.ButtonActive] : new Vector4(0f, 0f, 0f, 0f));
         bool clicked = ImGui.Button(label);
         ImGui.PopStyleColor();
-        if (ImGui.IsItemHovered()) MaybeTooltip(tip);
         if (clicked) value = !value;
         return clicked;
     }
@@ -111,7 +108,6 @@ public sealed partial class GameScene
         if (ImGui.IsItemHovered())
         {
             dl.AddRectFilled(min, min + new Vector2(h), ImGui.GetColorU32(ImGuiCol.ButtonHovered), 3f);
-            MaybeTooltip(_simSound ? "Sound on: click to mute." : "Muted: click to hear the game's sounds and music.");
         }
         uint ink = ImGui.GetColorU32(_simSound ? ImGuiCol.Text : ImGuiCol.TextDisabled);
         var c = min + new Vector2(h * 0.42f, h * 0.5f);

@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using CrashEngine.Core;
 
@@ -670,10 +669,6 @@ public sealed partial class AgentLabAgent
     }
 
     // Amedo
-    private bool _trailKind5_60;
-    private Quaternion _faceSpin50;
-
-    // Amedo
     private void FaceMotion_20DD38()
     {
         float inv = GameMath.InverseLength(_velocity);
@@ -683,9 +678,6 @@ public sealed partial class AgentLabAgent
         var before = LocalRotation;
         if (q != before) SetLocalRotation(q);
         if (Tracing) Trace($"face motion: along {d} -> {q}");
-        if (!_trailKind5_60) return;
-        float dt = StepDt;
-        _faceSpin50 = new Quaternion((q.X - before.X) * dt, (q.Y - before.Y) * dt, (q.Z - before.Z) * dt, (q.W - before.W) * dt);
     }
 
     // Amedo

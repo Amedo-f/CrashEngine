@@ -1,49 +1,10 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
-using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
 using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyPath = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPath;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using PS2AnyTwinsanitySM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanitySM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
 using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
-using ITwinObject = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject;
 
 namespace CrashLauncher;
 
@@ -79,55 +40,12 @@ public sealed partial class GameScene : Scene
                 }
             }
 
-            lighting.SceneryBaseColors = new Dictionary<object, List<TwinVec4>>();
-            foreach (var e in AllEntities(sceneryRoot).Where(x => x.Has<CrashEngine.Importer.MeshRenderer>()))
-            {
-                var tile = e.Parent?.Get<SceneryTile>();
-                if (tile is null) continue;
-                foreach (var meshId in ResolveSceneryMeshIds(gfx, tile.SourceId, tile.IsLod))
-                {
-                    if (ResolveSceneryModel(gfx, meshId) is not { } model) continue;
-                    foreach (var subItem in model.SubModels)
-                    {
-                        if (subItem is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel sub) continue;
-                        if (sub.Colors is null || lighting.SceneryBaseColors.ContainsKey(sub)) continue;
-                        // Amedo 2026-09-21
-                        float unbake = lighting.SceneryBakedBrightness > 0.001f ? lighting.SceneryBakedBrightness : 1f;
-                        lighting.SceneryBaseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X / unbake, c.Y / unbake, c.Z / unbake, c.W)).ToList();
-                    }
-                }
-            }
+            float unbake = lighting.SceneryBakedBrightness > 0.001f ? lighting.SceneryBakedBrightness : 1f;
+            lighting.SceneryBaseColors = CaptureBaseColors(gfx, SceneryTileMeshIds(gfx, sceneryRoot), unbake);
         }
 
-        foreach (var (subObj, baseColors) in lighting.SceneryBaseColors)
-        {
-            var sub = (Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel)subObj;
-            for (int i = 0; i < sub.Colors.Count && i < baseColors.Count; i++)
-            {
-                var b = baseColors[i];
-                sub.Colors[i] = new TwinVec4(
-                    Math.Clamp(b.X * lighting.SceneryBrightness, 0f, 1f),
-                    Math.Clamp(b.Y * lighting.SceneryBrightness, 0f, 1f),
-                    Math.Clamp(b.Z * lighting.SceneryBrightness, 0f, 1f), b.W);
-            }
-            sub.Compile();
-        }
-
-        if (chunkSource?.SceneryTables is not null)
-        {
-            var refreshed = new HashSet<uint>();
-            foreach (var e in AllEntities(sceneryRoot).Where(x => x.Has<CrashEngine.Importer.MeshRenderer>()))
-            {
-                var tile = e.Parent?.Get<SceneryTile>();
-                if (tile is null) continue;
-                foreach (var meshId in ResolveSceneryMeshIds(gfx, tile.SourceId, tile.IsLod))
-                {
-                    if (!refreshed.Add(meshId)) continue;
-                    if (ResolveSceneryModel(gfx, meshId) is { } model)
-                        MeshDecoder.RefreshSceneryMeshVertexData(Engine.Instance.GL, chunkSource.SceneryTables, meshId, model);
-                }
-            }
-        }
+        ScaleBaseColors(lighting.SceneryBaseColors, lighting.SceneryBrightness);
+        RefreshSceneryModels(chunkSource, gfx, SceneryTileMeshIds(gfx, sceneryRoot));
 
         lighting.SceneryBakedBrightness = lighting.SceneryBrightness; // Amedo 2026-09-21
 
@@ -144,53 +62,9 @@ public sealed partial class GameScene : Scene
         if (chunkSource?.Sm2 is null || gfx is null || skySec is null)
         { _browser.Log("Skydome Brightness: this level has no skydome data."); return; }
 
-        if (marker.BaseColors is null)
-        {
-            marker.BaseColors = new Dictionary<object, List<TwinVec4>>();
-            for (int i = 0; i < skySec.GetItemsAmount(); i++)
-            {
-                if (skySec.GetItem(i) is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnySkydome sky) continue;
-                foreach (var meshId in sky.Meshes)
-                {
-                    if (ResolveSceneryModel(gfx, meshId) is not { } model) continue;
-                    foreach (var subItem in model.SubModels)
-                    {
-                        if (subItem is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel sub) continue;
-                        if (sub.Colors is null || marker.BaseColors.ContainsKey(sub)) continue;
-                        marker.BaseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X, c.Y, c.Z, c.W)).ToList();
-                    }
-                }
-            }
-        }
-
-        foreach (var (subObj, baseColors) in marker.BaseColors)
-        {
-            var sub = (Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel)subObj;
-            for (int i = 0; i < sub.Colors.Count && i < baseColors.Count; i++)
-            {
-                var b = baseColors[i];
-                sub.Colors[i] = new TwinVec4(
-                    Math.Clamp(b.X * marker.Brightness, 0f, 1f),
-                    Math.Clamp(b.Y * marker.Brightness, 0f, 1f),
-                    Math.Clamp(b.Z * marker.Brightness, 0f, 1f), b.W);
-            }
-            sub.Compile();
-        }
-
-        if (chunkSource.SceneryTables is not null)
-        {
-            var refreshed = new HashSet<uint>();
-            for (int i = 0; i < skySec.GetItemsAmount(); i++)
-            {
-                if (skySec.GetItem(i) is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnySkydome sky) continue;
-                foreach (var meshId in sky.Meshes)
-                {
-                    if (!refreshed.Add(meshId)) continue;
-                    if (ResolveSceneryModel(gfx, meshId) is { } model)
-                        MeshDecoder.RefreshSceneryMeshVertexData(Engine.Instance.GL, chunkSource.SceneryTables, meshId, model);
-                }
-            }
-        }
+        marker.BaseColors ??= CaptureBaseColors(gfx, SkydomeMeshIds(skySec), 1f);
+        ScaleBaseColors(marker.BaseColors, marker.Brightness);
+        RefreshSceneryModels(chunkSource, gfx, SkydomeMeshIds(skySec));
 
         _browser.Log($"Skydome brightness set to {marker.Brightness:F2}x ({marker.BaseColors.Count} real submodel(s)). " +
                       "3D preview updates immediately, no reload needed. Save Chunk to keep it, then Build ISO + test.");
@@ -292,14 +166,40 @@ public sealed partial class GameScene : Scene
             sub.CalculateData();
             if (sub.Colors is null || !touched.Add(sub)) continue;
             for (int i = 0; i < sub.Colors.Count; i++)
-            {
-                var c = sub.Colors[i];
-                sub.Colors[i] = new TwinVec4(
-                    Math.Clamp(c.X * brightness, 0f, 1f),
-                    Math.Clamp(c.Y * brightness, 0f, 1f),
-                    Math.Clamp(c.Z * brightness, 0f, 1f), c.W);
-            }
+                sub.Colors[i] = ScaleColor(sub.Colors[i], brightness);
             sub.Compile();
         }
     }
+
+    private static Dictionary<object, List<TwinVec4>> CaptureBaseColors(PS2AnyGraphicsSection gfx, IEnumerable<uint> meshIds, float unbake)
+    {
+        var baseColors = new Dictionary<object, List<TwinVec4>>();
+        foreach (var meshId in meshIds)
+        {
+            if (ResolveSceneryModel(gfx, meshId) is not { } model) continue;
+            foreach (var subItem in model.SubModels)
+            {
+                if (subItem is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel sub) continue;
+                if (sub.Colors is null || baseColors.ContainsKey(sub)) continue;
+                baseColors[sub] = sub.Colors.Select(c => new TwinVec4(c.X / unbake, c.Y / unbake, c.Z / unbake, c.W)).ToList();
+            }
+        }
+        return baseColors;
+    }
+
+    private static void ScaleBaseColors(Dictionary<object, List<TwinVec4>> baseColors, float brightness)
+    {
+        foreach (var (subObj, colors) in baseColors)
+        {
+            var sub = (Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel)subObj;
+            for (int i = 0; i < sub.Colors.Count && i < colors.Count; i++)
+                sub.Colors[i] = ScaleColor(colors[i], brightness);
+            sub.Compile();
+        }
+    }
+
+    private static TwinVec4 ScaleColor(TwinVec4 c, float brightness) => new(
+        Math.Clamp(c.X * brightness, 0f, 1f),
+        Math.Clamp(c.Y * brightness, 0f, 1f),
+        Math.Clamp(c.Z * brightness, 0f, 1f), c.W);
 }

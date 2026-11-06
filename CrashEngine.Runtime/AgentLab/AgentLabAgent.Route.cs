@@ -11,9 +11,6 @@ public sealed partial class AgentLabAgent
     private int _routeIndex = 0xFF;
     private float _logicalRadius;
 
-    public NavRoute? Route => _route; // Amedo
-    public int RouteIndex => _routeIndex;
-
     private NavNode? RouteNode(int index) => _route is { } r && index >= 0 && index < r.Count ? World.PathFinder.PositionAt_253588(r, index) : null; // Amedo
 
     private NavNode? EdgeEndNode() => RouteNode(_routeIndex - 1 >= 0 ? _routeIndex - 1 : 0);
@@ -123,13 +120,11 @@ public sealed partial class AgentLabAgent
             GoalPos = (ushort)to.Index,
             StartNav = (ushort)nav.Index,
             GoalNav = (ushort)nav.Index,
-            Radius8 = (flags & 0x200000) != 0 ? _logicalRadius : 0f,
-            Byte4 = (byte)Arg(12),
         };
         if ((flags & 0x4000000) != 0) req.Flags = 4;
         else
         {
-            if ((flags & 0x400000) != 0) { req.Flags |= 2; req.ValueC = FloatValueOf(Arg(9)); }
+            if ((flags & 0x400000) != 0) req.Flags |= 2;
             if ((flags & 0x200000000) == 0) req.Flags |= 0x200000;
             if ((flags & 0x1000000000) == 0) req.Flags |= 0x1000000;
             if ((flags & 0x20000) == 0) req.Flags |= 0x20000 | 0x40000 | 0x80000;
@@ -141,9 +136,9 @@ public sealed partial class AgentLabAgent
             if ((flags & 0x800000000) == 0) req.Flags |= 0x800000;
             if ((flags & 0x400000000) == 0) req.Flags |= 0x400000;
             if ((flags & 0x100000) == 0) req.Flags |= 0x100000;
-            if ((flags & 0x1000000) != 0) { req.Flags |= 8; req.Value10 = FloatValueOf(Arg(7)); }
+            if ((flags & 0x1000000) != 0) req.Flags |= 8;
             if ((flags & 0x800000) != 0) { req.Flags |= 0x10; req.Value14 = FloatValueOf(Arg(8)); }
-            if ((flags & 0x8000000) != 0) { req.Flags |= 0x20; req.Value18 = FloatValueOf(Arg(10)); }
+            if ((flags & 0x8000000) != 0) req.Flags |= 0x20;
         }
         var pf = World.PathFinder;
         pf.Start_1200 = start;

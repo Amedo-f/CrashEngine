@@ -101,7 +101,7 @@ public sealed partial class GameScene
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            using var pkg = PackageReader.Open(GetPristineArchiveSource());
+            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
             foreach (var rec in pkg.GetByExtension(".rm2"))
             {
                 var rel = rec.Path.Replace('/', '\\');
@@ -170,7 +170,7 @@ public sealed partial class GameScene
         PS2AnyTwinsanitySM2? sm2 = null;
         try
         {
-            using var pkg = PackageReader.Open(GetPristineArchiveSource());
+            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
             pkg.ShadowDir = SavedChunksDir;
             using var stream = pkg.OpenByPath($"{levelBasePath}.sm2");
             if (stream is not null)
@@ -212,9 +212,6 @@ public sealed partial class GameScene
                 if (ImGui.ImageButton($"##thumb{tile.Index}", (nint)thumb.GlId, new Vector2(cell, cell),
                         new Vector2(1, 1), new Vector2(0, 0)))
                     ImportSingleSceneryTile(_assetsLevel, tile.Index, sm2);
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip($"Tile {tile.Index} — {tile.MeshCount} mesh(es). Click to import this ONE\n" +
-                                 "tile (fresh graphics ids) at the camera position. Not undoable.");
             }
             else
             {
@@ -324,27 +321,17 @@ public sealed partial class GameScene
 
     private void ImportSingleSceneryTile(string sourceLevelBasePath, int tileIndex, PS2AnyTwinsanitySM2 sourceSm2)
     {
-        var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-        var chunkSource = chunkRoot?.Get<ChunkSource>();
-        var destSm2 = chunkSource?.Sm2;
-        var sceneryRoot = chunkRoot is null ? null : AllEntities(chunkRoot).FirstOrDefault(x => x.Name == "Scenery");
-        if (destSm2 is null || sceneryRoot is null)
-        { _browser.Log("Assets: this chunk has no Scenery root to import into."); return; }
+        if (SceneryImportTarget() is not ({ } chunkSource, { } destSm2, { } sceneryRoot)) return;
 
         var camPos = _camera?.Transform.Position ?? Vector3.Zero;
-        if (!MeshDecoder.TransplantSceneryTiles(Engine.Instance.GL, destSm2, chunkSource!.SceneryTexCache,
+        if (!MeshDecoder.TransplantSceneryTiles(Engine.Instance.GL, destSm2, chunkSource.SceneryTexCache,
                 sourceSm2, new List<int> { tileIndex }, out string log, targetPosition: camPos))
         {
             _browser.Log($"Assets: {log}");
             return;
         }
 
-        var preMoves = CaptureLiveSceneryTransforms(sceneryRoot);
-
-        foreach (var child in sceneryRoot.Children.ToList())
-            sceneryRoot.RemoveChild(child);
-        chunkSource.SceneryTables = MeshDecoder.BuildSceneryMeshes(Engine.Instance.GL, destSm2, sceneryRoot, chunkSource.SceneryTexCache, applyGlobalEffects: false);
-        ReapplyLiveSceneryTransforms(sceneryRoot, preMoves);
+        RebuildSceneryKeepingMoves(sceneryRoot, chunkSource, destSm2);
 
         var justImported = sceneryRoot.Children.FirstOrDefault(c =>
             c.Get<SceneryTile>() is { } t &&
@@ -360,6 +347,26 @@ public sealed partial class GameScene
         var p = tile.Source.Column4;
         return (tile.SourceId,
                 (long)MathF.Round(p.X / 0.01f), (long)MathF.Round(p.Y / 0.01f), (long)MathF.Round(p.Z / 0.01f));
+    }
+
+    private (ChunkSource ChunkSource, PS2AnyTwinsanitySM2 Sm2, Entity SceneryRoot)? SceneryImportTarget()
+    {
+        var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
+        var chunkSource = chunkRoot?.Get<ChunkSource>();
+        var destSm2 = chunkSource?.Sm2;
+        var sceneryRoot = chunkRoot is null ? null : AllEntities(chunkRoot).FirstOrDefault(x => x.Name == "Scenery");
+        if (chunkSource is null || destSm2 is null || sceneryRoot is null)
+        { _browser.Log("Assets: this chunk has no Scenery root to import into."); return null; }
+        return (chunkSource, destSm2, sceneryRoot);
+    }
+
+    private static void RebuildSceneryKeepingMoves(Entity sceneryRoot, ChunkSource chunkSource, PS2AnyTwinsanitySM2 sm2)
+    {
+        var preMoves = CaptureLiveSceneryTransforms(sceneryRoot);
+        foreach (var child in sceneryRoot.Children.ToList())
+            sceneryRoot.RemoveChild(child);
+        chunkSource.SceneryTables = MeshDecoder.BuildSceneryMeshes(Engine.Instance.GL, sm2, sceneryRoot, chunkSource.SceneryTexCache, applyGlobalEffects: false);
+        ReapplyLiveSceneryTransforms(sceneryRoot, preMoves);
     }
 
     private static Dictionary<(uint, long, long, long), Matrix4x4> CaptureLiveSceneryTransforms(Entity sceneryRoot)
@@ -410,7 +417,6 @@ public sealed partial class GameScene
             ImGui.PushID("fld_" + sub);
             ImGui.BeginGroup();
             if (DrawFolderTile("##fldbtn", cell)) { _assetsMyAssetsFolder = subPath; _assetsFilter = ""; }
-            if (ImGui.IsItemHovered()) MaybeTooltip($"{sub}\nClick to open. Right-click to rename/delete.");
             if (ImGui.BeginPopupContextItem("##fldctx"))
             {
                 if (ImGui.MenuItem("Open"))   { _assetsMyAssetsFolder = subPath; _assetsFilter = ""; }
@@ -435,9 +441,6 @@ public sealed partial class GameScene
             {
                 if (ImGui.ImageButton($"##thumb{fileName}", (nint)thumb.GlId, new Vector2(cell, cell), new Vector2(1, 1), new Vector2(0, 0)))
                     ImportCustomAssetEntry(cur, fileName, entry);
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip($"{entry.Name} — {entry.TileIndices.Count} tile(s), independent copy.\n" +
-                                 "Click to import at the camera. Right-click to rename/move/delete.");
             }
             else ImGui.Button("?##nothumb", new Vector2(cell, cell));
 
@@ -486,8 +489,6 @@ public sealed partial class GameScene
             }
             else if (ImGui.Button($"[obj]##{fileName}", new Vector2(cell, cell)))
                 ImportObjectAssetEntry(cur, fileName, oentry);
-            if (ImGui.IsItemHovered())
-                MaybeTooltip($"{oentry.Name} — object 0x{oentry.ObjectId:X4} (full data + settings).\nClick to import into this level. Right-click to rename/move/delete.\nSource level: {oentry.SourceLevel}");
 
             if (ImGui.BeginPopupContextItem($"##objctx{fileName}"))
             {
@@ -631,17 +632,12 @@ public sealed partial class GameScene
             return;
         }
 
-        var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-        var chunkSource = chunkRoot?.Get<ChunkSource>();
-        var destSm2 = chunkSource?.Sm2;
-        var sceneryRoot = chunkRoot is null ? null : AllEntities(chunkRoot).FirstOrDefault(x => x.Name == "Scenery");
-        if (destSm2 is null || sceneryRoot is null)
-        { _browser.Log("Assets: this chunk has no Scenery root to import into."); return; }
+        if (SceneryImportTarget() is not ({ } chunkSource, { } destSm2, { } sceneryRoot)) return;
 
         var spawnPos = Vector3.Zero;
 
         var newIds = new List<uint>();
-        if (!MeshDecoder.TransplantSceneryTiles(Engine.Instance.GL, destSm2, chunkSource!.SceneryTexCache,
+        if (!MeshDecoder.TransplantSceneryTiles(Engine.Instance.GL, destSm2, chunkSource.SceneryTexCache,
                 sourceSm2, entry.TileIndices, out string log, targetPosition: spawnPos, newSourceIds: newIds))
         {
             _browser.Log($"Assets: {log}");
@@ -649,13 +645,7 @@ public sealed partial class GameScene
         }
         var newIdSet = new HashSet<uint>(newIds);
 
-        // Amedo 2026-09-16
-        var preMoves = CaptureLiveSceneryTransforms(sceneryRoot);
-
-        foreach (var child in sceneryRoot.Children.ToList())
-            sceneryRoot.RemoveChild(child);
-        chunkSource.SceneryTables = MeshDecoder.BuildSceneryMeshes(Engine.Instance.GL, destSm2, sceneryRoot, chunkSource.SceneryTexCache, applyGlobalEffects: false);
-        ReapplyLiveSceneryTransforms(sceneryRoot, preMoves);
+        RebuildSceneryKeepingMoves(sceneryRoot, chunkSource, destSm2);
 
         var justImported = sceneryRoot.Children.Where(c =>
             c.Get<SceneryTile>() is { } t && newIdSet.Contains(t.SourceId))

@@ -104,7 +104,6 @@ public sealed partial class AgentLabWorld
     public uint Progression { get => Progress.Word_04; set => Progress.Word_04 = value; } // Amedo
     public AgentLabAgent? GunHolder_30A5B0 { get; set; } // Amedo
     public const uint PlayerModeSingle = 1; // Amedo 2026-10-05
-    public AgentLabAgent? PlayerSupport { get; set; } // Amedo 2026-09-27
     public Character.CharacterController? PlayerCharacter { get; set; } // Amedo 2026-09-27
     public bool RootLinksLoaded { get; set; } = true; // Amedo 2026-09-30
     public bool RootLinksQueued { get; set; } = true; // Amedo

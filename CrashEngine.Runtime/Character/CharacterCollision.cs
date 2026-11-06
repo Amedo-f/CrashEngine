@@ -346,9 +346,6 @@ public sealed class CharacterCollision
         return rec;
     }
 
-    // Amedo 2026-09-27
-    public Vector3 PushOut(Vector3 p, bool dynamic, bool statics, bool mark) => PushOut_2849C8(p, dynamic, statics, mark, null, out _);
-
     // Amedo
     public Vector3 PushOut_2849C8(Vector3 p, bool dynamic, bool statics, bool mark, Func<object, RigidBody?>? bodyOf, out float depth)
     {

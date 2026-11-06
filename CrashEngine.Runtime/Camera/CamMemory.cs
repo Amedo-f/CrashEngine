@@ -86,6 +86,4 @@ public sealed class CamMemory
         F(a + 32, m.M31); F(a + 36, m.M32); F(a + 40, m.M33); F(a + 44, m.M34);
         F(a + 48, m.M41); F(a + 52, m.M42); F(a + 56, m.M43); F(a + 60, m.M44);
     }
-
-    public string RegionName(uint a) => Find(a, 1)?.Name ?? "?";
 }

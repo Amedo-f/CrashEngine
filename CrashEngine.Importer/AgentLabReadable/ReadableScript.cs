@@ -63,8 +63,6 @@ public static class ReadableScript
 {
     private static readonly Regex RawLine = new(@"^(\s*)@PS2 (\w+)\((.*)\);\s*$", RegexOptions.Compiled);
     private static readonly Regex ReadLine = new(@"^(\s*)([A-Za-z_]\w*)\((.*)\);\s*$", RegexOptions.Compiled);
-
-    public static IReadOnlyDictionary<string, CommandSpec> ByName => _byName;
     public static IReadOnlyDictionary<ushort, CommandSpec> ByOp => _byOp;
     private static readonly Dictionary<string, CommandSpec> _byName = new();
     private static readonly Dictionary<ushort, CommandSpec> _byOp = new();

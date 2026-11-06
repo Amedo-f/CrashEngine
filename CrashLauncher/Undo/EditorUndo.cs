@@ -196,77 +196,6 @@ public sealed class ParticleEmitterAddAction : IEditAction
     public IEnumerable<Entity> AffectedEntities { get { yield return Entity; } }
 }
 
-public sealed class InstanceCompactDeleteAction : IEditAction
-{
-    public required Entity Entity;
-    public required Entity Parent;
-    public required Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection Section;
-    public required Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Item;
-
-    private int  _removedAtIndex = -1;
-    private uint _removedId;
-    private readonly List<(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Item, uint OldId)> _renumbered = new();
-    private readonly List<(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Owner, List<UInt16> OldList)> _refSnapshots = new();
-
-    public void Redo()
-    {
-        _renumbered.Clear();
-        _refSnapshots.Clear();
-
-        int count = Section.GetItemsAmount();
-        _removedAtIndex = -1;
-        for (int i = 0; i < count; i++)
-            if (ReferenceEquals(Section.GetItem(i), Item)) { _removedAtIndex = i; break; }
-        _removedId = Item.GetID();
-        if (_removedAtIndex < 0) return;
-
-        for (int i = 0; i < count; i++)
-        {
-            if (Section.GetItem(i) is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance owner) continue;
-            if (owner.Instances.Count == 0) continue;
-            bool touched = owner.Instances.Any(v => v == _removedId || v > _removedId);
-            if (!touched) continue;
-            _refSnapshots.Add((owner, new List<UInt16>(owner.Instances)));
-            var newList = owner.Instances
-                .Where(v => v != _removedId)
-                .Select(v => v > _removedId ? (UInt16)(v - 1) : v)
-                .ToList();
-            owner.Instances.Clear();
-            owner.Instances.AddRange(newList);
-        }
-
-        Section.RemoveItem<Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem>(_removedId);
-
-        int newCount = Section.GetItemsAmount();
-        for (int i = _removedAtIndex; i < newCount; i++)
-        {
-            if (Section.GetItem(i) is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance it) continue;
-            _renumbered.Add((it, it.GetID()));
-            it.SetID(it.GetID() - 1);
-        }
-
-        Parent.RemoveChild(Entity);
-    }
-
-    public void Undo()
-    {
-        foreach (var (it, oldId) in _renumbered) it.SetID(oldId);
-
-        Section.AddItem(Item);
-        Section.ChangeItemPosition(_removedId, _removedAtIndex);
-
-        foreach (var (owner, oldList) in _refSnapshots)
-        {
-            owner.Instances.Clear();
-            owner.Instances.AddRange(oldList);
-        }
-
-        Parent.AddChild(Entity);
-    }
-
-    public IEnumerable<Entity> AffectedEntities { get { yield return Entity; } }
-}
-
 public sealed class InstanceNeuterAction : IEditAction
 {
     public required Entity Entity;
@@ -347,7 +276,6 @@ public sealed class SceneryAddAction : IEditAction
     public required Twinsanity.TwinsanityInterchange.Common.Matrix4 Matrix;
     public required Twinsanity.TwinsanityInterchange.Common.Vector4[] BoundingBox;
 
-    public bool IndependentLeaf { get; init; }
 
     // Amedo 2026-09-21
     public void Undo()
@@ -490,91 +418,6 @@ public sealed class ClearCollisionAction : IEditAction
         Coll.Vectors   = new();
         Coll.Triggers  = new();
         Coll.Groups    = new();
-    }
-
-    public IEnumerable<Entity> AffectedEntities => Array.Empty<Entity>();
-}
-
-public sealed class GenerateMeshCollisionAction : IEditAction
-{
-    public required Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData Coll;
-    public required List<(int Index, Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle Original)> Degenerated;
-    public required List<Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle> NewTriangles;
-    public required List<Twinsanity.TwinsanityInterchange.Common.Vector4>                          NewVectors;
-    public required List<Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation>   NewGroups;
-
-    private int _triInsertAt = -1, _vecInsertAt = -1;
-
-    private void RebuildTriggers()
-    {
-        var rebuilt = GameScene.BuildTriggerTree(Coll.Groups, Coll.Triangles, Coll.Vectors);
-        Coll.Triggers.Clear();
-        Coll.Triggers.AddRange(rebuilt);
-    }
-
-    public void Undo()
-    {
-        if (_triInsertAt < 0) return;
-        if (NewGroups.Count > 0) Coll.Groups.RemoveRange(Coll.Groups.Count - NewGroups.Count, NewGroups.Count);
-        if (NewTriangles.Count > 0) Coll.Triangles.RemoveRange(_triInsertAt, NewTriangles.Count);
-        if (NewVectors.Count > 0)   Coll.Vectors.RemoveRange(_vecInsertAt, NewVectors.Count);
-        foreach (var (index, original) in Degenerated) Coll.Triangles[index] = original;
-        RebuildTriggers();
-    }
-
-    public void Redo()
-    {
-        foreach (var (index, original) in Degenerated)
-            Coll.Triangles[index] = new Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle
-            {
-                Vector1Index = original.Vector1Index, Vector2Index = original.Vector1Index,
-                Vector3Index = original.Vector1Index, SurfaceIndex = original.SurfaceIndex,
-            };
-
-        _triInsertAt = Coll.Triangles.Count;
-        _vecInsertAt = Coll.Vectors.Count;
-        Coll.Triangles.AddRange(NewTriangles);
-        Coll.Vectors.AddRange(NewVectors);
-        Coll.Groups.AddRange(NewGroups);
-        RebuildTriggers();
-    }
-
-    public IEnumerable<Entity> AffectedEntities => Array.Empty<Entity>();
-}
-
-public sealed class AddCollisionTrianglesAction : IEditAction
-{
-    public required Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData Coll;
-    public required List<Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle> NewTriangles;
-    public required List<Twinsanity.TwinsanityInterchange.Common.Vector4> NewVectors;
-    public required int TriInsertAt;
-    public required int VecInsertAt;
-
-    private void RebuildTriggers()
-    {
-        var rebuilt = GameScene.BuildTriggerTree(Coll.Groups, Coll.Triangles, Coll.Vectors);
-        Coll.Triggers.Clear();
-        Coll.Triggers.AddRange(rebuilt);
-    }
-
-    public void Undo()
-    {
-        if (NewTriangles.Count > 0) Coll.Groups.RemoveAt(Coll.Groups.Count - 1);
-        Coll.Triangles.RemoveRange(TriInsertAt, NewTriangles.Count);
-        Coll.Vectors.RemoveRange(VecInsertAt, NewVectors.Count);
-        if (NewTriangles.Count > 0) RebuildTriggers();
-    }
-
-    public void Redo()
-    {
-        Coll.Triangles.InsertRange(TriInsertAt, NewTriangles);
-        Coll.Vectors.InsertRange(VecInsertAt, NewVectors);
-        if (NewTriangles.Count > 0)
-        {
-            Coll.Groups.Add(new Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation
-            { Offset = (uint)TriInsertAt, Size = (uint)NewTriangles.Count });
-            RebuildTriggers();
-        }
     }
 
     public IEnumerable<Entity> AffectedEntities => Array.Empty<Entity>();

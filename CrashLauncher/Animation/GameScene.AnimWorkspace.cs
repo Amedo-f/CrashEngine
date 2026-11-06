@@ -1,9 +1,5 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
 using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
 using TwinJoint = Twinsanity.TwinsanityInterchange.Common.TwinJoint;
@@ -57,7 +53,6 @@ public sealed partial class GameScene
 					anim.Stop();
 					_animGroup = null;
 				}
-				if (ImGui.IsItemHovered()) MaybeTooltip("The bind pose — the skeleton with no animation on it.");
 				ImGui.SameLine();
 				ImGui.TextDisabled($"{anim.Groups.Count} animations");
 				if (ImGui.BeginChild("##animlist", Vector2.Zero, ImGuiChildFlags.Border))
@@ -111,7 +106,6 @@ public sealed partial class GameScene
 				ImGui.TextDisabled($"Slot {_animGroup.SlotIndex} · {frames} frames · {_animGroup.Anim.DefaultFPS} fps · {AnimatedObject.NaturalDuration(_animGroup):0.00} s · frame {anim.Frame:0.0}");
 				ImGui.SameLine();
 				ImGui.Checkbox("All frames##animallframes", ref _timelineAllFrames);
-				if (ImGui.IsItemHovered()) MaybeTooltip("Off: only the real keys (frames the motion bends at — the rest are filled in between, exactly).\nOn: every frame of the game's data as a key.");
 				DrawAnimRecordBar(anim, _animGroup);
 				DrawChannelTimeline(anim, _animGroup, frames);
 			}

@@ -850,7 +850,7 @@ public sealed partial class CharacterController
                 if (down < 0f) t += down * -4f;
             }
             if (1f < t) t = 1f;
-            Crouch.PhaseTime += GameMath.Trunc(t * dt * GameMath.SecToTick);
+            Crouch.Duration += GameMath.Trunc(t * dt * GameMath.SecToTick); // Amedo 2026-11-04
         }
         return turnOut;
     }
@@ -1324,8 +1324,6 @@ public sealed partial class CharacterController
         float down = Velocity.X * 0f + Velocity.Y * -1f + Velocity.Z * 0f;
         if (FallSpeed < down) StartFall(true);
     }
-
-    public Action<string, int, string>? Unimplemented; // Amedo 2026-09-27
 
     public Func<bool>? SnapInstanceToGround; // Amedo
 

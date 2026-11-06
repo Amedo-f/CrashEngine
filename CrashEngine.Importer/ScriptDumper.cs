@@ -156,14 +156,4 @@ public static class ScriptDumper
 
         Console.WriteLine($"[ScriptDumper] {rm2Path}: {scripts.Behaviours.Count} scripts dumped.");
     }
-
-    public static void DumpAll(PackageReader pkg, string outputFolder)
-    {
-        foreach (var record in pkg.GetByExtension(".rm2"))
-        {
-            try   { DumpFromPackage(pkg, record.Path, outputFolder); }
-            catch (Exception ex)
-            { Console.WriteLine($"[ScriptDumper] SKIP {record.Path}: {ex.Message}"); }
-        }
-    }
 }

@@ -1,11 +1,7 @@
-using System.Diagnostics;
-using System.Numerics;
 using System.Runtime.InteropServices;
-using ImGuiNET;
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using Twinsanity.Libraries;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Archives;
 using PS2AnySound = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnySound;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
@@ -49,7 +45,6 @@ public sealed partial class GameScene
             using (var wavWriter = new BinaryWriter(wavStream))
                 RIFF.SaveRiff(wavWriter, pcm, ref ch, ref sr);
             var wav = wavStream.ToArray();
-            _lastPreviewWav = wav;
 
             Task.Delay(50).ContinueWith(_ =>
             {
@@ -116,26 +111,12 @@ public sealed partial class GameScene
         return diff < 0.05;
     }
 
-    private static Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2 LoadFreshPristineRm2(BinaryReader reader, int length, string rm2RelPath)
-    {
-        Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2 rm2 =
-            rm2RelPath.Equals(@"Startup\Default.rm2", StringComparison.OrdinalIgnoreCase)
-                ? new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default()
-                : new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2();
-        rm2.Read(reader, length);
-        return rm2;
-    }
-
     private void ResetSoundEffectToOriginal(PS2AnySound snd, uint sid, string rm2Scope,
         int sectionId = TwinConstants.CODE_SOUND_EFFECTS_SECTION)
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(rm2Scope)
-                ?? throw new FileNotFoundException($"Couldn't reopen {rm2Scope} from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshRm2 = LoadFreshPristineRm2(reader, (int)stream.Length, rm2Scope);
+            var freshRm2 = ReadPristineRm2(rm2Scope);
 
             var freshSndSec = freshRm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>(
                     (uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
@@ -240,16 +221,9 @@ public sealed partial class GameScene
         BaseTwinSection? section = null;
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(rm2Scope);
-            if (stream is not null)
-            {
-                using var reader = new BinaryReader(stream);
-                var freshRm2 = LoadFreshPristineRm2(reader, (int)stream.Length, rm2Scope);
-                section = freshRm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>(
-                        (uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
-                    ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>((uint)sectionId);
-            }
+            section = TryReadPristineRm2(rm2Scope)?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>(
+                    (uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
+                ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>((uint)sectionId);
         }
         catch
         {

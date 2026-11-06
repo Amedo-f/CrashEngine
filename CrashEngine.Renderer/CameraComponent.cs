@@ -1,7 +1,6 @@
 using CrashEngine.Core;
 using ImGuiNET;
 using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
 
 namespace CrashEngine.Renderer;

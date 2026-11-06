@@ -13,8 +13,6 @@ public sealed partial class AgentLabAgent
     private double _packetStart;
     private double _packetDeadline = -1;
 
-    public bool PacketRunning => _packetRunning;
-
     private void ApplyPacket(TwinBehaviourControlPacket packet)
     {
         ControlPacket  = packet;

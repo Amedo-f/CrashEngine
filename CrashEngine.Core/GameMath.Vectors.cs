@@ -296,6 +296,21 @@ public static partial class GameMath
         return new Quaternion(s * axis.X, s * axis.Y, s * axis.Z, cos);
     }
 
+    public static Matrix4x4 AxisAngle_18CEA8(Vector3 axis, int angle) // Amedo
+    {
+        if (angle == 0) return Matrix4x4.Identity;
+        var (s, c) = GameMath.SinCos(angle * GameMath.UnitToRad);
+        float x = axis.X, y = axis.Y, z = axis.Z;
+        float t = 1f - c;
+        float tx = t * x, tz = t * z, ty = t * y;
+        float txz = tx * z, txy = tx * y, tyz = ty * z, tzz = tz * z, txx = tx * x, tyy = ty * y;
+        float sz = s * z, sx = s * x, sy = s * y;
+        return new Matrix4x4(txx + c, txy + sz, txz - sy, 0f,
+                             txy - sz, tyy + c, tyz + sx, 0f,
+                             txz + sy, tyz - sx, tzz + c, 0f,
+                             0f, 0f, 0f, 1f);
+    }
+
     public static int AxisAngle_186B50(ref Quaternion q, out Vector3 axis)
     {
         float l = q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W;

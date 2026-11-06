@@ -237,12 +237,6 @@ public sealed partial class GameScene : Scene
     private Vector2 UvToScreen(float u, float v) =>
         _uvCanvasOrigin + new Vector2((u - _uvPan.X) * _uvCanvasSize * _uvZoom, (1f - (v - _uvPan.Y)) * _uvCanvasSize * _uvZoom);
 
-    private (float U, float V) ScreenToUv(Vector2 screen)
-    {
-        var local = (screen - _uvCanvasOrigin) / (_uvCanvasSize * _uvZoom);
-        return (local.X + _uvPan.X, 1f - local.Y + _uvPan.Y);
-    }
-
     private void DrawUvCanvas(UvEditPart part)
     {
         ImGui.BeginChild("##uvcanvaschild", new Vector2(-1f, -1f), ImGuiChildFlags.Border);
@@ -251,7 +245,6 @@ public sealed partial class GameScene : Scene
         _uvCanvasOrigin = ImGui.GetCursorScreenPos();
         var drawList = ImGui.GetWindowDrawList();
 
-        var bgMin = _uvCanvasOrigin + new Vector2(-_uvPan.X, _uvPan.Y - 1f) * _uvCanvasSize * _uvZoom;
         if (part.Tex is not null)
         {
             var p0 = UvToScreen(0f, 1f);

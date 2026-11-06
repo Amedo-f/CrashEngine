@@ -105,12 +105,6 @@ public sealed partial class GameScene
         var lines = TextLinesOf(inst, obj, localBehaviours, globalBehaviours, out bool textMaster);
         if (lines.Count == 0) return;
         if (!ImGui.CollapsingHeader("Text##objtext", ImGuiTreeNodeFlags.DefaultOpen)) return;
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("The on-screen text this object shows (bottom hints).\n" +
-                         "The words live in <project>\\Language\\<language>\\AgentLab.txt (one line each):\n" +
-                         "editing here writes that same line, editing the file shows here. The style\n" +
-                         "(font, colours, outline, shadow) is saved in the language's style.json.\n" +
-                         "Play Scene and Build to PC use both. The PS2 ISO keeps the original font.");
         var proj = GetGameProject();
         var language = LanguageDirectory(proj?.Language);
         var original = OriginalTexts().AgentLabTexts;
@@ -157,7 +151,6 @@ public sealed partial class GameScene
                 if (!_textEdits.TryGetValue(editKey, out var buffer)) buffer = shown.Replace('~', '\n');
                 if (RtlTextBox.Draw("##textedit", ref buffer, new Vector2(-1f, ImGui.GetTextLineHeight() * 3.2f), out bool committed))
                     _textEdits[editKey] = buffer;
-                if (ImGui.IsItemHovered()) MaybeTooltip("Click to type (right-to-left for Arabic). Enter = new line ('~' in the game).\nCtrl+V pastes, Ctrl+C copies all. Saved when you click outside the box or press Esc.");
                 if (committed && _textEdits.TryGetValue(editKey, out var edited))
                 {
                     try
@@ -201,8 +194,6 @@ public sealed partial class GameScene
                 }
                 ImGui.EndCombo();
             }
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Which text this TEXTMASTER shows (its variable 0: lines 30-40 and 52+).\nSave Chunk to keep the choice.");
             if (language is not null && ImGui.Button("New text for this object##textnew"))
             {
                 try
@@ -268,11 +259,9 @@ public sealed partial class GameScene
                 if (ImGui.Selectable(f, string.Equals(s.Font, f, StringComparison.OrdinalIgnoreCase))) { s.Font = f; commit = true; }
             ImGui.EndCombo();
         }
-        if (ImGui.IsItemHovered()) MaybeTooltip("Fonts found in this language's folder and in Fonts\\ next to the engine.\nDrop any .ttf/.otf into the language folder to use it.");
 
         bool latin = s.GameFontForLatin;
         if (ImGui.Checkbox("Game font for English letters, digits and buttons##stylelatin", ref latin)) { s.GameFontForLatin = latin; commit = true; }
-        if (ImGui.IsItemHovered()) MaybeTooltip("On: letters the game's own font has keep the original look.\nOff: everything except the button icons uses the chosen font and this style.");
 
         float size = s.Size, letter = s.LetterSpacing, word = s.WordSpacing;
         if (ImGui.SliderFloat("Size##stylesize", ref size, 0.5f, 2.5f, "%.2f")) s.Size = size;
@@ -292,7 +281,6 @@ public sealed partial class GameScene
         float g0 = s.GradientStart, g1 = s.GradientEnd;
         if (ImGui.DragFloatRange2("Gradient from/to##stylegradient", ref g0, ref g1, 0.01f, 0f, 1f, "%.2f", "%.2f")) { s.GradientStart = g0; s.GradientEnd = g1; }
         Done();
-        if (ImGui.IsItemHovered()) MaybeTooltip("0 = top of the capital letters, 1 = the baseline.");
 
         ImGui.SeparatorText("Outline");
         bool outline = s.Outline;

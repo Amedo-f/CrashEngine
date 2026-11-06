@@ -1,9 +1,7 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
-using SysVec4 = System.Numerics.Vector4;
 using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
@@ -11,24 +9,15 @@ using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.
 using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
 using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
 using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -182,134 +171,33 @@ public static partial class MeshDecoder
         var destScenery = destSm2.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
         if (srcScenery is null || destScenery is null) { log = "missing SCENERY item on one side (TransplantSceneryTiles)"; return false; }
 
-        var destRmSec    = EnsureGfxSubsection<PS2AnyRigidModelsSection>(destGfx, Constants.GRAPHICS_RIGID_MODELS_SECTION);
-        var destMeshSec  = EnsureGfxSubsection<PS2AnyMeshesSection>(destGfx, Constants.GRAPHICS_MESHES_SECTION);
-        var destModelSec = EnsureGfxSubsection<PS2AnyModelsSection>(destGfx, Constants.GRAPHICS_MODELS_SECTION);
-        var destMatSec   = EnsureGfxSubsection<PS2AnyMaterialsSection>(destGfx, Constants.GRAPHICS_MATERIALS_SECTION);
-        var destTexSec   = EnsureGfxSubsection<PS2AnyTexturesSection>(destGfx, Constants.GRAPHICS_TEXTURES_SECTION);
-        var destLodSec   = EnsureGfxSubsection<PS2AnyLODsSection>(destGfx, Constants.GRAPHICS_LODS_SECTION);
-        var srcRmSec     = srcGfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_RIGID_MODELS_SECTION);
-        var srcMeshSec   = srcGfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MESHES_SECTION);
-        var srcModelSec  = srcGfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MODELS_SECTION);
-        var srcMatSec    = srcGfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION);
-        var srcTexSec    = srcGfx.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
-        var srcLodSec    = srcGfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_LODS_SECTION);
-
-        if (srcRmSec is null || srcMeshSec is null || srcModelSec is null || srcMatSec is null || srcTexSec is null)
-        { log = "source scenery is missing a required GRAPHICS subsection"; return false; }
-
-        static uint NewGraphicsId(BaseTwinSection section, params BaseTwinSection?[] alsoAvoid)
-        {
-            var rng = new Random();
-            uint id;
-            do { id = (uint)rng.Next(0x10000, 0x7FFFFFF); }
-            while (id == 0 || section.ContainsItem(id) || alsoAvoid.Any(s => s?.ContainsItem(id) == true));
-            return id;
-        }
-
-        var texIdMap = new Dictionary<uint, uint>();
-        uint CloneTexture(uint srcTexId)
-        {
-            if (texIdMap.TryGetValue(srcTexId, out var already)) return already;
-            var srcTex = srcTexSec?.GetItem<PS2AnyTexture>(srcTexId);
-            if (srcTex is null) { texIdMap[srcTexId] = srcTexId; return srcTexId; }
-            var clone = CloneItem(srcTex);
-            uint newId = NewGraphicsId(destTexSec);
-            clone.SetID(newId);
-            destTexSec.AddItem(clone);
-            texIdMap[srcTexId] = newId;
-            var t = ChunkImporter.DecodeTexture(gl, clone);
-            if (t is not null) destTexCache[newId] = t;
-            return newId;
-        }
-
-        var matIdMap = new Dictionary<uint, uint>();
-        uint CloneMaterial(uint srcMatId)
-        {
-            if (srcMatId == 0) return 0;
-            if (matIdMap.TryGetValue(srcMatId, out var already)) return already;
-            var srcMat = srcMatSec?.GetItem<PS2AnyMaterial>(srcMatId);
-            if (srcMat is null) return 0;
-            var clone = CloneItem(srcMat);
-            uint newId = NewGraphicsId(destMatSec);
-            clone.SetID(newId);
-            foreach (var sh in clone.Shaders) sh.TextureId = CloneTexture(sh.TextureId);
-            destMatSec.AddItem(clone);
-            matIdMap[srcMatId] = newId;
-            return newId;
-        }
-
-        var modelIdMap = new Dictionary<uint, uint>();
-        uint CloneModel(uint srcModelId)
-        {
-            if (modelIdMap.TryGetValue(srcModelId, out var already)) return already;
-            var srcModel = srcModelSec?.GetItem<PS2AnyModel>(srcModelId);
-            if (srcModel is null) return 0;
-            var clone = CloneItem(srcModel);
-            uint newId = NewGraphicsId(destModelSec);
-            clone.SetID(newId);
-            destModelSec.AddItem(clone);
-            modelIdMap[srcModelId] = newId;
-            return newId;
-        }
-
-        uint? CloneRigidModel(uint srcId)
-        {
-            BaseTwinSection? srcSec = null; BaseTwinSection? destSec = null;
-            var rm = srcMeshSec?.GetItem<PS2AnyRigidModel>(srcId);
-            if (rm is not null) { srcSec = srcMeshSec; destSec = destMeshSec; }
-            else
-            {
-                rm = srcRmSec?.GetItem<PS2AnyRigidModel>(srcId);
-                if (rm is not null) { srcSec = srcRmSec; destSec = destRmSec; }
-            }
-            if (rm is null || srcSec is null || destSec is null) return null;
-
-            var clone = CloneItem(rm);
-            uint newId = NewGraphicsId(destSec, destMeshSec, destRmSec);
-            clone.SetID(newId);
-            clone.Model = CloneModel(clone.Model);
-            for (int i = 0; i < clone.Materials.Count; i++)
-                clone.Materials[i] = CloneMaterial(clone.Materials[i]);
-            destSec.AddItem(clone);
-            return newId;
-        }
+        var copy = SceneryGraphicsCopy.Between(gl, destTexCache, srcGfx, destGfx, withLods: true);
+        if (copy is null) { log = "source scenery is missing a required GRAPHICS subsection"; return false; }
+        var destLodSec = copy.DestLods!;
 
         var lodIdMap = new Dictionary<uint, uint>();
         uint? CloneLod(uint srcLodId)
         {
             if (lodIdMap.TryGetValue(srcLodId, out var already)) return already;
-            var srcLod = srcLodSec?.GetItem<PS2AnyLOD>(srcLodId);
+            var srcLod = copy.SrcLods?.GetItem<PS2AnyLOD>(srcLodId);
             if (srcLod is null) return null;
 
             var clone = CloneItem(srcLod);
             clone.Meshes.Clear();
             foreach (var m in srcLod.Meshes)
             {
-                var newMeshId = CloneRigidModel(m);
+                var newMeshId = copy.RigidModel(m);
                 if (newMeshId is not null) clone.Meshes.Add(newMeshId.Value);
             }
             if (clone.Meshes.Count == 0) return null;
 
-            uint newId = NewGraphicsId(destLodSec, destMeshSec, destRmSec);
+            uint newId = NewGraphicsLocalId(destLodSec, copy.DestMeshes, copy.DestRigidModels);
             clone.SetID(newId);
             destLodSec.AddItem(clone);
             lodIdMap[srcLodId] = newId;
             return newId;
         }
 
-        static TwinMat4 CloneMatrix(TwinMat4 m) => new TwinMat4
-        {
-            Column1 = new TwinVec4(m.Column1.X, m.Column1.Y, m.Column1.Z, m.Column1.W),
-            Column2 = new TwinVec4(m.Column2.X, m.Column2.Y, m.Column2.Z, m.Column2.W),
-            Column3 = new TwinVec4(m.Column3.X, m.Column3.Y, m.Column3.Z, m.Column3.W),
-            Column4 = new TwinVec4(m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W),
-        };
-        static TwinVec4[] CloneBB(TwinVec4[] bb) => new[]
-        {
-            new TwinVec4(bb[0].X, bb[0].Y, bb[0].Z, bb[0].W),
-            new TwinVec4(bb[1].X, bb[1].Y, bb[1].Z, bb[1].W),
-        };
         static TwinVec4 CloneVec(TwinVec4 v) => new TwinVec4(v.X, v.Y, v.Z, v.W);
 
         int addedTiles = 0, addedMeshes = 0, skippedTiles = 0;
@@ -332,11 +220,11 @@ public static partial class MeshDecoder
             for (int i = 0; i < srcLeaf.MeshIDs.Count; i++)
             {
                 if (allowedIds is not null && !allowedIds.Contains(srcLeaf.MeshIDs[i])) continue;
-                var newId = CloneRigidModel(srcLeaf.MeshIDs[i]);
+                var newId = copy.RigidModel(srcLeaf.MeshIDs[i]);
                 if (newId is null) { unresolvedMeshIds.Add((idx, srcLeaf.MeshIDs[i])); continue; }
                 newLeaf.MeshIDs.Add(newId.Value);
-                newLeaf.MeshModelMatrices.Add(CloneMatrix(srcLeaf.MeshModelMatrices[i]));
-                newLeaf.BoundingBoxes.Add(CloneBB(srcLeaf.BoundingBoxes[i]));
+                newLeaf.MeshModelMatrices.Add(CloneTwinMat4(srcLeaf.MeshModelMatrices[i]));
+                newLeaf.BoundingBoxes.Add(CloneSceneryBox(srcLeaf.BoundingBoxes[i]));
                 addedMeshes++;
             }
 
@@ -346,8 +234,8 @@ public static partial class MeshDecoder
                 var newLodId = CloneLod(srcLeaf.LodIDs[i]);
                 if (newLodId is null) { unresolvedMeshIds.Add((idx, srcLeaf.LodIDs[i])); continue; }
                 newLeaf.LodIDs.Add(newLodId.Value);
-                newLeaf.LodModelMatrices.Add(CloneMatrix(srcLeaf.LodModelMatrices[i]));
-                newLeaf.BoundingBoxes.Add(CloneBB(srcLeaf.BoundingBoxes[srcLeaf.MeshIDs.Count + i]));
+                newLeaf.LodModelMatrices.Add(CloneTwinMat4(srcLeaf.LodModelMatrices[i]));
+                newLeaf.BoundingBoxes.Add(CloneSceneryBox(srcLeaf.BoundingBoxes[srcLeaf.MeshIDs.Count + i]));
                 addedMeshes++;
             }
 
@@ -382,23 +270,7 @@ public static partial class MeshDecoder
         }
 
         foreach (var l in newLeaves)
-        {
-            var lMin = new SysVec3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var lMax = new SysVec3(float.MinValue, float.MinValue, float.MinValue);
-            bool lAny = false;
-            for (int i = 0; i < l.MeshIDs.Count; i++)
-            {
-                var c4 = l.MeshModelMatrices[i].Column4;
-                var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-                var box = l.BoundingBoxes[i];
-                var a = pos + new SysVec3(box[0].X, box[0].Y, box[0].Z);
-                var b = pos + new SysVec3(box[1].X, box[1].Y, box[1].Z);
-                lMin = SysVec3.Min(lMin, SysVec3.Min(a, b));
-                lMax = SysVec3.Max(lMax, SysVec3.Max(a, b));
-                lAny = true;
-            }
-            if (lAny) ApplySceneryBounds(l, lMin, lMax);
-        }
+            RefitSceneryBounds(l, withLods: false);
 
         if (newSourceIds is not null)
             foreach (var l in newLeaves)
@@ -409,13 +281,13 @@ public static partial class MeshDecoder
 
         var mergeMode = GraftLeavesIntoScenery(destScenery, newLeaves);
 
-        log = $"Added {addedTiles} scenery tile(s), {addedMeshes} mesh(es) total, +{modelIdMap.Count} Model, " +
-              $"+{matIdMap.Count} Material, +{texIdMap.Count} Texture, +{lodIdMap.Count} LOD ({mergeMode}).";
+        log = $"Added {addedTiles} scenery tile(s), {addedMeshes} mesh(es) total, +{copy.ModelIdMap.Count} Model, " +
+              $"+{copy.MatIdMap.Count} Material, +{copy.TexIdMap.Count} Texture, +{lodIdMap.Count} LOD ({mergeMode}).";
         if (skippedTiles > 0) log += $"  {skippedTiles} tile(s) skipped (not a real leaf tile, or no meshes resolved).";
         if (unresolvedMeshIds.Count > 0)
             log += "  Unresolved mesh id(s): " + string.Join(", ",
                 unresolvedMeshIds.Select(u => $"0x{u.MeshId:X8}@srcIdx{u.SourceIndex}")) +
-                $" (not found in source's own Meshes[{srcMeshSec.GetItemsAmount()} items]/RigidModels[{srcRmSec.GetItemsAmount()} items] sections).";
+                $" (not found in source's own Meshes[{copy.SrcMeshes.GetItemsAmount()} items]/RigidModels[{copy.SrcRigidModels.GetItemsAmount()} items] sections).";
         return addedTiles > 0;
     }
 
@@ -525,94 +397,6 @@ public static partial class MeshDecoder
         GraftLeavesIntoScenery(destScenery, new List<TwinSceneryLeaf> { leaf });
     }
 
-    private static (SysVec3 Min, SysVec3 Max, bool Any) CollectSceneryContent(
-        List<TwinSceneryBaseType> flat, ref int cursor,
-        List<uint> meshIds, List<TwinMat4> meshMats, List<TwinVec4[]> meshBoxes,
-        List<uint> lodIds, List<TwinMat4> lodMats, List<TwinVec4[]> lodBoxes,
-        bool[] lights)
-    {
-        var self = flat[cursor];
-        cursor++;
-
-        var min = new SysVec3(float.MaxValue, float.MaxValue, float.MaxValue);
-        var max = new SysVec3(float.MinValue, float.MinValue, float.MinValue);
-        bool any = false;
-
-        int meshCount = self.MeshIDs.Count;
-        for (int i = 0; i < meshCount; i++)
-        {
-            meshIds.Add(self.MeshIDs[i]);
-            meshMats.Add(self.MeshModelMatrices[i]);
-            var bb = self.BoundingBoxes[i];
-            meshBoxes.Add(bb);
-            var c4 = self.MeshModelMatrices[i].Column4;
-            var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-            min = SysVec3.Min(min, pos + SysVec3.Min(new SysVec3(bb[0].X, bb[0].Y, bb[0].Z), new SysVec3(bb[1].X, bb[1].Y, bb[1].Z)));
-            max = SysVec3.Max(max, pos + SysVec3.Max(new SysVec3(bb[0].X, bb[0].Y, bb[0].Z), new SysVec3(bb[1].X, bb[1].Y, bb[1].Z)));
-            any = true;
-        }
-        for (int i = 0; i < self.LodIDs.Count; i++)
-        {
-            lodIds.Add(self.LodIDs[i]);
-            lodMats.Add(self.LodModelMatrices[i]);
-            var bb = self.BoundingBoxes[meshCount + i];
-            lodBoxes.Add(bb);
-            var c4 = self.LodModelMatrices[i].Column4;
-            var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-            min = SysVec3.Min(min, pos + SysVec3.Min(new SysVec3(bb[0].X, bb[0].Y, bb[0].Z), new SysVec3(bb[1].X, bb[1].Y, bb[1].Z)));
-            max = SysVec3.Max(max, pos + SysVec3.Max(new SysVec3(bb[0].X, bb[0].Y, bb[0].Z), new SysVec3(bb[1].X, bb[1].Y, bb[1].Z)));
-            any = true;
-        }
-        for (int i = 0; i < 128; i++) lights[i] |= self.LightsEnabler[i];
-
-        if (self is TwinSceneryNode node)
-        {
-            foreach (var t in node.SceneryTypes)
-            {
-                if (t == ITwinScenery.SceneryType.None) continue;
-                var (cMin, cMax, cAny) = CollectSceneryContent(flat, ref cursor, meshIds, meshMats, meshBoxes, lodIds, lodMats, lodBoxes, lights);
-                if (!cAny) continue;
-                min = SysVec3.Min(min, cMin);
-                max = SysVec3.Max(max, cMax);
-                any = true;
-            }
-        }
-
-        return (min, max, any);
-    }
-
-    public static void FlattenSceneryToSingleNode(PS2AnyScenery scenery)
-    {
-        if (scenery.Sceneries.Count == 0) return;
-
-        var meshIds = new List<uint>();
-        var meshMats = new List<TwinMat4>();
-        var meshBoxes = new List<TwinVec4[]>();
-        var lodIds = new List<uint>();
-        var lodMats = new List<TwinMat4>();
-        var lodBoxes = new List<TwinVec4[]>();
-        var lights = new bool[128];
-
-        int cursor = 0;
-        var (min, max, any) = CollectSceneryContent(scenery.Sceneries, ref cursor, meshIds, meshMats, meshBoxes, lodIds, lodMats, lodBoxes, lights);
-
-        var root = new TwinSceneryRoot
-        {
-            MeshIDs = meshIds,
-            MeshModelMatrices = meshMats,
-            LodIDs = lodIds,
-            LodModelMatrices = lodMats,
-        };
-        root.BoundingBoxes = new List<TwinVec4[]>(meshBoxes);
-        root.BoundingBoxes.AddRange(lodBoxes);
-        Array.Copy(lights, root.LightsEnabler, 128);
-        for (int i = 0; i < 8; i++) root.SceneryTypes[i] = ITwinScenery.SceneryType.None;
-        if (any) ApplySceneryBounds(root, min, max);
-
-        scenery.Sceneries.Clear();
-        scenery.Sceneries.Add(root);
-    }
-
     public static void ApplySceneryBounds(TwinSceneryBaseType item, SysVec3 min, SysVec3 max)
     {
         var center = (min + max) * 0.5f;
@@ -624,59 +408,32 @@ public static partial class MeshDecoder
         item.UnkVec4 = new TwinVec4(half.X, half.Y, half.Z, radius);
     }
 
-    private static (SysVec3 Min, SysVec3 Max, bool Any) RecomputeSubtreeBoundsRec(List<TwinSceneryBaseType> flat, ref int cursor)
+    public static (SysVec3 Min, SysVec3 Max)? SceneryContentBounds(TwinSceneryBaseType node, bool withLods)
     {
-        var self = flat[cursor];
-        cursor++;
-
         var min = new SysVec3(float.MaxValue, float.MaxValue, float.MaxValue);
         var max = new SysVec3(float.MinValue, float.MinValue, float.MinValue);
         bool any = false;
-        for (int i = 0; i < self.MeshIDs.Count; i++)
-        {
-            var c4 = self.MeshModelMatrices[i].Column4;
-            var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-            var bb = self.BoundingBoxes[i];
-            var a = pos + new SysVec3(bb[0].X, bb[0].Y, bb[0].Z);
-            var b = pos + new SysVec3(bb[1].X, bb[1].Y, bb[1].Z);
-            min = SysVec3.Min(min, SysVec3.Min(a, b));
-            max = SysVec3.Max(max, SysVec3.Max(a, b));
-            any = true;
-        }
-        for (int i = 0; i < self.LodIDs.Count; i++)
-        {
-            var c4 = self.LodModelMatrices[i].Column4;
-            var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-            var bb = self.BoundingBoxes[self.MeshIDs.Count + i];
-            var a = pos + new SysVec3(bb[0].X, bb[0].Y, bb[0].Z);
-            var b = pos + new SysVec3(bb[1].X, bb[1].Y, bb[1].Z);
-            min = SysVec3.Min(min, SysVec3.Min(a, b));
-            max = SysVec3.Max(max, SysVec3.Max(a, b));
-            any = true;
-        }
-
-        if (self is TwinSceneryNode node)
-        {
-            foreach (var t in node.SceneryTypes)
-            {
-                if (t == ITwinScenery.SceneryType.None) continue;
-                var (cMin, cMax, cAny) = RecomputeSubtreeBoundsRec(flat, ref cursor);
-                if (!cAny) continue;
-                min = SysVec3.Min(min, cMin);
-                max = SysVec3.Max(max, cMax);
-                any = true;
-            }
-        }
-
-        if (any) ApplySceneryBounds(self, min, max);
-        return (min, max, any);
+        for (int i = 0; i < node.MeshIDs.Count; i++)
+            GrowBounds(ref min, ref max, ref any, node.MeshModelMatrices[i], node.BoundingBoxes[i]);
+        if (withLods)
+            for (int i = 0; i < node.LodIDs.Count; i++)
+                GrowBounds(ref min, ref max, ref any, node.LodModelMatrices[i], node.BoundingBoxes[node.MeshIDs.Count + i]);
+        return any ? (min, max) : null;
     }
 
-    public static void RecomputeAllSceneryBounds(PS2AnyScenery scenery)
+    public static void RefitSceneryBounds(TwinSceneryBaseType node, bool withLods)
     {
-        if (scenery.Sceneries.Count == 0) return;
-        int cursor = 0;
-        RecomputeSubtreeBoundsRec(scenery.Sceneries, ref cursor);
+        if (SceneryContentBounds(node, withLods) is { } b) ApplySceneryBounds(node, b.Min, b.Max);
+    }
+
+    private static void GrowBounds(ref SysVec3 min, ref SysVec3 max, ref bool any, TwinMat4 m, TwinVec4[] box)
+    {
+        var pos = new SysVec3(m.Column4.X, m.Column4.Y, m.Column4.Z);
+        var a = pos + new SysVec3(box[0].X, box[0].Y, box[0].Z);
+        var b = pos + new SysVec3(box[1].X, box[1].Y, box[1].Z);
+        min = SysVec3.Min(min, SysVec3.Min(a, b));
+        max = SysVec3.Max(max, SysVec3.Max(a, b));
+        any = true;
     }
 
     private static List<TwinSceneryBaseType> RebuildSceneryTree(List<TwinSceneryLeaf> leaves)
@@ -694,22 +451,7 @@ public static partial class MeshDecoder
 
         var boundsOf = new Dictionary<TwinSceneryBaseType, (SysVec3 Min, SysVec3 Max)>();
         foreach (var leaf in leaves)
-        {
-            if (leaf.MeshIDs.Count == 0) continue;
-            var min = new SysVec3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var max = new SysVec3(float.MinValue, float.MinValue, float.MinValue);
-            for (int i = 0; i < leaf.MeshIDs.Count; i++)
-            {
-                var c4 = leaf.MeshModelMatrices[i].Column4;
-                var pos = new SysVec3(c4.X, c4.Y, c4.Z);
-                var bb = leaf.BoundingBoxes[i];
-                var a = pos + new SysVec3(bb[0].X, bb[0].Y, bb[0].Z);
-                var b = pos + new SysVec3(bb[1].X, bb[1].Y, bb[1].Z);
-                min = SysVec3.Min(min, SysVec3.Min(a, b));
-                max = SysVec3.Max(max, SysVec3.Max(a, b));
-            }
-            boundsOf[leaf] = (min, max);
-        }
+            if (SceneryContentBounds(leaf, withLods: false) is { } lb) boundsOf[leaf] = lb;
 
         var childrenOf = new Dictionary<TwinSceneryBaseType, List<TwinSceneryBaseType>>();
         List<TwinSceneryBaseType> level = leaves.Cast<TwinSceneryBaseType>().ToList();

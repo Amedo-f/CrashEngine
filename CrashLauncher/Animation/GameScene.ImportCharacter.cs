@@ -1,20 +1,10 @@
-using System.Numerics;
 using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
 using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinAnimatedTransformation = Twinsanity.TwinsanityInterchange.Common.Animation.AnimatedTransformation;
-using TransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using Vector3 = System.Numerics.Vector3;
-using TwinJoint = Twinsanity.TwinsanityInterchange.Common.TwinJoint;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
 
 namespace CrashLauncher;
 
@@ -67,30 +57,16 @@ public sealed partial class GameScene
             if (rec is null) { _browser.Log($"Import Character: {log}"); return true; }
             chunkSource.Transplants[rec.ObjectId] = rec;
 
-            var section = AllEntities(chunkRoot).Select(e => e.Get<InstanceData>()?.Section).FirstOrDefault(s => s is not null);
-            if (section is null)
-            {
-                var layout = chunkSource.Rm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_LAYOUT_1_SECTION);
-                section = layout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_INSTANCES_SECTION);
-                if (section is null) { _browser.Log("Import Character: this level has no instances section to add to."); return true; }
-            }
-            uint stateFlags = (uint)(Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState.Visible |
-                                     Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState.ShadowActive);
+            var section = FindInstanceSection(chunkRoot, chunkSource);
+            if (section is null) { _browser.Log("Import Character: this level has no instances section to add to."); return true; }
+            uint stateFlags = NewInstanceStateFlags;
             float extent = 0f;
             foreach (var sm in rc.Meshes)
                 foreach (var p in sm.Mesh.Positions) extent = MathF.Max(extent, MathF.Max(MathF.Abs(p.X), MathF.Max(MathF.Abs(p.Y), MathF.Abs(p.Z))));
             var spawnPos = _camera?.Transform.Position ?? Vector3.Zero;
             if (_camera is not null) spawnPos += _camera.Forward * MathF.Max(3f, extent * 2.5f);
-            var inst = new PS2AnyInstance
-            {
-                Position = new TwinVec4(spawnPos.X, spawnPos.Y, spawnPos.Z, 1f),
-                RotationX = new TwinIntegerRotation(), RotationY = new TwinIntegerRotation(), RotationZ = new TwinIntegerRotation(),
-                ObjectId = (ushort)rec.ObjectId, RefListIndex = -1, OnSpawnHeaderScriptID = 0xFFFF, StateFlags = stateFlags,
-                InstancesRelated = 0, Instances = new List<ushort>(), PositionsRelated = 0, Positions = new List<ushort>(),
-                PathsRelated = 0, Paths = new List<ushort>(),
-                ParamList1 = new List<uint>(), ParamList2 = new List<float>(), ParamList3 = new List<uint>(),
-            };
-            var instRoot = chunkRoot.Children.FirstOrDefault(c => c.Name == "Instances") ?? chunkRoot;
+            var inst = NewInstance(new TwinVec4(spawnPos.X, spawnPos.Y, spawnPos.Z, 1f), rec.ObjectId, null, stateFlags);
+            var instRoot = InstancesRoot(chunkRoot);
             var entity = AddOrReuseInstance(section, inst, instRoot, chunkSource);
             SelectClicked(entity, false);
             _browser.Log($"Import Character: {log}. Animations: {(clipNotes.Count == 0 ? "none in the file" : string.Join("; ", clipNotes))}." +

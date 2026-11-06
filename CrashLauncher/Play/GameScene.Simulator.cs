@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Core;
-using CrashEngine.Renderer;
 using CrashEngine.Runtime.Character;
 using ImGuiNET;
 
@@ -80,7 +79,6 @@ public sealed partial class GameScene
         if (ImGui.Button("Fit to Screen##simfit")) _simFit = true;
         ImGui.SameLine();
         if (ImGui.Button((_simPortrait ? "Portrait" : "Landscape") + "##simrotate")) _simPortrait = !_simPortrait;
-        if (ImGui.IsItemHovered()) MaybeTooltip("Rotate the phone.");
         ImGui.SameLine();
         ToolbarToggle("Safe Area##simsafe", ref _simSafeArea, "Outlines the part of the screen the camera cutout and the system bars leave free.");
     }

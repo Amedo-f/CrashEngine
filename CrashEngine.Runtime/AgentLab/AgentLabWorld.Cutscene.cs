@@ -59,14 +59,6 @@ public sealed partial class AgentLabWorld
         for (int i = 0; i < _videoModelCount_E0; i++)
             if (ReferenceEquals(_videoModels_A0[i], agent)) _videoModels_A0[i] = null;
     }
-
-    // Amedo
-    public AgentLabAgent? VideoModelInstance(ushort id)
-    {
-        for (int i = 0; i < _videoModelCount_E0; i++)
-            if (_videoModelIds_80[i] == id) return _videoModels_A0[i];
-        return null;
-    }
     public int MovieFade_54 { get; private set; } // Amedo
     public int Movie_58 { get; private set; }
 
@@ -161,8 +153,6 @@ public sealed partial class AgentLabWorld
 
     public ICutsceneCamera? CutsceneCamera { get; set; } // Amedo 2026-09-29
     public bool CutsceneActive => GameMode is ModeCutscene or ModeCutsceneAlt;
-    public float HudFadeTime { get; private set; }
-    public bool HudHidden { get; private set; }
 
     // Amedo
     public bool StartCutscene_176A48(float seconds, AgentLabAgent by)
@@ -171,8 +161,6 @@ public sealed partial class AgentLabWorld
         if (GameMode == ModePlay)
         {
             _requestedMode = ModeCutscene;
-            HudHidden = true;
-            HudFadeTime = fade;
             BottomShown = true; // Amedo
             HoldPlayer_178038();
             DisablePlayerControl_17C190();
@@ -184,7 +172,6 @@ public sealed partial class AgentLabWorld
             return true;
         }
         if (GameMode != ModeCutsceneAlt) return false;
-        HudFadeTime = fade;
         BottomShown = true; // Amedo
         Oleg.Show_259B20(Oleg.Groups_08[Oleg.CutsceneGroup], Seconds(fade), 0); // Amedo
         return true;
@@ -197,8 +184,6 @@ public sealed partial class AgentLabWorld
         if (GameMode == ModeCutscene)
         {
             _requestedMode = ModeExitCutscene;
-            HudHidden = false;
-            HudFadeTime = fade;
             Oleg.Hide_259BC0(Oleg.Groups_08[Oleg.CutsceneGroup], Seconds(fade), 0); // Amedo
             Log?.Invoke($"[mode {Now:0.00}s] CutsceneEnd({seconds:0.##}) by {by.Entity.Name}: 0xD -> 0xB, HUD back over {fade:0.##}s");
             Sounds?.Groups.DuckEnd_1E58F0(); // Amedo 2026-10-06
@@ -382,8 +367,6 @@ public sealed partial class AgentLabWorld
 
     private void ResetCutsceneMode()
     {
-        HudHidden = false;
-        HudFadeTime = 0f;
     }
 
     private readonly HashSet<int> _reportedModes = new();

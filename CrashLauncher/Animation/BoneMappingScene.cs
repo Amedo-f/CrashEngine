@@ -310,7 +310,6 @@ public sealed class BoneMappingScene : Scene
         var cursorBefore = ImGui.GetCursorScreenPos();
         ImGui.Image((nint)_fbo!.ColorTexture, new Vector2(pw, ph), new Vector2(0, 1), new Vector2(1, 0));
 
-        var vpMat = view * proj;
         var dl = ImGui.GetWindowDrawList();
 
         if (_copiedTarget is not null)

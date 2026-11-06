@@ -503,12 +503,6 @@ public static class ChunkImporter
     }
 }
 
-
-public sealed class SceneryMarker : CrashEngine.Core.Component
-{
-    public Dictionary<uint, Texture2D> TextureCache { get; set; } = new();
-}
-
 public sealed class CollisionMesh : CrashEngine.Core.Component
 {
 }

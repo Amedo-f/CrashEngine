@@ -162,7 +162,6 @@ public sealed partial class SceneSimulation
     private readonly Dictionary<StreamResource, StreamedChunk> _streamed = new();
 
     public ChunkStreamer? Streamer { get; private set; }
-    public IEnumerable<WorldChunk> StreamedChunks => _streamed.Values.Select(s => s.Chunk);
 
     private static List<StreamLink> LinksOf(PS2AnyTwinsanitySM2? sm2) =>
         sm2?.GetItem<PS2AnyLink>((uint)Constants.SCENERY_LINK_ITEM)?.LinksList.Select(l => new StreamLink(l)).ToList() ?? new();
@@ -741,7 +740,6 @@ public sealed partial class SceneSimulation
             ToRoot = toRoot,
             ToAnchor = toAnchor,
             Host = e,
-            MeshTables = src.MeshTables,
         };
         World.AddChunk(chunk);
         ReadSceneryShaders_1CCF80(src.Sm2); // Amedo

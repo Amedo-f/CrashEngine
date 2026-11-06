@@ -2,8 +2,6 @@ using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Renderer;
 using ImGuiNET;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using PS2PSM = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSM;
 using PS2PSF = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF;
@@ -103,32 +101,30 @@ public sealed partial class GameScene
         catch (Exception ex) { _browser.Log($"Legal restore failed: {ex.Message}"); }
     }
 
-    private void DrawUiLegal()
+    private static readonly string[] UiLanguages = { "English", "French", "German", "Italian", "Spanish" };
+
+    private void DrawUiLanguageCombo(string id)
     {
-        string[] langs = { "English", "French", "German", "Italian", "Spanish" };
         ImGui.SetNextItemWidth(160f);
-        if (ImGui.BeginCombo("##uiLegalLang", _uiLanguage))
+        if (ImGui.BeginCombo(id, _uiLanguage))
         {
-            foreach (var l in langs)
+            foreach (var l in UiLanguages)
                 if (ImGui.Selectable(l, l == _uiLanguage))
                     _uiLanguage = l;
             ImGui.EndCombo();
         }
+    }
+
+    private void DrawUiLegal()
+    {
+        DrawUiLanguageCombo("##uiLegalLang");
         ImGui.Separator();
         DrawUiPsmGroup(GetLegalPsmPaths(), kind: UiAssetKind.SplitFrames, flip180: true); // Amedo 2026-09-24
     }
 
     private void DrawUiLevelTitles()
     {
-        string[] langs = { "English", "French", "German", "Italian", "Spanish" };
-        ImGui.SetNextItemWidth(160f);
-        if (ImGui.BeginCombo("##uiLang", _uiLanguage))
-        {
-            foreach (var l in langs)
-                if (ImGui.Selectable(l, l == _uiLanguage))
-                    _uiLanguage = l;
-            ImGui.EndCombo();
-        }
+        DrawUiLanguageCombo("##uiLang");
         ImGui.Separator();
 
         var files = GetUiLanguageFiles(_uiLanguage);
@@ -298,7 +294,6 @@ public sealed partial class GameScene
                 _uiZoomFlip180 = flip180;
                 _uiZoomFlipV = flipV;
             }
-            if (ImGui.IsItemHovered()) MaybeTooltip("Double-click to view full-size");
             ImGui.TextDisabled($"{tex.Width}x{tex.Height}");
             ImGui.EndGroup();
 

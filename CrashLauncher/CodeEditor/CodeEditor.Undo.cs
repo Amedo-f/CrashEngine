@@ -1,4 +1,3 @@
-using System.Text;
 
 namespace CrashLauncher.CodeEditor;
 
@@ -17,9 +16,6 @@ public sealed partial class CodeEditor
 
     private readonly List<Edit> _undo = new();
     private readonly List<Edit> _redo = new();
-
-    public bool CanUndo => _undo.Count > 0;
-    public bool CanRedo => _redo.Count > 0;
 
     // ---- the only two places the text changes ----
 

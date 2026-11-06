@@ -1,7 +1,5 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;

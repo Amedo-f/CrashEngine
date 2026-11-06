@@ -1,4 +1,3 @@
-using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
@@ -32,7 +31,7 @@ public sealed partial class AgentLabWorld
     // Amedo
     private Screen.Oleg.Oleg NewOleg(Screen.GameScreen? screen)
     {
-        var oleg = new Screen.Oleg.Oleg(screen?.Font, Progress, screen?.CodeTexts, screen?.Icons) { Unimplemented = Unimplemented, Game_3095C8 = this };
+        var oleg = new Screen.Oleg.Oleg(screen?.Font, Progress, screen?.CodeTexts, screen?.Icons) { Game_3095C8 = this };
         if (screen is not null)
         {
             oleg.LanguageName_309758 = screen.DiscLanguage;

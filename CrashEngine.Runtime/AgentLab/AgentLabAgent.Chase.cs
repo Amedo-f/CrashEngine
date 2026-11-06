@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using CrashEngine.Core;
@@ -23,8 +22,6 @@ public sealed partial class AgentLabAgent
     private float _damping;
     private float _maxBank = 80f;
     private float _sqrTolerance;
-
-    public float ChaseSpeed => _chaseCurrentSpeed;
 
     private void StartChase(TwinBehaviourControlPacket packet)
     {

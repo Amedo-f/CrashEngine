@@ -48,8 +48,6 @@ public sealed partial class GameScene
                 slots[0] = def is null ? NewShadowShape(ogi) : GameShadowDefs.Clone(def);
                 SaveShadow(src, target, slots, 0);
             }
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Writes the shadow as real shadow commands (187-191) into this object's definition,\nso the editor, Play, the PC build and the PS2 (Build ISO) all use it.");
             return;
         }
 
@@ -89,8 +87,6 @@ public sealed partial class GameScene
                 if (ImGui.Selectable(ShadowSlotLabel(slotsNow, s), s == _shadowEditSlot)) { _shadowEditSlot = s; _shadowHot = (-1, -1); }
             ImGui.EndCombo();
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("An object can have up to 4 shadow shapes; scripts switch between them (ShadowToggle 191).\nThe start slot is the one used when the object appears.");
         int startSlot = _shadowEditActive;
         if (ImGui.SliderInt("Start Slot##shadowstart", ref startSlot, 0, 3) && slotsNow[startSlot] is not null) { _shadowEditActive = startSlot; changed = true; }
 
@@ -107,11 +103,8 @@ public sealed partial class GameScene
         {
             float maxDist = shape.MaxDistance;
             if (ImGui.DragFloat("Max Camera Distance##shadowmax", ref maxDist, 0.5f, 1f, 1023f, "%.0f")) { shape.MaxDistance = MathF.Round(maxDist); changed = true; }
-            if (ImGui.IsItemHovered()) MaybeTooltip("Farther than this from the camera = no shadow.");
             changed |= ImGui.DragFloat("Length Near##shadownear", ref shape.LengthNear, 0.1f, 0f, 200f, "%.2f");
-            if (ImGui.IsItemHovered()) MaybeTooltip("How far down the shadow reaches when the camera is close.\nShort = the shadow disappears when the object is high above the ground.");
             changed |= ImGui.DragFloat("Length Far##shadowfar", ref shape.LengthFar, 0.1f, 0f, 200f, "%.2f");
-            if (ImGui.IsItemHovered()) MaybeTooltip("Reach at Max Camera Distance (blends from Length Near).");
 
             var reacts = ShadowJointChoices(ogi);
             changed |= DrawShadowElements(shape.Circles, 0, "Circle", reacts, false);
@@ -148,7 +141,6 @@ public sealed partial class GameScene
                 shape.Rect = simple.Rect;
                 changed = true;
             }
-            if (ImGui.IsItemHovered()) MaybeTooltip("Replaces the parts with one soft round cone under the object (like the fruit).");
             ImGui.SameLine();
             if (slotsNow.Count(x => x is not null) > 1 && ImGui.SmallButton("Delete This Slot##shadowdelslot"))
             {

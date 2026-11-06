@@ -14,7 +14,6 @@ public sealed partial class CharacterController
     {
         public Vector4 Source;
         public uint Kind;
-        public int Amount;
     }
 
     public DamageRecord LastDamage;
@@ -42,7 +41,7 @@ public sealed partial class CharacterController
         if (hp == 0) return;
         if (primary.Invincible && (uint)amount < 50) return;
         int now = hp > amount ? hp - amount : 0;
-        var record = new DamageRecord { Source = new Vector4(source, 1f), Kind = kind, Amount = amount };
+        var record = new DamageRecord { Source = new Vector4(source, 1f), Kind = kind };
         primary.LastDamage = record;
         primary.HitPoints = now;
         if (second is not null)

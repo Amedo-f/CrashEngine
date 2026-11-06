@@ -47,8 +47,7 @@ public sealed class PhysicsController
     public float MaxTilt;
     public float ParamBC = 1f;
     public float AirTime;
-    public float Value_98, Magnet_9C; // Amedo
-    public float ParamC4;
+    public float Magnet_9C; // Amedo
     public float GripNow;
     public TriangleCache? Terrain;
     public RigidBody? Body;

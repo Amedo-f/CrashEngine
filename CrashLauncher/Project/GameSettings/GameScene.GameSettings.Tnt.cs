@@ -1,14 +1,8 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -81,14 +75,6 @@ public sealed partial class GameScene
                 SetDelay(packets[i], _tntOriginalDelays[i] / _tntSpeedMultiplier);
             if (!own) chunkSource.GlobalRm2Dirty = true; // Amedo
         }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip("Scales every ControlPacket Delay in the TNT fuse's beep-beep-beep\n" +
-                         "countdown script (Startup\\Default.rm2, COM_TNT_CRATE_COUNTDOWN),\n" +
-                         "relative to the TRUE original values (read once from the pristine\n" +
-                         "disc, not whatever's currently live) — drag freely, no compounding.\n" +
-                         "1.00x = original speed. Save Chunk to persist, then Build ISO + test.");
-        }
         ImGui.SameLine();
         if (ImGui.Button("Reset##tntreset"))
         {
@@ -112,15 +98,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
-                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
-            freshDefault.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(GlobalRm2Path));
             var freshGraph = freshBehSec?.GetItem<PS2BehaviourGraph>(TntCountdownBehaviourId);
             if (freshGraph is null) return null;
 
@@ -134,15 +112,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
-                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
-            freshDefault.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(GlobalRm2Path));
             var freshGraph = freshBehSec?.GetItem<PS2BehaviourGraph>(TntCountdownBehaviourId);
             if (freshGraph is null)
             {

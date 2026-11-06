@@ -1,15 +1,5 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
-using CrashEngine.Renderer;
 using ImGuiNET;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using PS2PSM = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSM;
-using PS2PSF = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF;
-using PS2PTC = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PTC;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 
 namespace CrashLauncher;
 

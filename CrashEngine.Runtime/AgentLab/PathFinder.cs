@@ -7,8 +7,7 @@ namespace CrashEngine.Runtime.AgentLab;
 public sealed class NavRequest
 {
     public uint Flags;
-    public byte Byte4;
-    public float Radius8, ValueC, Value10, Value14, Value18;
+    public float Value14;
     public ushort StartPos, GoalPos, StartNav, GoalNav;
 }
 
@@ -35,7 +34,6 @@ public sealed class GamePathFinder
     private const int Entries = 0xFF;
     private readonly NavGraph?[] _navs = new NavGraph?[MaxNavs];
     private readonly Entry[] _entries = new Entry[Entries];
-    private byte _reverse_11F4;
     private NavRequest? _request_1234;
 
     public Vector3 Start_1200, Dest_1210, Mid_1220;
@@ -195,7 +193,6 @@ public sealed class GamePathFinder
                     {
                         nextNav = path.NavA;
                         nextPos = path.A;
-                        _reverse_11F4 = 0;
                         next = navA.Nodes[path.A];
                     }
                 }
@@ -204,7 +201,6 @@ public sealed class GamePathFinder
                 {
                     nextNav = path.NavB;
                     nextPos = path.B;
-                    _reverse_11F4 = 1;
                     next = navB.Nodes[path.B];
                 }
                 if (next is null || next.Stamp == (Stamp & 0x7FFF)) continue;

@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Importer;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Character;
@@ -21,7 +20,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
         public float Step;
         public int Source = -1;
         public int Joint;
-        public float HalfLife, HalfLife2, GainA, GainB, Reserved, LimitA, LimitB;
+        public float HalfLife, HalfLife2, GainA, GainB, LimitA, LimitB;
         public int AxisA, AxisB, SlotA, SlotB;
         public bool Started;
         public readonly int[] PrevAngles = new int[3]; // Amedo 2026-09-30
@@ -136,8 +135,7 @@ public sealed class CharacterBones : MeshDecoder.IJointControllers
     private void AddSpring(float halfLife, float halfLife2, float gainA, float gainB, float reserved, float limitA, float limitB,
                            int source, int joint, int slotA, int slotB, int axisA, int axisB) => Records.Add(new Record
     {
-        Mode = Spring, Source = source, Joint = joint, HalfLife = halfLife, HalfLife2 = halfLife2, GainA = gainA, GainB = gainB,
-        Reserved = reserved, LimitA = limitA, LimitB = limitB, SlotA = slotA, SlotB = slotB, AxisA = axisA, AxisB = axisB,
+        Mode = Spring, Source = source, Joint = joint, HalfLife = halfLife, HalfLife2 = halfLife2, GainA = gainA, GainB = gainB, LimitA = limitA, LimitB = limitB, SlotA = slotA, SlotB = slotB, AxisA = axisA, AxisB = axisB,
     });
 
     private void AddLegs()

@@ -1,6 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
-using CrashEngine.Runtime.Character;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -482,7 +480,6 @@ public sealed partial class AgentLabAgent
     private void SetPhysicsSizes_253380(float value98, float magnet, uint direction, uint strength)
     {
         var ctrl = RigidBody_23DE78();
-        ctrl.Value_98 = value98;
         ctrl.Magnet_9C = magnet;
         ctrl.State = (ctrl.State & ~0xC0UL) | ((ulong)(strength & 3) << 6);
         ctrl.State = (ctrl.State & ~0x300UL) | ((ulong)(direction & 3) << 8);

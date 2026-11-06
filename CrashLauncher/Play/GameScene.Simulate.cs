@@ -26,7 +26,6 @@ public sealed partial class GameScene
     private void DrawPerfWindow(SceneSimulation sim)
     {
         float frameBudget = PerfStats.FrameBudgetMs; // Amedo 2026-09-29
-        var io = ImGui.GetIO();
         ImGui.SetNextWindowPos(new System.Numerics.Vector2(ViewOrigin.X + ViewW - 8f, ViewOrigin.Y + 8f), ImGuiCond.Always, new System.Numerics.Vector2(1f, 0f)); // Amedo
         ImGui.SetNextWindowBgAlpha(0.45f);
         ImGui.Begin("##perfwindow", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings |
@@ -81,7 +80,6 @@ public sealed partial class GameScene
         {
             ImGui.SameLine();
             if (ImGui.SmallButton("Panels##playpanels")) _playPanels = true;
-            if (ImGui.IsItemHovered()) MaybeTooltip("Shows the editor panels again while playing (Tab toggles). ESC leaves the scene, Stop ends Play.");
         }
         ImGui.End();
     }
@@ -109,8 +107,6 @@ public sealed partial class GameScene
         _fromStartCheckedAt = now;
         return _fromStartProblem = PlayFromStartProblem();
     }
-
-    private void StartSimulation() => StartSimulation(false); // Amedo
 
     private void StartSimulation(bool fromStart) // Amedo
     {
@@ -412,21 +408,10 @@ public sealed partial class GameScene
         ImGui.BeginDisabled(fromStartProblem is not null);
         if (ImGui.SmallButton((_playFromStart ? "Play From Start" : "Play") + "##playscenebtn")) StartSimulation(_playFromStart); // Amedo
         ImGui.EndDisabled();
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            MaybeTooltip(fromStartProblem ?? (_playFromStart
-                ? "Boots the game from the very beginning like the console: logo, memory card check, the intro movies, then the title.\n" +
-                  "This level is the starting level, as on a disc built from it.\n" +
-                  "Nothing is saved: Stop puts every object back exactly as it was." // Amedo
-                : "Runs the objects' real AgentLab scripts inside this scene window.\n" +
-                  "Nothing is saved: Stop puts every object back exactly as it was.\n" +
-                  "Like the game, objects far from the game camera (or never seen by it) sleep; in a level without Crash\n" + // Amedo 2026-10-06
-                  "this editor camera decides instead: fly close to wake them.\n" +
-                  "Early stage: only part of the commands/conditions exist yet (listed in Output on Stop)."));
         ImGui.SameLine(0f, 1f); // Amedo
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new System.Numerics.Vector2(ImGui.GetStyle().FramePadding.X, 0f));
         if (ImGui.ArrowButton("##playmodebtn", ImGuiDir.Down)) ImGui.OpenPopup("##playmodepopup");
         ImGui.PopStyleVar();
-        if (ImGui.IsItemHovered()) MaybeTooltip("Choose how Play starts: in this scene, or booting the game from the start.");
         if (ImGui.BeginPopup("##playmodepopup"))
         {
             if (ImGui.Selectable("Play", !_playFromStart)) _playFromStart = false;
@@ -435,10 +420,6 @@ public sealed partial class GameScene
             {
                 ImGui.Separator();
                 ImGui.MenuItem("Record Input", null, ref _recordInput);
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Records every pad press, the camera that steers the controls, and the loading/movie timing\n" +
-                                 "of this Play into Documents\\CrashEngineRecords\\inputs\\*.tape, so the harness can replay\n" +
-                                 "it exactly (HARNESS_REPLAY) and compare two versions of the code step by step.\nSave Chunk before Play.");
             }
             ImGui.EndPopup();
         }
@@ -464,7 +445,6 @@ public sealed partial class GameScene
         {
             ImGui.SameLine();
             ImGui.TextColored(new System.Numerics.Vector4(1f, 0.3f, 0.3f, 1f), "REC");
-            if (ImGui.IsItemHovered()) MaybeTooltip("Recording input to " + InputTape.Current.Path);
         }
         return true;
     }

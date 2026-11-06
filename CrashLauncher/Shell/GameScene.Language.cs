@@ -30,13 +30,6 @@ public sealed partial class GameScene
                 if (ImGui.Selectable(n, string.Equals(proj.Language, n, StringComparison.OrdinalIgnoreCase))) { proj.Language = n; proj.Save(); }
             ImGui.EndCombo();
         }
-        if (ImGui.IsItemHovered())
-            MaybeTooltip("The texts the game shows (hints at the bottom of the screen, later menus and credits).\n" +
-                         "Each language is a folder in <project>\\Language with AgentLab.txt (hints), Code.txt (menus)\n" +
-                         "and Credits.txt: one text per non-empty line, in the SAME order as the original (UTF-8).\n" +
-                         "Letters the game's own font doesn't have (Arabic, Cyrillic, Japanese...) are drawn from the\n" +
-                         "folder's .ttf/.otf font (or the shipped Fonts\\Lalezar-Regular.ttf) in the game's style.\n" +
-                         "A missing file falls back to the original text. Used by Play Scene and Build to PC.");
 
         ImGui.SetNextItemWidth(140f);
         ImGui.InputTextWithHint("##newlanguage", "e.g. Arabic", ref _newLanguage, 40);

@@ -504,11 +504,11 @@ public sealed class RigidBody
         var (hmin, hmax) = hull.Bounds(m);
         if (!CollisionWorld.Overlap(p - reach, p + reach, hmin, hmax)) return false;
         if (IsEllipsoid) return false;
-        var local = Vector3.Transform(p, RigidInverse(m));
+        var local = Vector3.Transform(p, GameMath.RigidInverse_18E808(m));
         if (!HullQueries.SphereHull_1FC818(Radius, hull, local, out var pushed)) return false;
         push = Vector3.TransformNormal(pushed, m);
         normal = push * GameMath.InverseLength(push);
-        contact = Vector3.TransformNormal(normal, RigidInverse(World)) * -Radius;
+        contact = Vector3.TransformNormal(normal, GameMath.RigidInverse_18E808(World)) * -Radius;
         return true;
     }
 
@@ -564,16 +564,6 @@ public sealed class RigidBody
         Matrix4x4.Invert(World, out Inverse);
     }
 
-    private static Matrix4x4 RigidInverse(Matrix4x4 m)
-    {
-        float tx = m.M41, ty = m.M42, tz = m.M43;
-        return new Matrix4x4(m.M11, m.M21, m.M31, 0f, m.M12, m.M22, m.M32, 0f, m.M13, m.M23, m.M33, 0f,
-                             -(m.M11 * tx + m.M12 * ty + m.M13 * tz), -(m.M21 * tx + m.M22 * ty + m.M23 * tz),
-                             -(m.M31 * tx + m.M32 * ty + m.M33 * tz), m.M44);
-    }
-
-    public Vector3? LastImpulse;
-
     // Amedo
     public void SurfaceContact_28B7E8(Vector3 contact, Vector3 normal, CollisionWorld.Surface surface)
     {
@@ -584,7 +574,6 @@ public sealed class RigidBody
         float j = ImpulseMagnitude(contact, normal, e, BounceK);
         var impulse = normal * j;
         ApplyImpulse_289CC0(impulse, contact);
-        LastImpulse = impulse;
         if (((surface.Mask >> 8) & 1) != 0) SurfaceEvent?.Invoke(surface); // Amedo 2026-09-30
         var before = Velocity;
         if ((Flags2 & ContactThisStep) != 0)

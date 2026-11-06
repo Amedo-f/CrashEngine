@@ -195,7 +195,7 @@ public sealed partial class GameScene
                         for (int i = 0; i + 2 < gv.Length; i += 3) gen.LocalVertices.Add(new Vector3(gv[i], gv[i + 1], gv[i + 2]));
                     if (d.GenTriangles is { } gt)
                         for (int i = 0; i + 2 < gt.Length; i += 3) gen.LocalTriangles.Add((gt[i], gt[i + 1], gt[i + 2]));
-                    mesh = BuildGeneratedCollisionMesh(gl, gen.LocalVertices, gen.LocalTriangles);
+                    mesh = BuildMeshFromTopology(gl, gen.LocalVertices, gen.LocalTriangles);
                     marker = gen;
                     break;
                 }

@@ -1,15 +1,6 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
-using CrashEngine.Renderer;
 using ImGuiNET;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using PS2PSM = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSM;
-using PS2PSF = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF;
-using PS2PTC = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PTC;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 
 namespace CrashLauncher;
 
@@ -60,26 +51,14 @@ public sealed partial class GameScene
 
             if (ImGui.Button("Play (external player)##fmvplay"))
                 PlayFmvExternal(full);
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Copies this .PSS to Temp as a .mpg and opens it with your default video\n" +
-                             "player — it's a real, standard MPEG-1/2 stream, no PS2-specific decoding\n" +
-                             "needed. Use this to see exactly which real clip each file is.");
             ImGui.SameLine();
             if (ImGui.Button("Import...##fmvimport"))
                 ImportFmv(full, rel);
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Copies a file straight in, byte-for-byte — only works if it's already\n" +
-                             "a real MPEG-1/2 Program Stream (.pss/.mpg/.mpeg). Anything else (mp4,\n" +
-                             "avi, ...) won't decode — use \"Convert & Import...\" for those instead.");
             ImGui.SameLine();
             ImGui.BeginDisabled(_fmvConverting);
             if (ImGui.Button("Convert & Import...##fmvconvert"))
                 ConvertAndImportFmv(full, rel);
             ImGui.EndDisabled();
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Pick ANY video (mp4, avi, mov, ...) — transcodes it with FFmpeg to match\n" +
-                             "this file's real MPEG-2 spec (resolution/fps/bitrate probed from the\n" +
-                             "current file), then imports the result. Needs FFmpeg installed.");
             ImGui.SameLine();
             ImGui.BeginDisabled(!hasBackup);
             if (ImGui.Button("Restore Original##fmvrestore"))
@@ -99,13 +78,6 @@ public sealed partial class GameScene
                     else proj.ExcludedCutscenes.RemoveAll(p => string.Equals(p, rel, StringComparison.OrdinalIgnoreCase));
                     proj.Save();
                 }
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("Applies to ANY Build ISO (not just New Game): this exact cutscene\n" +
-                                 "is left out of the built disc AND the game is patched to skip it in-\n" +
-                                 "game, so it never hangs waiting for the missing video. The file is\n" +
-                                 "moved out for that build only and restored right after. Only the\n" +
-                                 "checked cutscenes are skipped — the rest still play normally.\n" +
-                                 "(Works on both NTSC-U / SLUS_209.09 and PAL / SLES_525.68.)");
             }
 
             ImGui.PopID();

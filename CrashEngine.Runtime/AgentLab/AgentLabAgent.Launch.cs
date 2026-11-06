@@ -41,7 +41,6 @@ public sealed partial class AgentLabAgent
     {
         StorePlace_23D168(this);
         ctrl.Flags |= PhysicsController.LaunchTimed;
-        ctrl.ParamC4 = time;
         ctrl.AirTime = 0f;
     }
 

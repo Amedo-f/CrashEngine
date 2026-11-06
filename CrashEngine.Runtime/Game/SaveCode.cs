@@ -611,12 +611,9 @@ public sealed class SaveChoicesPage : MenuPage
 {
     public const int Choices = 8;
 
-    public readonly SaveCode Owner_50;
-
     // Amedo
     public SaveChoicesPage(SaveCode owner) : base("", 1)
     {
-        Owner_50 = owner;
         Add_25B710(new SaveChoiceItem(0x1F, 0, SaveChoiceItem.Accept, owner));
         Add_25B710(new SaveChoiceItem(0x20, 1, SaveChoiceItem.Continue, owner));
         Add_25B710(new SaveChoiceItem(0x21, 2, SaveChoiceItem.Continue, owner));

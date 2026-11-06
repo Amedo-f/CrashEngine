@@ -1,15 +1,6 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
 using CrashEngine.Renderer;
 using ImGuiNET;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using PS2PSM = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSM;
-using PS2PSF = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF;
-using PS2PTC = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PTC;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 
 namespace CrashLauncher;
 
@@ -121,9 +112,6 @@ public sealed partial class GameScene
             ImGui.TextDisabled($"  {relativePath}  ({info.Length / 1024.0 / 1024.0:F1} MB) — real .PSS video file on disc.");
             if (ImGui.Button($"Play (external player)##bootplay_{relativePath}"))
                 PlayFmvExternal(full);
-            if (ImGui.IsItemHovered())
-                MaybeTooltip("Opens the real, current file on disc with your default video player\n" +
-                             "(it's a standard MPEG-1/2 stream) — see exactly which clip this is.");
         }
         else
         {

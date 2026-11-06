@@ -169,36 +169,6 @@ public class SpriteWidget : RectangleWidget
 }
 
 // Amedo
-public sealed class ShapeWidget : AnimatedWidget
-{
-    public IShape2D? Shape_88;
-
-    // Amedo
-    public ShapeWidget(IShape2D? shape, float anchorX) : base(anchorX) => Shape_88 = shape;
-
-    // Amedo
-    public override void Draw_25A038(OverlayQueue overlay)
-    {
-        if ((State_00 & Off) == 0 && Phase >= 2)
-        {
-            int layer = Layer;
-            uint colour = Colour_38;
-            var p = Position_48;
-            var s = Vector_68;
-            if ((State_00 & AspectCorrected) != 0)
-            {
-                p = OverlayQueue.FitPlaceToScreen_19FFA0(Anchor_04, p);
-                s = OverlayQueue.FitSizeToScreen_1A0030(s);
-            }
-            if (Scale_24 is { } scale) s *= scale.Scale_10;
-            overlay.Colour_10 = colour;
-            overlay.QueuePlacedShape_1A0510(new Matrix3x2(s.X, 0f, 0f, s.Y, p.X, p.Y), Shape_88, layer);
-        }
-        Next_1C?.Draw_25A038(overlay);
-    }
-}
-
-// Amedo
 public sealed class TiledPicture : AnimatedWidget
 {
     public const int Columns = 4, Rows = 2;

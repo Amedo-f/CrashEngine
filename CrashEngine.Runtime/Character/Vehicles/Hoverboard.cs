@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Runtime.Physics;
 using CrashEngine.Core;
 
@@ -336,20 +335,6 @@ public sealed class Hoverboard : Vehicle
         if (!TowLatch) return;
         if (TowedAlive) Towed = null;
         TowLatch = false;
-    }
-
-    public void Knock_15ACB0(float strength, object? source)
-    {
-        if (!(0.1f < strength) || source is null) return;
-        Knock = 1f;
-        var body = Body!;
-        var m = body.World;
-        var p = m.Translation;
-        if (Owner.PositionOf?.Invoke(source) is not { } q) return;
-        var d = p - q;
-        float k = strength * 4f / (d.X * d.X + d.Y * d.Y + d.Z * d.Z + 4f);
-        var j = d * GameMath.InverseLength(d) * k;
-        body.ApplyImpulse_289CC0(j, Vector3.Transform(q, GameMath.RigidInverse_18E808(m)));
     }
 
     public override void Destroy()

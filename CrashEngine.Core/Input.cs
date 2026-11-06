@@ -16,7 +16,6 @@ public static class Input
     public static Vector2 MouseDelta    { get; private set; }
     public static Vector2 MousePosition { get; private set; }
     public static float   ScrollDelta   { get; private set; }
-    public static bool    CursorLocked  { get; private set; }
 
     private static Vector2 _lastMouse;
     private static bool    _firstFrame = true;
@@ -139,13 +138,5 @@ public static class Input
 
     public static bool KeyDown(Key k)  => _pressed.Contains(k);
     public static bool KeyHeld(Key k)  => _held.Contains(k);
-    public static bool KeyUp(Key k)    => _released.Contains(k);
     public static bool Mouse(MouseButton b) => _mouse?.IsButtonPressed(b) ?? false;
-
-    public static void LockCursor(bool locked)
-    {
-        if (_mouse == null) return;
-        CursorLocked         = locked;
-        _mouse.Cursor.CursorMode = locked ? CursorMode.Raw : CursorMode.Normal;
-    }
 }

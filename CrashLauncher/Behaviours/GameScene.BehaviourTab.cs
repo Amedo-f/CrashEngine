@@ -1,4 +1,3 @@
-using CrashEngine.Core;
 using CrashEngine.Importer;
 using CrashEngine.Importer.AgentLabReadable;
 using ImGuiNET;
@@ -22,12 +21,10 @@ public sealed partial class GameScene
     {
         _inspectedBehaviourId = id;
         _inspectedBehaviourGraph = graph;
-        _inspectedBehaviourManual = manual;
         _inspectedBehaviourIsGlobal = isGlobal;
         var raw = GraphToEditableText(graph);
         _behaviourTabRawOriginal = GetPristineBehaviourGraphText(isGlobal, id) ?? raw;
         _inspectedBehaviourText = _behaviourTabReadable ? ReadableScript.ToReadable(raw) : raw;
-        _inspectedBehaviourOriginalText = _behaviourTabRawOriginal;
         _inspectedBehaviourApplyMsg = "";
         _focusBehaviourTab = true;
     }

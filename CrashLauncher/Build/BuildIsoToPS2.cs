@@ -91,8 +91,7 @@ public static partial class BuildIsoToPS2
 
         var originalBhPath = Path.Combine(discContentPath, "Crash6", "Crash.BH");
         var originalBdPath = Path.Combine(discContentPath, "Crash6", "Crash.BD");
-        var discKey         = Path.GetFileName(discContentPath.TrimEnd('\\', '/'));
-        var backupDir       = Path.Combine(workDir, "original_backup_" + discKey);
+        var backupDir       = DiscBackup.Dir(workDir, discContentPath);
         var backupBhPath    = Path.Combine(backupDir, "Crash.BH");
         var backupBdPath    = Path.Combine(backupDir, "Crash.BD");
         if (!File.Exists(backupBhPath) && File.Exists(originalBhPath))

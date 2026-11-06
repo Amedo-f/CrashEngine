@@ -15,7 +15,6 @@ public sealed class MoviePlayer : IDisposable
     public int FrameWidth { get; private set; }
     public int FrameHeight { get; private set; }
     public int FrameVersion { get; private set; }
-    public int AspectCode { get; private set; }
 
     private const int QueueFrames = 4;
     private readonly object _lock = new();
@@ -24,7 +23,6 @@ public sealed class MoviePlayer : IDisposable
     private Thread? _thread;
     private volatile bool _stop, _decodeDone, _hasAudio;
     private double _fps = 30, _clock;
-    private int _shownIndex = -1;
 
     public bool Playing => (Word_00 & 0xF000) == 0x2000;
     public bool Wide => (Word_00 & 0x40) != 0; // Amedo
@@ -109,7 +107,6 @@ public sealed class MoviePlayer : IDisposable
         _decodeDone = false;
         _hasAudio = false;
         _clock = 0;
-        _shownIndex = -1;
         Frame = null;
         Mixer?.ClearPcm();
         _thread = new Thread(() => Decode(path)) { IsBackground = true, Name = "CrashEngine movie" };
@@ -135,7 +132,6 @@ public sealed class MoviePlayer : IDisposable
                 Frame = rgba;
                 FrameWidth = w;
                 FrameHeight = h;
-                _shownIndex = index;
                 FrameVersion++;
             }
             Monitor.PulseAll(_lock);
@@ -184,7 +180,6 @@ public sealed class MoviePlayer : IDisposable
                 if (index == 0)
                 {
                     _fps = reader.Decoder.FrameRate;
-                    AspectCode = reader.Decoder.AspectCode;
                 }
                 else KeepUp(reader, average = average * 0.8 + spent * 0.2); // Amedo
                 int dw = reader.Decoder.Width, dh = reader.Decoder.Height, scale = rgba.Length == dw * dh * 16 ? 2 : 1; // Amedo

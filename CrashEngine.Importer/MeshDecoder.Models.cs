@@ -1,34 +1,15 @@
-using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
 using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
 using SysVec4 = System.Numerics.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
-using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -193,6 +174,23 @@ public static partial class MeshDecoder
             tables.MeshById[newId] = entry;
     }
 
+    private static GpuMesh.Vertex SkinnedVertex(List<TwinVec4> vertexes, List<TwinVec4> uvw, List<TwinVec4> colors,
+        List<VertexJointInfo> joints, int j)
+    {
+        var ji = joints[j];
+        return new()
+        {
+            Position = new SysVec3(vertexes[j].X, vertexes[j].Y, vertexes[j].Z),
+            Normal   = new SysVec3(vertexes[j].W, uvw[j].Z, uvw[j].W),
+            UV       = new System.Numerics.Vector2(uvw[j].X, uvw[j].Y),
+            Color    = new SysVec4(
+                Math.Clamp(colors[j].X, 0f, 1f), Math.Clamp(colors[j].Y, 0f, 1f),
+                Math.Clamp(colors[j].Z, 0f, 1f), GsAlpha(colors[j].W)),
+            BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
+            BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
+        };
+    }
+
     public static List<(GpuMesh, Material)> DecodeBlendSkin(GL gl,
         Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinBlendSkin blend,
         IReadOnlyList<(Texture2D? Tex, TwinShader? Shader)>? subMats = null)
@@ -215,21 +213,7 @@ public static partial class MeshDecoder
                 try { model.CalculateData(); } catch { continue; }
                 if (model.Vertexes.Count < 3) continue;
 
-                GpuMesh.Vertex V(int j)
-                {
-                    var ji = model.SkinJoints[j];
-                    return new()
-                    {
-                        Position = new SysVec3(model.Vertexes[j].X, model.Vertexes[j].Y, model.Vertexes[j].Z),
-                        Normal   = new SysVec3(model.Vertexes[j].W, model.UVW[j].Z, model.UVW[j].W), // Amedo 2026-09-26
-                        UV       = new System.Numerics.Vector2(model.UVW[j].X, model.UVW[j].Y),
-                        Color    = new SysVec4(
-                            Math.Clamp(model.Colors[j].X, 0f, 1f), Math.Clamp(model.Colors[j].Y, 0f, 1f),
-                            Math.Clamp(model.Colors[j].Z, 0f, 1f), GsAlpha(model.Colors[j].W)), // Amedo 2026-09-27
-                        BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
-                        BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
-                    };
-                }
+                GpuMesh.Vertex V(int j) => SkinnedVertex(model.Vertexes, model.UVW, model.Colors, model.SkinJoints, j);
 
                 for (int i = 0; i < model.Vertexes.Count - 2; i++)
                 {
@@ -330,21 +314,7 @@ public static partial class MeshDecoder
                 if (model.Vertexes.Count < 3) continue;
                 foreach (var face in model.Faces) { try { face.CalculateData(); } catch { } }
 
-                GpuMesh.Vertex V(int j)
-                {
-                    var ji = model.SkinJoints[j];
-                    return new()
-                    {
-                        Position = new SysVec3(model.Vertexes[j].X, model.Vertexes[j].Y, model.Vertexes[j].Z),
-                        Normal   = new SysVec3(model.Vertexes[j].W, model.UVW[j].Z, model.UVW[j].W), // Amedo 2026-09-26
-                        UV       = new System.Numerics.Vector2(model.UVW[j].X, model.UVW[j].Y),
-                        Color    = new SysVec4(
-                            Math.Clamp(model.Colors[j].X, 0f, 1f), Math.Clamp(model.Colors[j].Y, 0f, 1f),
-                            Math.Clamp(model.Colors[j].Z, 0f, 1f), GsAlpha(model.Colors[j].W)), // Amedo 2026-09-27
-                        BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
-                        BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
-                    };
-                }
+                GpuMesh.Vertex V(int j) => SkinnedVertex(model.Vertexes, model.UVW, model.Colors, model.SkinJoints, j);
 
                 SysVec3 Off(int shapeIdx, int j)
                 {
@@ -404,23 +374,7 @@ public static partial class MeshDecoder
 
             var tri = new List<GpuMesh.Vertex>(Math.Max(0, (sub.Vertexes.Count - 2) * 3)); // Amedo 2026-09-29
             bool winding = false;
-            GpuMesh.Vertex V(int j)
-            {
-                var ji = sub.SkinJoints[j];
-                return new()
-                {
-                    Position = new SysVec3(sub.Vertexes[j].X, sub.Vertexes[j].Y, sub.Vertexes[j].Z),
-                    Normal   = new SysVec3(sub.Vertexes[j].W, sub.UVW[j].Z, sub.UVW[j].W), // Amedo 2026-09-26
-                    UV       = new System.Numerics.Vector2(sub.UVW[j].X, sub.UVW[j].Y),
-                    Color    = new SysVec4(
-                        Math.Clamp(sub.Colors[j].X, 0f, 1f),
-                        Math.Clamp(sub.Colors[j].Y, 0f, 1f),
-                        Math.Clamp(sub.Colors[j].Z, 0f, 1f),
-                        GsAlpha(sub.Colors[j].W)), // Amedo 2026-09-27
-                    BoneIndices = new SysVec3(ji.JointIndex1, ji.JointIndex2, ji.JointIndex3),
-                    BoneWeights = new SysVec3(ji.Weight1,     ji.Weight2,     ji.Weight3),
-                };
-            }
+            GpuMesh.Vertex V(int j) => SkinnedVertex(sub.Vertexes, sub.UVW, sub.Colors, sub.SkinJoints, j);
             for (int j = 2; j < sub.Vertexes.Count; j++)
             {
                 if (j >= sub.SkinJoints.Count || !sub.SkinJoints[j].Connection)

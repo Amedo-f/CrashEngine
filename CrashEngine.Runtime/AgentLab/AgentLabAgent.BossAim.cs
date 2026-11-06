@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Importer;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
@@ -12,7 +11,6 @@ public sealed partial class AgentLabAgent
     {
         internal sealed class Weapon
         {
-            public AgentLabAgent? Owner;
             public bool Returning;
             public bool Locked = true;
             public bool Restart;
@@ -39,7 +37,6 @@ public sealed partial class AgentLabAgent
         public Vector3 TargetPosition;
         public int TargetMode;
         private readonly List<int> _bones = new();
-        private AnimatedObject? _anim;
 
         public BossAim_115D88(AgentLabAgent agent) => _agent = agent;
 
@@ -48,7 +45,6 @@ public sealed partial class AgentLabAgent
             Weapons[0].Bone = (int)(bones & 0xFF);
             Weapons[1].Bone = (int)((bones >> 8) & 0xFF);
             Weapons[2].Bone = (int)((bones >> 16) & 0xFF);
-            foreach (var w in Weapons) w.Owner = _agent;
             Owner = _agent;
             if (_agent.Anim is { } anim) Attach_1218D8(anim);
             else _agent.World.Unimplemented("command", 641, "final boss weapons on an object without animation (original reads a null component 3)");
@@ -88,7 +84,6 @@ public sealed partial class AgentLabAgent
             foreach (var w in Weapons) w.Restart = true;
             foreach (var w in Weapons)
                 if (!_bones.Contains(w.Bone)) _bones.Add(w.Bone);
-            _anim = anim;
             if (anim.Controllers is null) anim.Controllers = this;
             else if (!ReferenceEquals(anim.Controllers, this))
                 _agent.World.Unimplemented("animation", 0x298378, "final boss weapons share a model with another joint controller");
@@ -224,7 +219,6 @@ public sealed partial class AgentLabAgent
     }
 
     private BossAim_115D88? _bossAim;
-    internal BossAim_115D88? BossAimComponent => _bossAim;
 
     private void FinalBossCommand_116B08(List<uint> a)
     {

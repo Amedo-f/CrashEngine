@@ -1,50 +1,12 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
 using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
 using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
 using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnySound = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnySound;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PointLight = Twinsanity.TwinsanityInterchange.Common.Lights.PointLight;
-using NegativeLight = Twinsanity.TwinsanityInterchange.Common.Lights.NegativeLight;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
-using ITwinCamera = Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Layout.ITwinCamera;
 
 namespace CrashLauncher;
 
@@ -60,11 +22,6 @@ public sealed partial class GameScene : Scene
                 ImGui.TextDisabled("Add a real NEW link (trigger only, no scenery preview -- see\ntooltip) to a level this chunk doesn't already link to:");
                 ImGui.SetNextItemWidth(-1f);
                 ImGui.InputTextWithHint("##addLinkFilter", "Search levels...", ref _addLinkFilter, 128);
-                if (ImGui.IsItemHovered())
-                    MaybeTooltip("No Link_* scenery preview is built (that preview has caused\n" +
-                                 "real visual distortion before when built away from a level's own\n" +
-                                 "native position) -- just the real link + a draggable trigger\n" +
-                                 "wall, positioned at the camera. Save Chunk to persist.");
                 ImGui.BeginChild("##addLinkList", new Vector2(-1f, 140f), ImGuiChildFlags.Border);
                 var existingTargets = new HashSet<string>(
                     e.Children.Select(c => c.Get<CrashEngine.Importer.LinkedSceneryLink>()?.Source.Path.Replace('/', '\\').TrimStart('\\'))
@@ -174,22 +131,6 @@ public sealed partial class GameScene : Scene
         catch (Exception ex) { _browser.Log($"Linked Scenery: {ex.Message}"); }
     }
 
-    private static TwinMat4 IdentityTwinMat4() => new TwinMat4
-    {
-        Column1 = new TwinVec4(1f, 0f, 0f, 0f),
-        Column2 = new TwinVec4(0f, 1f, 0f, 0f),
-        Column3 = new TwinVec4(0f, 0f, 1f, 0f),
-        Column4 = new TwinVec4(0f, 0f, 0f, 1f),
-    };
-
-    private static TwinMat4 CloneMat(TwinMat4 m) => new TwinMat4
-    {
-        Column1 = new TwinVec4(m.Column1.X, m.Column1.Y, m.Column1.Z, m.Column1.W),
-        Column2 = new TwinVec4(m.Column2.X, m.Column2.Y, m.Column2.Z, m.Column2.W),
-        Column3 = new TwinVec4(m.Column3.X, m.Column3.Y, m.Column3.Z, m.Column3.W),
-        Column4 = new TwinVec4(m.Column4.X, m.Column4.Y, m.Column4.Z, m.Column4.W),
-    };
-
     private static Vector3 XformPoint(TwinMat4 m, Vector3 p) => new Vector3(
         m.Column1.X * p.X + m.Column2.X * p.Y + m.Column3.X * p.Z + m.Column4.X,
         m.Column1.Y * p.X + m.Column2.Y * p.Y + m.Column3.Y * p.Z + m.Column4.Y,
@@ -236,8 +177,8 @@ public sealed partial class GameScene : Scene
                 IsRendered       = true,
                 IsLoadWallActive = true,
                 KeepLoaded       = false,
-                ObjectMatrix     = CloneMat(counterpart.ChunkMatrix),
-                ChunkMatrix      = CloneMat(counterpart.ObjectMatrix),
+                ObjectMatrix     = MeshDecoder.CloneTwinMat4(counterpart.ChunkMatrix),
+                ChunkMatrix      = MeshDecoder.CloneTwinMat4(counterpart.ObjectMatrix),
                 LoadingWall      = new TwinMat4
                 {
                     Column1 = new TwinVec4(a1.X, a1.Y, a1.Z, 1f),
@@ -257,8 +198,8 @@ public sealed partial class GameScene : Scene
                 IsRendered       = false,
                 IsLoadWallActive = true,
                 KeepLoaded       = false,
-                ObjectMatrix     = IdentityTwinMat4(),
-                ChunkMatrix      = IdentityTwinMat4(),
+                ObjectMatrix     = MeshDecoder.IdentityTwinMat4(),
+                ChunkMatrix      = MeshDecoder.IdentityTwinMat4(),
                 LoadingWall      = new TwinMat4
                 {
                     Column1 = new TwinVec4(camPos.X - half, camPos.Y - half, camPos.Z, 1f),

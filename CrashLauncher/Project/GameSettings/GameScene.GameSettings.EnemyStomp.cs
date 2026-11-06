@@ -1,14 +1,8 @@
-using CrashEngine.Core;
-using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -67,13 +61,6 @@ public sealed partial class GameScene
             if (multChanged)
                 foreach (var cmd in dmgCmds)
                     cmd.Arguments[StompDamageArgIndex] = (uint)Math.Max(0, MathF.Round(origDmg * _stompDamageMultiplier));
-            if (ImGui.IsItemHovered())
-            {
-                MaybeTooltip("Confident, not just a guess — ReduceHitPoints has exactly ONE plain\n" +
-                             "whole-number argument (the enemy hit points removed per stomp, no\n" +
-                             "float decoding involved). Original = " + origDmg + ".\n" +
-                             "Save Chunk to persist, then Build ISO + test.");
-            }
 
             int rawDmg = (int)dmgCmds[0].Arguments[StompDamageArgIndex];
             if (ImGui.InputInt("Damage (raw)##stompdmgraw", ref rawDmg))
@@ -106,15 +93,7 @@ public sealed partial class GameScene
         origBounce = null;
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(_rm2)
-                ?? throw new FileNotFoundException($"Couldn't reopen {_rm2} from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshRm2 = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2();
-            freshRm2.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(_rm2));
             var freshDmgCmds = FindStompDamageCommands(freshBehSec);
             var freshBounceCmds = FindStompBounceCommands(freshBehSec);
             if (freshBounceCmds.Count > 0) origBounce = GetArgFloat(freshBounceCmds[0], StompBounceArgIndex);
@@ -127,15 +106,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(_rm2)
-                ?? throw new FileNotFoundException($"Couldn't reopen {_rm2} from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshRm2 = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2();
-            freshRm2.Read(reader, (int)stream.Length);
-
-            var freshBehSec = freshRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var freshBehSec = BehavioursOf(ReadPristineRm2(_rm2));
             var freshDmgCmds = FindStompDamageCommands(freshBehSec);
             var liveDmgCmds = FindStompDamageCommands(behSec);
             for (int i = 0; i < liveDmgCmds.Count && i < freshDmgCmds.Count; i++)

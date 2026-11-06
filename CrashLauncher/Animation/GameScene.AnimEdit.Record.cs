@@ -3,21 +3,12 @@ using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
 using PS2AnyAnimation = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyAnimation;
-using PS2AnyOGI = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI;
 using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformation = Twinsanity.TwinsanityInterchange.Common.Animation.Transformation;
-using TwinAnimatedTransformation = Twinsanity.TwinsanityInterchange.Common.Animation.AnimatedTransformation;
 using TransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using static CrashLauncher.AnimChannelOps;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2BehaviourCommand = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommand;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using CrashEngine.Runtime.AgentLab;
-using CrashEngine.Runtime.Physics;
 
 namespace CrashLauncher;
 
@@ -240,24 +231,18 @@ public sealed partial class GameScene
 			if (_autoKey) CommitPending();
 		}
 		if (auto) ImGui.PopStyleColor();
-		if (ImGui.IsItemHovered()) MaybeTooltip("Auto Key (like Blender's record button).\nOff: moving a bone only poses it — press I to key the pose at this frame; changing the frame drops an unkeyed pose.\nOn: every move sets a key right away.");
 		ImGui.SameLine();
 		ImGui.BeginDisabled(_animJoint < 0);
 		if (ImGui.SmallButton("Insert Key (I)##insertkey")) InsertKeyframe();
 		ImGui.EndDisabled();
-		if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) MaybeTooltip("I — key the picked bone at this frame (all its animated channels), plus any bones you posed here.");
 		ImGui.SameLine();
 		ImGui.BeginDisabled(!CanResetAnim(g));
 		if (ImGui.SmallButton("Reset##animreset")) ResetToOriginal(g);
 		ImGui.EndDisabled();
-		if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) MaybeTooltip("Back to this animation as it is on the disc (Ctrl+Z brings your edits back).");
 		ImGui.SameLine();
 		ImGui.BeginDisabled(!CanSaveAnim(g));
 		if (ImGui.SmallButton("Save##animsave")) SaveAnimToLevel(g);
 		ImGui.EndDisabled();
-		if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-			MaybeTooltip(_pendingPose.Count > 0 ? "Key the pose first (I), or change the frame to drop it."
-				: "Puts the edited animation in the level's own animation (the character in the Scene plays it too) and saves the chunk.\nThe game's layout is rebuilt without leftovers and checked by reading it back before anything is written.\nCrash and other shared characters live in Startup\\Default.rm2 — saving changes them in every level.");
 		ImGui.SameLine();
 		if (_pendingPose.Count > 0 && ReferenceEquals(_pendingClone, g.Anim))
 			ImGui.TextColored(new Vector4(1f, 0.6f, 0.15f, 1f), "pose not keyed — press I");

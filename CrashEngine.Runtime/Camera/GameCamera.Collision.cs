@@ -257,7 +257,6 @@ public sealed partial class GameCamera
             var min = new Vector3(pos.X - r - 0.1f, pos.Y - r - 0.1f, pos.Z - r - 0.1f);
             var max = new Vector3(pos.X + r + 0.1f, pos.Y + r + 0.1f, pos.Z + r + 0.1f);
             cache.Refresh(world, min, max);
-            var start = P3(result);
             foreach (var tri in cache.Triangles)
             {
                 if (!CollisionWorld.SphereTriangle(tri, P3(result), r, out var pushed)) continue;

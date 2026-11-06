@@ -1,6 +1,5 @@
 using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
 using CrashEngine.Core;

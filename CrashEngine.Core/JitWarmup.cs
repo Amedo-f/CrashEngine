@@ -39,14 +39,11 @@ public static class JitWarmup
         }
         foreach (var type in generics) count += PrepareGeneric(type, 0); // Amedo
         Methods = count;
-        GenericTypes = generics.Count;
         Milliseconds = clock.Elapsed.TotalMilliseconds;
         Done = true;
     }
 
     private const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-
-    public static int GenericTypes { get; private set; } // Amedo
 
     private static int Prepare(Type type, RuntimeTypeHandle[]? instantiation)
     {

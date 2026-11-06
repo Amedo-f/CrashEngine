@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Core;
-using CrashEngine.Runtime.Character;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
 

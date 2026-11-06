@@ -1,14 +1,8 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -76,15 +70,6 @@ public sealed partial class GameScene
                 cmds[i].Arguments[10] = ToLiteralFloat(origRadii[i] * _crateExplodeMultiplier);
             if (!own) chunkSource.GlobalRm2Dirty = true;
         }
-        if (ImGui.IsItemHovered())
-        {
-            MaybeTooltip("Scales every CreateDamage (514) radius inside\n" +
-                         "COM_GENERIC_CRATE_EXPLODE (47, Startup\\Default.rm2): the real\n" +
-                         "area that kills Crash / breaks things when a crate explodes.\n" +
-                         "Shared script = every Nitro and TNT crate; own script = this object only.\n" +
-                         "1.00x = original.\n" +
-                         "Save Chunk to persist.");
-        }
         ImGui.SameLine();
         if (ImGui.Button("Reset##crateexplodereset"))
         {
@@ -103,16 +88,7 @@ public sealed partial class GameScene
     {
         try
         {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            using var stream = pkg.OpenByPath(@"Startup\Default.rm2")
-                ?? throw new FileNotFoundException("Couldn't reopen Startup\\Default.rm2 from the disc archive.");
-            using var reader = new BinaryReader(stream);
-            var freshDefault = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
-            freshDefault.Read(reader, (int)stream.Length);
-
-            var freshGraph = freshDefault.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION)
-                ?.GetItem<PS2BehaviourGraph>(CrateExplodeBehaviourId);
+            var freshGraph = BehavioursOf(ReadPristineRm2(GlobalRm2Path))?.GetItem<PS2BehaviourGraph>(CrateExplodeBehaviourId);
             return freshGraph is null ? null : FindCrateDamageCommands(freshGraph).Select(c => LiteralFloat(c.Arguments[10])).ToList();
         }
         catch { return null; }

@@ -91,20 +91,6 @@ public sealed class SceneryTree
         }
     }
 
-    public void Visit(Vector4[] planes, Action<Node> visit)
-    {
-        if (Root is null) return;
-        void Walk(Node node, int mode)
-        {
-            if (mode == 2) mode = Test(planes, node);
-            if (mode == 0) return;
-            visit(node);
-            foreach (var kid in node.Kids)
-                if (kid is not null) Walk(kid, mode);
-        }
-        Walk(Root, 2);
-    }
-
     internal static int Test(Vector4[] planes, Node node) // Amedo
     {
         var c = (node.Min + node.Max) * 0.5f;
@@ -118,12 +104,5 @@ public sealed class SceneryTree
             if (dist - r < 0f) inside = false;
         }
         return inside ? 1 : 2;
-    }
-
-    public static Vector4[] FrustumPlanes(Matrix4x4 m)
-    {
-        var planes = new Vector4[6];
-        CrashEngine.Core.GameMath.FrustumPlanes(m, planes); // Amedo
-        return planes;
     }
 }

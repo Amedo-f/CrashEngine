@@ -109,14 +109,6 @@ public sealed class SoundMixer
         for (int i = 0; i < VoiceCount; i++) _voices[i] = new Voice();
     }
 
-    public int ActiveVoices
-    {
-        get
-        {
-            lock (_lock) return _voices.Count(v => v.On);
-        }
-    }
-
     public int Start(byte[] adpcm, int pitch, int volL, int volR, bool repeat = true, int group = 0) // Amedo 2026-10-06
     {
         lock (_lock) return Claim(adpcm, pitch, volL, volR, false, repeat, group);

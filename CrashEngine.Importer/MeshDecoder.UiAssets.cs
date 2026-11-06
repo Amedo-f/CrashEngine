@@ -1,34 +1,11 @@
-using CrashEngine.Core;
 using CrashEngine.Renderer;
 using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
-using SysVec3 = System.Numerics.Vector3;
 using SysVec4 = System.Numerics.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
-using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Enumerations;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
-using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -124,29 +101,6 @@ public static partial class MeshDecoder
 
     public static List<Texture2D> DecodePsf(GL gl, Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF psf) =>
         psf.FontPages.Select(p => DecodeUiTexture(gl, p)).Where(t => t is not null).Select(t => t!).ToList();
-
-    public readonly record struct PsfGlyph(int Codepoint, int PageIndex, int X, int Y, int W, int H);
-
-    public static (List<(int W, int H, byte[] Rgba)> Pages, List<PsfGlyph> Glyphs)? GetPsfRawGlyphs(
-        Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2PSF psf)
-    {
-        if (psf.FontPages.Count != 1) return null;
-
-        if (psf.FontPages[0].Texture is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture tex)
-            return null;
-        var raw = DecodeRaw(tex);
-        if (raw is null) return null;
-
-        var glyphs = new List<PsfGlyph>();
-        for (int i = 0; i < psf.UnkVecs.Count; i++)
-        {
-            var v = psf.UnkVecs[i];
-            int x = (int)v.X, y = (int)v.Y, w = (int)v.Z, h = (int)v.W;
-            if (w <= 0 || h <= 0) continue;
-            glyphs.Add(new PsfGlyph(psf.UnkInt + i, 0, x, y, w, h));
-        }
-        return (new List<(int, int, byte[])> { raw.Value }, glyphs);
-    }
 
 
     // Amedo 2026-09-26

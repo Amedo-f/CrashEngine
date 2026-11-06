@@ -41,8 +41,5 @@ public sealed record TouchLayout(int Version, float Opacity, List<TouchControl> 
 
     // Amedo 2026-10-27
     public string ToJson() => JsonSerializer.Serialize(this, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true });
-
-    public static TouchLayout FromJson(string json) =>
-        JsonSerializer.Deserialize<TouchLayout>(json, Json) ?? throw new InvalidDataException("touch layout");
 }
 

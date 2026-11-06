@@ -1,48 +1,7 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using CrashEngine.Renderer;
-using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
-using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
 
 namespace CrashLauncher;
 
@@ -78,7 +37,7 @@ public sealed partial class GameScene : Scene
         }
         if (!anyVerts) { _browser.Log($"Convert to Object: '{tileEntity.Name}' has no real mesh geometry."); return; }
 
-        var instRootForPlacement = chunkRoot.Children.FirstOrDefault(c => c.Name == "Instances") ?? chunkRoot;
+        var instRootForPlacement = InstancesRoot(chunkRoot);
         var placementLocal = Matrix4x4.Invert(instRootForPlacement.Transform.World, out var instRootInv)
             ? tileEntity.Transform.World * instRootInv : tileEntity.Transform.World;
         Matrix4x4.Decompose(placementLocal, out var scale, out var rotQuat, out var worldPos);
@@ -104,35 +63,12 @@ public sealed partial class GameScene : Scene
             scale, tileEntity.Name, out string log);
         if (rec is null) { _browser.Log($"Convert to Object: {log}"); return; }
 
-        var section = AllEntities(chunkRoot).Select(e => e.Get<InstanceData>()?.Section).FirstOrDefault(s => s is not null);
-        if (section is null)
-        {
-            var layout = chunkSource.Rm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_LAYOUT_1_SECTION);
-            section = layout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_INSTANCES_SECTION);
-            if (section is null) { _browser.Log("Convert to Object: this level has no instances section to add to."); return; }
-        }
+        var section = FindInstanceSection(chunkRoot, chunkSource);
+        if (section is null) { _browser.Log("Convert to Object: this level has no instances section to add to."); return; }
 
-        uint templateStateFlags = (uint)(
-            Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState.Visible |
-            Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState.ShadowActive);
+        uint templateStateFlags = NewInstanceStateFlags;
 
-        var inst = new PS2AnyInstance
-        {
-            Position              = new TwinVec4(worldPos.X, worldPos.Y, worldPos.Z, 1f),
-            RotationX             = new TwinIntegerRotation(),
-            RotationY             = new TwinIntegerRotation(),
-            RotationZ             = new TwinIntegerRotation(),
-            ObjectId              = (ushort)rec.ObjectId,
-            RefListIndex          = -1,
-            OnSpawnHeaderScriptID = 0xFFFF,
-            StateFlags            = templateStateFlags,
-            InstancesRelated      = 0, Instances = new List<ushort>(),
-            PositionsRelated      = 0, Positions = new List<ushort>(),
-            PathsRelated          = 0, Paths     = new List<ushort>(),
-            ParamList1            = new List<uint>(),
-            ParamList2            = new List<float>(),
-            ParamList3            = new List<uint>(),
-        };
+        var inst = NewInstance(new TwinVec4(worldPos.X, worldPos.Y, worldPos.Z, 1f), rec.ObjectId, null, templateStateFlags);
         inst.RotationX.SetRotation(ex);
         inst.RotationY.SetRotation(ey);
         inst.RotationZ.SetRotation(ez);

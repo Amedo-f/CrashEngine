@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Physics;
@@ -8,7 +7,6 @@ namespace CrashEngine.Runtime.Physics;
 public sealed class RigidConstraint
 {
     public uint Flags;
-    public Vector3 AxisLocal;
     public Vector3 AxisWorld;
     public float Limit;
     public Quaternion A, B;
@@ -50,7 +48,6 @@ public sealed class RigidConstraint
     public void Axis_2880F8(Vector3 l, Vector3 w)
     {
         Flags |= 1;
-        AxisLocal = l;
         AxisWorld = w;
         var cr = new Vector3(l.Y * w.Z - l.Z * w.Y, l.Z * w.X - l.X * w.Z, l.X * w.Y - l.Y * w.X);
         float s = MathF.Sqrt(cr.X * cr.X + cr.Y * cr.Y + cr.Z * cr.Z);

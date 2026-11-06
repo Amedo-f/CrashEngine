@@ -1,5 +1,4 @@
 using System.Numerics;
-using CrashEngine.Runtime.Character;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.Screen.Oleg;
@@ -24,7 +23,6 @@ public sealed class ColourCurve
 // Amedo
 public class Strip : IShape2D
 {
-    public object? Material_00;
     public int Count_10;
     public Vector2[] Positions_14 = [];
     public uint[] Colours_18 = [];
@@ -90,7 +88,6 @@ public sealed class Ring : Strip
         Sweep_4C = GameMath.FromValue_11BFA0(BitConverter.Int32BitsToSingle(0x40C90FDB), 0);
         Positions_58 = new Vector2[(count + 1) * 2];
         Colours_54 = new uint[(count + 1) * 2];
-        Material_00 = material;
         SetVertexes_1AC028(count * 2, Positions_58, Colours_54);
     }
 

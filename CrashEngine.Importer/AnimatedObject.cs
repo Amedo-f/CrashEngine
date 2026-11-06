@@ -1,34 +1,5 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
-using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
-using SysVec3 = System.Numerics.Vector3;
-using SysVec4 = System.Numerics.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
-using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
-using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
-using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
-using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
-using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Enumerations;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2;
-using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -89,8 +60,7 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
     public float Speed { get; set; } = 1f; // Amedo 2026-09-26
 
     // Amedo 2026-09-27
-    public const uint LoopFlag = 0x1000, BlendFlag = 0x2000, StartPhaseFlag = 0x20000, SyncPhaseFlag = 0x40000,
-                      ReverseFlag = 0x80000, AppendFlag = 0x100000;
+    public const uint LoopFlag = 0x1000, BlendFlag = 0x2000, StartPhaseFlag = 0x20000, SyncPhaseFlag = 0x40000, AppendFlag = 0x100000;
 
     private const float TickRate = 9000f;
     private const float TickTime = 1f / 9000f;

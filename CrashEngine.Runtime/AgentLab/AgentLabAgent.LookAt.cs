@@ -1,6 +1,5 @@
 using System.Numerics;
 using CrashEngine.Importer;
-using CrashEngine.Runtime.Camera;
 using CrashEngine.Core;
 
 namespace CrashEngine.Runtime.AgentLab;
@@ -39,12 +38,10 @@ public sealed partial class AgentLabAgent
         public bool LooksAway => ((D0 >> 5) & 1) != 0;
         public bool Active => ((D0 >> 1) & 1) != 0;
 
-        public float Random_C4; // Amedo
-
         public void Setup_236B68(List<uint> config)
         {
             Config = config;
-            Random_C4 = _owner.World.Rng.RandomFromFloat_18C1C0(2f, 8f); // Amedo
+            _owner.World.Rng.RandomFromFloat_18C1C0(2f, 8f); // Amedo
             if (!Whole)
             {
                 uint c = Arg(15);
@@ -56,7 +53,6 @@ public sealed partial class AgentLabAgent
                 PitchMin = -((int)Arg(3) * GameMath.UnitToRad);
                 Damping = BitConverter.UInt32BitsToSingle(Arg(16));
             }
-            HeardAt_C0 = _owner.World.NowTicks; // Amedo
             D0 = (D0 & ~4UL) | 8;
             D0 = (D0 & ~0x10UL) | (_owner.HasCharacterController ? 0x10UL : 0UL);
             Enable_237530();
@@ -96,8 +92,6 @@ public sealed partial class AgentLabAgent
             A0 &= ~Attached;
         }
 
-        public int HeardAt_C0; // Amedo
-
         // Amedo
         public void HearNoise_237380(float loudness, AgentLabAgent source)
         {
@@ -105,7 +99,6 @@ public sealed partial class AgentLabAgent
             Target = source;
             Last = Target;
             Weight = loudness;
-            HeardAt_C0 = _owner.World.NowTicks;
             if ((Arg(15) & WholeBody) == 0) A0 &= ~Returning;
             ulong old = D0;
             D0 = (old & ~4UL) | 8;
@@ -272,7 +265,6 @@ public sealed partial class AgentLabAgent
     }
 
     private LookAt_236570? _lookAt;
-    internal LookAt_236570? LookAtComponent => _lookAt;
 
     // Amedo 2026-10-02
     public string? LookAtDescription => _lookAt is not { } l ? null : FormattableString.Invariant(

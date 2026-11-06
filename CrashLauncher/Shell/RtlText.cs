@@ -122,15 +122,6 @@ public static class RtlText
         }
         return visual.ToString();
     }
-
-    public static void TextWrappedRight(string logical)
-    {
-        if (!HasRtl(logical)) { ImGui.TextWrapped(logical); return; }
-        var visual = Visual(logical);
-        float width = ImGui.CalcTextSize(visual).X, avail = ImGui.GetContentRegionAvail().X;
-        if (width < avail) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
-        ImGui.TextUnformatted(visual);
-    }
 }
 
 // Amedo 2026-10-01

@@ -1,34 +1,11 @@
-using CrashEngine.Core;
 using CrashEngine.Renderer;
-using Silk.NET.OpenGL;
-using SysVec2 = System.Numerics.Vector2;
 using SysVec3 = System.Numerics.Vector3;
-using SysVec4 = System.Numerics.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinSceneryBaseType = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryBaseType;
-using TwinSceneryLeaf = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryLeaf;
-using TwinSceneryNode = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryNode;
-using TwinSceneryRoot = Twinsanity.TwinsanityInterchange.Common.ScenerySubtypes.TwinSceneryRoot;
-using ITwinScenery = Twinsanity.TwinsanityInterchange.Interfaces.Items.SM.ITwinScenery;
 using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnimation;
 using TwinMorphAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinMorphAnimation;
 using TwinJointSettings = Twinsanity.TwinsanityInterchange.Common.Animation.JointSettings;
 using TwinTransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Enumerations;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2;
-using Twinsanity.TwinsanityInterchange.Common;
-using Twinsanity.TwinsanityInterchange.Common.AgentLab;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics;
-using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout;
-using Twinsanity.TwinsanityInterchange.Interfaces.Items;
-using static Twinsanity.TwinsanityInterchange.Enumerations.Enums;
 
 namespace CrashEngine.Importer;
 
@@ -72,24 +49,6 @@ public static partial class MeshDecoder
             return IdentityBones();
         }
         return ComposePose(ogi, pose, out jointWorlds);
-    }
-
-    // Amedo 2026-09-26
-    public static Matrix4x4[] SampleBlendedPose(PS2AnyOGI ogi,
-        TwinAnimation from, float fromFrame, bool fromLoop,
-        TwinAnimation to, float toFrame, bool toLoop, float weight,
-        out Dictionary<int, Matrix4x4> jointWorlds)
-    {
-        var a = SampleLocalPose(ogi, from, fromFrame, fromLoop);
-        var b = SampleLocalPose(ogi, to, toFrame, toLoop);
-        if (a is null || b is null) return SampleAnimationPose(ogi, to, toFrame, out jointWorlds, toLoop);
-        for (int i = 0; i < b.Length; i++)
-        {
-            b[i].Translate = a[i].Translate + (b[i].Translate - a[i].Translate) * weight;
-            b[i].Scale     = a[i].Scale + (b[i].Scale - a[i].Scale) * weight;
-            b[i].Rot       = GameSlerp(a[i].Rot, b[i].Rot, weight);
-        }
-        return ComposePose(ogi, b, out jointWorlds);
     }
 
     // Amedo 2026-09-27
@@ -389,14 +348,6 @@ public static partial class MeshDecoder
     private static float VuRcp(float v) => v != 0f ? 1f / v : float.MaxValue; // Amedo 2026-09-26
 
     private static float GsAlpha(float a) => Math.Clamp(a * (255f / 128f), 0f, 1f); // Amedo 2026-09-27
-
-    public static float[] SampleFacialWeights(TwinMorphAnimation facialAnim, float frameF, bool loop = false) // Amedo 2026-09-26
-    {
-        if (facialAnim.JointSettings.Count == 0 || facialAnim.AnimatedTransformations.Count == 0)
-            return new float[MaxMorphShapes];
-        var (f0, f1, t) = AnimFramePair(facialAnim.AnimatedTransformations.Count, frameF, loop); // Amedo 2026-09-26
-        return SampleFacialWeights(facialAnim, f0, f1, t);
-    }
 
     // Amedo 2026-09-27
     public static float[] SampleFacialWeights(TwinMorphAnimation facialAnim, int f0, int f1, float t)

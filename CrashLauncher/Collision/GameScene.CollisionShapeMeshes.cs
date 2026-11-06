@@ -1,46 +1,7 @@
-using CrashEngine.Assets;
 using CrashEngine.Core;
-using CrashEngine.Importer;
 using CrashEngine.Renderer;
-using CrashEngine.Stealth;
-using ImGuiNET;
-using Silk.NET.Input;
 using Silk.NET.OpenGL;
 using System.Numerics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using TwinMat4 = Twinsanity.TwinsanityInterchange.Common.Matrix4;
-using TwinChunkLink = Twinsanity.TwinsanityInterchange.Common.TwinChunkLink;
-using PS2AnyLink = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyLink;
-using TwinIntegerRotation = Twinsanity.TwinsanityInterchange.Common.TwinIntegerRotation;
-using PS2AnyInstance = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
-using PS2AnyTexture = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics.PS2AnyTexture;
-using PS2AnyGraphicsSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.PS2AnyGraphicsSection;
-using PS2AnyTexturesSection = Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections.Graphics.PS2AnyTexturesSection;
-using ITwinTexture = Twinsanity.TwinsanityInterchange.Interfaces.Items.ITwinTexture;
-using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
-using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
-using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
-using PS2AnyTrigger = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyTrigger;
-using PS2AnyCamera = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyCamera;
-using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
-using PS2AnyAIPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition;
-using PS2AnyCollisionData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using TwinCollisionTriangle = Twinsanity.TwinsanityInterchange.Common.Collision.TwinCollisionTriangle;
-using TwinGroupInformation = Twinsanity.TwinsanityInterchange.Common.Collision.TwinGroupInformation;
-using SurfaceType = Twinsanity.TwinsanityInterchange.Enumerations.Enums.SurfaceType;
-using PS2AnyScenery = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery;
-using PS2AnyParticleData = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyParticleData;
-using TwinParticleSystem = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleSystem;
-using TwinParticleEmitter = Twinsanity.TwinsanityInterchange.Common.Particles.TwinParticleEmitter;
-using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
-using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
-using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
-using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
 namespace CrashLauncher;
 
@@ -56,31 +17,20 @@ public sealed partial class GameScene : Scene
         (0,1,5), (0,5,4),
     };
 
-    private static GpuMesh BuildCollisionBoxMesh(GL gl, Vector3[] corners)
-    {
-        var verts = new GpuMesh.Vertex[CollisionBoxFaceTris.Length * 3];
-        int vi = 0;
-        foreach (var (a, b, c) in CollisionBoxFaceTris)
-        {
-            var pa = corners[a]; var pb = corners[b]; var pc = corners[c];
-            var n = Vector3.Cross(pb - pa, pc - pa);
-            n = n.LengthSquared() > 1e-12f ? Vector3.Normalize(n) : Vector3.UnitY;
-            verts[vi++] = new GpuMesh.Vertex { Position = pa, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-            verts[vi++] = new GpuMesh.Vertex { Position = pb, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-            verts[vi++] = new GpuMesh.Vertex { Position = pc, Normal = n, UV = Vector2.Zero, Color = Vector4.One };
-        }
-        return new GpuMesh(gl, verts, PrimitiveType.Triangles);
-    }
+    private static GpuMesh BuildCollisionBoxMesh(GL gl, Vector3[] corners) => BuildMeshFromTopology(gl, corners, CollisionBoxFaceTris);
 
-    private void RebuildCollisionBoxMesh(Entity e, CollisionBoxMarker marker)
+    private void ReplaceCollisionShapeMesh(Entity e, Func<GL, GpuMesh> build)
     {
         var rdr = e.Get<DirectCubeRenderer>();
         if (rdr is null) return;
         var old = rdr.Mesh;
-        rdr.Mesh = BuildCollisionBoxMesh(Engine.Instance.GL, marker.Corners);
+        rdr.Mesh = build(Engine.Instance.GL);
         rdr.OwnsMesh = true;
         if (old is not null && old != _cubeMesh) old.Dispose();
     }
+
+    private void RebuildCollisionBoxMesh(Entity e, CollisionBoxMarker marker) =>
+        ReplaceCollisionShapeMesh(e, gl => BuildCollisionBoxMesh(gl, marker.Corners));
 
     private static void RampCorners(Vector3[] corners, float highSign, int axis)
     {
@@ -134,12 +84,13 @@ public sealed partial class GameScene : Scene
         return (verts, tris);
     }
 
-    private static GpuMesh BuildMeshFromTopology(GL gl, Vector3[] corners, (int A, int B, int C)[] triList)
+    private static GpuMesh BuildMeshFromTopology(GL gl, IReadOnlyList<Vector3> corners, IReadOnlyList<(int A, int B, int C)> triList)
     {
-        var verts = new GpuMesh.Vertex[triList.Length * 3];
+        var verts = new GpuMesh.Vertex[triList.Count * 3];
         int vi = 0;
-        foreach (var (a, b, c) in triList)
+        for (int t = 0; t < triList.Count; t++)
         {
+            var (a, b, c) = triList[t];
             var pa = corners[a]; var pb = corners[b]; var pc = corners[c];
             var n = Vector3.Cross(pb - pa, pc - pa);
             n = n.LengthSquared() > 1e-12f ? Vector3.Normalize(n) : Vector3.UnitY;
@@ -162,23 +113,9 @@ public sealed partial class GameScene : Scene
         return BuildMeshFromTopology(gl, verts, tris);
     }
 
-    private void RebuildCollisionCylinderMesh(Entity e, CollisionCylinderMarker marker)
-    {
-        var rdr = e.Get<DirectCubeRenderer>();
-        if (rdr is null) return;
-        var old = rdr.Mesh;
-        rdr.Mesh = BuildCollisionCylinderMesh(Engine.Instance.GL, marker.Radius, marker.Height, marker.Segments);
-        rdr.OwnsMesh = true;
-        old?.Dispose();
-    }
+    private void RebuildCollisionCylinderMesh(Entity e, CollisionCylinderMarker marker) =>
+        ReplaceCollisionShapeMesh(e, gl => BuildCollisionCylinderMesh(gl, marker.Radius, marker.Height, marker.Segments));
 
-    private void RebuildCollisionPlaneMesh(Entity e, CollisionPlaneMarker marker)
-    {
-        var rdr = e.Get<DirectCubeRenderer>();
-        if (rdr is null) return;
-        var old = rdr.Mesh;
-        rdr.Mesh = BuildCollisionPlaneMesh(Engine.Instance.GL, marker.Width, marker.Length);
-        rdr.OwnsMesh = true;
-        old?.Dispose();
-    }
+    private void RebuildCollisionPlaneMesh(Entity e, CollisionPlaneMarker marker) =>
+        ReplaceCollisionShapeMesh(e, gl => BuildCollisionPlaneMesh(gl, marker.Width, marker.Length));
 }
