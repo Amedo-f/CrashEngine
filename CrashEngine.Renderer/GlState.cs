@@ -24,6 +24,15 @@ public static class GlState
         return t;
     }
 
+    static GlState() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        _gl = null;
+        _stencilLater = false;
+        Invalidate();
+    }
+
     public static void Invalidate()
     {
         if (_gl is { } gl) SendLater(gl);

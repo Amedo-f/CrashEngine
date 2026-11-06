@@ -127,6 +127,14 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
     private static bool _following;
     private bool _generatedMips;
 
+    static Texture2D() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        lock (Live) Live.Clear();
+        _maxAnisotropy = -1f;
+    }
+
     // Amedo
     public static void FollowSettings()
     {

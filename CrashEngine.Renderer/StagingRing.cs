@@ -18,6 +18,18 @@ internal static class StagingRing
 
     public static bool Enabled { get; set; } = true;
 
+    static StagingRing() => Engine.GpuContextStarted += ForgetContext;
+
+    private static unsafe void ForgetContext()
+    {
+        _gl = null;
+        _buffer = 0;
+        _base = null;
+        _head = 0;
+        _frame = -1;
+        Array.Clear(FrameBytes);
+    }
+
     // Amedo
     public static unsafe bool Copy(GL gl, uint target, long targetOffset, void* data, long bytes)
     {

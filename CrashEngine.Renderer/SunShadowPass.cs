@@ -38,6 +38,21 @@ public static partial class SunShadowPass
     private static TwinShaderProgram[] _programs = [];
     private static TwinShaderProgram? _current;
 
+    static SunShadowPass() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        _fbo = _depth = 0;
+        _failed = false;
+        _programs = [];
+        _current = null;
+        _lastScene = null;
+        _settingsVersion = -1;
+        _skyFirst = _skyLast = null;
+        _skyCount = -1;
+        ForgetPointContext();
+    }
+
     // Amedo
     private struct Caster
     {

@@ -39,6 +39,15 @@ public static class InstanceBatcher
     private static Vector4[] _upload = new Vector4[Stride * 256];
     private static ShaderStorage? _storage;
     private static int _frame;
+
+    static InstanceBatcher() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        Groups.Clear();
+        Order.Clear();
+        _storage = null;
+    }
     private static float[] _keys = new float[64];
     private static int[] _byKey = new int[64];
     private static Vector4[] _sorted = new Vector4[Stride * 64];

@@ -16,6 +16,14 @@ public static class ParticleFx
     private static ParticleBatch? _batch;
     private static ParticleBatch.Vertex[] _verts = new ParticleBatch.Vertex[4096];
 
+    static ParticleFx() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        _batch = null;
+        _white = null;
+    }
+
     public static ParticleDef DefFor(TwinParticleSystem sys) => Defs.GetValue(sys, s => new ParticleDef(s));
 
     public static void Draw(GL gl, ParticleWorld world, Matrix4x4 view, Matrix4x4 projection, Matrix4x4 toEditor,

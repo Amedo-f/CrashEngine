@@ -9,6 +9,10 @@ internal static class GlNames
     private static readonly uint[] Textures = new uint[Batch], Buffers = new uint[Batch], VertexArrays = new uint[Batch];
     private static int _textures, _buffers, _vertexArrays;
 
+    static GlNames() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext() => _textures = _buffers = _vertexArrays = 0;
+
     public static uint Texture(GL gl)
     {
         if (_textures == 0)

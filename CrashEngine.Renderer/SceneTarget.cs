@@ -100,7 +100,6 @@ public sealed class SceneTarget : IDisposable
 
     public int Width => _width;
     public int Height => _height;
-    public int Samples => _samples;
 
     private SceneTarget(GL gl)
     {
@@ -111,6 +110,17 @@ public sealed class SceneTarget : IDisposable
         gl.GetInteger(GetPName.MaxRenderbufferSize, out _maxSize);
         _maxSamples = Math.Max(1, _maxSamples);
         _maxSize = Math.Max(1, _maxSize);
+    }
+
+    static SceneTarget() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        if (Instance is null) return;
+        Instance = null;
+        Engine.BeginScene = null;
+        Engine.EndScene = null;
+        Engine.ReuseScene = null;
     }
 
     public static void Install(GL gl)
@@ -227,7 +237,6 @@ public sealed class SceneTarget : IDisposable
 
     private void End(GL gl)
     {
-        var engine = Engine.Instance;
         int w = _width, h = _height;
         if (_samples > 1 && !_tiled)
         {

@@ -9,8 +9,6 @@ public sealed class TwinShaderProgram : IDisposable
     private readonly uint _id;
     private readonly Dictionary<string, int> _loc = new();
 
-    public uint Handle => _id;
-
     public TwinShaderProgram(GL gl, string shaderDir, string vertFile, string fragFile)
     {
         _gl = gl;
@@ -93,6 +91,10 @@ public sealed class TwinShaderProgram : IDisposable
 
     private readonly List<Slot> _later = new();
     private static readonly List<TwinShaderProgram> _withLater = new();
+
+    static TwinShaderProgram() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext() => _withLater.Clear();
 
     public void SetLater(Slot s, int v) => Later(s, 1, v, default);
     public void SetLater(Slot s, float v) => Later(s, 2, 0, new Vector4(v, 0f, 0f, 0f));

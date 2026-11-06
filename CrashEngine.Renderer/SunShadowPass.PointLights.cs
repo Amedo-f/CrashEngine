@@ -35,7 +35,6 @@ public static partial class SunShadowPass
     private static TwinShaderProgram? _pointProgram;
 
     public static bool PointWanted => Wanted && GraphicsSettings.Current.PointLights;
-    public static int PointLightCount => _pointCount;
 
     public static void AddPointLight(Vector3 position, Vector3 color, float radius, int exponent)
     {
@@ -294,6 +293,16 @@ public static partial class SunShadowPass
         sh.Set("PointCount", _pointCount);
         sh.SetVector4Array("PointPosRange", _pointPosRange);
         sh.SetVector4Array("PointColor", _pointColor);
+    }
+
+    private static void ForgetPointContext()
+    {
+        _pointFbo = _pointDepth = _pointStatic = 0;
+        _pointFailed = false;
+        _pointProgram = null;
+        Array.Clear(_staticValid);
+        foreach (var set in _staticSet) set.Clear();
+        foreach (var movers in _movers) movers.Clear();
     }
 
     private static unsafe bool EnsurePointTarget(GL gl)

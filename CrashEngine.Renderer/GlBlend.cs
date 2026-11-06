@@ -7,6 +7,10 @@ public static class GlBlend
 {
     private static int _state = -1;
 
+    static GlBlend() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext() => _state = -1;
+
     public static bool IsOn(GL gl)
     {
         if (_state < 0) _state = gl.IsEnabled(EnableCap.Blend) ? 1 : 0;
@@ -25,8 +29,6 @@ public static class GlBlend
         else gl.Disable(EnableCap.Blend);
         _state = on ? 1 : 0;
     }
-
-    public static void Invalidate() => _state = -1;
 
     public static void Assume(bool on) => _state = on ? 1 : 0; // Amedo
 }

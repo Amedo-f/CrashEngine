@@ -64,6 +64,10 @@ public static class MeshPool
 
     private static readonly List<Page> Pages = new();
 
+    static MeshPool() => Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext() => Pages.Clear();
+
     internal static unsafe Page? Allocate(GL gl, ReadOnlySpan<GpuMesh.Vertex> verts, ReadOnlySpan<uint> indices, out int baseVertex, out int firstIndex)
     {
         baseVertex = firstIndex = -1;
@@ -121,7 +125,7 @@ public static class MeshPool
     {
         page.Vertices.Give(baseVertex, vertices);
         page.Indices.Give(firstIndex, indices);
-        if (--page.Users > 0 || Pages.Count <= 1) return;
+        if (--page.Users > 0 || Pages.Count <= 1 || !Pages.Contains(page)) return;
         bool spare = true; // Amedo
         foreach (var p in Pages)
             if (!ReferenceEquals(p, page) && p.Users == 0) spare = false;

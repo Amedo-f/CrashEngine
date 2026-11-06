@@ -11,6 +11,14 @@ public static class GpuStats
     public static int TextureStressScale = 1;
     public const int TextureStressMaxSide = 4096;
 
+    static GpuStats() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        Textures = Meshes = 0;
+        TextureBytes = MeshBytes = MeshPoolBytes = 0;
+    }
+
     public static void BeginFrame()
     {
         Draws = 0;

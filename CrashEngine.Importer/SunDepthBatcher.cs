@@ -26,6 +26,15 @@ public static class SunDepthBatcher
     private static ShaderStorage? _storage;
     private static int _flushes;
 
+    static SunDepthBatcher() => CrashEngine.Core.Engine.GpuContextStarted += ForgetContext;
+
+    private static void ForgetContext()
+    {
+        Groups.Clear();
+        Order.Clear();
+        _storage = null;
+    }
+
     public static void Defer(GpuMesh mesh, Material material, in Matrix4x4 world)
     {
         var key = new Key(mesh, material);

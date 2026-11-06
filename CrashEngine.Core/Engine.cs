@@ -90,6 +90,7 @@ public sealed class Engine
         _win.DoEvents();
         _imguiRenderer?.Dispose(); // Amedo
         _imgui?.Dispose(); // Amedo
+        _input?.Dispose();
         _win.Reset();
         _limiter.Dispose();
     }
@@ -141,6 +142,8 @@ public sealed class Engine
 
     public static Func<bool>? SceneHeld { get; set; }
     public static Func<GL, bool>? ReuseScene { get; set; }
+
+    public static event Action? GpuContextStarted;
 
     // Amedo
     public (int X, int Y, int W, int H)? SceneViewport { get; set; }
@@ -223,6 +226,7 @@ public sealed class Engine
         _gl    = GL.GetApi(_win);
         Console.WriteLine($"[Engine] OpenGL {_gl.GetStringS(StringName.Version)} on {_gl.GetStringS(StringName.Renderer)} ({_gl.GetStringS(StringName.Vendor)})"); // Amedo 2026-09-30
         GlCaps.Detect(_gl, Gles); // Amedo 2026-10-26
+        GpuContextStarted?.Invoke();
         if (Desktop is null && _win.FramebufferSize is { X: > 0, Y: > 0 } fb) (Width, Height) = (fb.X, fb.Y); // Amedo 2026-10-26
 
         // Amedo 2026-09-22
@@ -498,5 +502,6 @@ public sealed class Engine
     private void OnClose()
     {
         _activeScene?.Destroy();
+        GraphicsSettings.Changed -= ApplyFrameSettings;
     }
 }
