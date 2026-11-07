@@ -649,6 +649,8 @@ public sealed partial class SceneSimulation
         StopRecording(); // Amedo 2026-10-01
         _screenDraw.Dispose(); // Amedo 2026-09-30
         World.Screen?.Dispose(); // Amedo 2026-10-01
+        Screen.Oleg.MenuPage.StaticInit_2597C0();
+        Screen.Oleg.LevelWidget.ClearSbss();
         ResetLook(); // Amedo 2026-09-29
         World.Particles?.Clear(); // Amedo 2026-09-27
         if (World.Particles is { } particles)
@@ -659,6 +661,8 @@ public sealed partial class SceneSimulation
             particles.BoxInView = null; // Amedo
         }
         CrashEngine.Renderer.RenderPipeline.ShaderClockStopped = null; // Amedo
+        CrashEngine.Renderer.SunShadowPass.FocusEntity = null;
+        if (ReferenceEquals(Latest, this)) Latest = null;
         Engine.SceneHeld = null;
         World.Music?.StopAll(); // Amedo 2026-09-28
         World.Sounds?.StopAll();

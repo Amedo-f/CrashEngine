@@ -174,6 +174,7 @@ public sealed partial class GameScene
             _browser.Log("Play Scene: unimplemented opcodes hit (most used first): " + sim.UnhandledSummary());
         EndLevelSwitch(); // Amedo
         _browser.Log("Play Scene: stopped, scene restored.");
+        CollectLeftovers();
         PrepareForPlay(); // Amedo 2026-10-02
     }
 
@@ -249,11 +250,29 @@ public sealed partial class GameScene
     private Action? _leaveTo;
     private const string LeavePlayPopup = "Play Scene is running##leaveplay";
 
+    private bool _releaseGpu;
+
+    protected override void OnDestroy()
+    {
+        if (!_releaseGpu) return;
+        _releaseGpu = false;
+        CrashEngine.Renderer.RenderPipeline.SkydomeDraws.Clear();
+        int freed = CrashEngine.Renderer.GpuOwner.Release(this);
+        _browser.Log($"Left the scene: freed {freed} GPU meshes and textures.");
+        CollectLeftovers();
+    }
+
+    private static void CollectLeftovers()
+    {
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+    }
+
     // Amedo 2026-09-28
     private void LeaveScene(Action? leave = null)
     {
         var go = leave ?? (() => Engine.Instance.ActiveScene = _browser); // Amedo 2026-10-02
-        leave = () => { DropPlayHost(); go(); };
+        leave = () => { DropPlayHost(); _releaseGpu = true; go(); };
         if (!Simulating) { leave(); return; }
         if (_leavePlayOpen) { _cancelLeavePlay = true; return; }
         _leaveTo = leave;

@@ -164,5 +164,8 @@ public class Scene
     internal void Destroy()
     {
         foreach (var e in _roots) e.Destroy();
+        OnDestroy();
     }
+
+    protected virtual void OnDestroy() { }
 }

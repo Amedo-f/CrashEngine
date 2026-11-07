@@ -133,6 +133,7 @@ public sealed partial class GameScene : Scene
 
 	protected override void Build()
 	{
+		GpuOwner.Current = this;
 		if (!_built)
 		{
 			_built = true;

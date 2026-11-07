@@ -124,7 +124,8 @@ public static class ParticleFx
             s = 1f / k;
         }
         _batch ??= new ParticleBatch(gl);
-        _white ??= Texture2D.White(gl);
+        if (_white is null)
+            using (GpuOwner.Shared()) _white = Texture2D.White(gl);
         bool date = GameShadowPass.ReceiversMarked;
         bool begun = false;
         for (int pass = 0; pass < 2; pass++)

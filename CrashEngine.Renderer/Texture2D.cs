@@ -9,6 +9,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
     private readonly GL   _gl;
     private uint _id; // Amedo 2026-09-29
     private byte[]? _pending;
+    private object? _owner;
     public uint Width { get; private set; }
     public uint Height { get; private set; }
     public bool Uploaded { get; private set; }
@@ -66,6 +67,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
     private unsafe void Create(ReadOnlySpan<byte> rgba)
     {
         GpuUploadQueue.RequireMainThread("Texture2D");
+        _owner = GpuOwner.Track(this);
         var gl = _gl;
         _id    = GlNames.Texture(gl); // Amedo 2026-09-30
         gl.BindTexture(TextureTarget.Texture2D, _id);
@@ -342,6 +344,8 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         if (!Uploaded) return;
         Uploaded = false;
         lock (Live) Live.Remove(this); // Amedo
+        GpuOwner.Forget(_owner, this);
+        _owner = null;
         GpuStats.TextureBytes -= _bytes; // Amedo 2026-09-30
         GpuStats.Textures--;
         _gl.DeleteTexture(_id);

@@ -23,6 +23,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     private uint                   _vao, _vbo, _ebo; // Amedo 2026-09-29
     private MeshPool.Page?         _page; // Amedo 2026-10-01
     private int                    _baseVertex, _firstIndex;
+    private object?                _owner;
     private Vertex[]?              _pendingVerts;
     private uint[]?                _pendingIndices;
     public bool Uploaded { get; private set; }
@@ -157,6 +158,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
     private unsafe void Create(Vertex[] verts, uint[]? indices)
     {
         GpuUploadQueue.RequireMainThread("GpuMesh");
+        _owner = GpuOwner.Track(this);
         var gl = _gl;
         _bytes = (long)verts.Length * sizeof(Vertex) + (indices?.Length ?? 0) * sizeof(uint); // Amedo 2026-10-01
         if (indices is not null && !Dynamic && MeshPool.Allocate(gl, verts, indices, out _baseVertex, out _firstIndex) is { } page)
@@ -331,6 +333,8 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
         _pendingIndices = null;
         if (!Uploaded) return;
         Uploaded = false;
+        GpuOwner.Forget(_owner, this);
+        _owner = null;
         GpuStats.MeshBytes -= _bytes; // Amedo 2026-09-30
         GpuStats.Meshes--;
         if (_page is { } page) // Amedo 2026-10-01
