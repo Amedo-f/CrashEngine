@@ -56,6 +56,11 @@ public sealed partial class GameScene : Scene
                 return;
             }
             MeshDecoder.RebuildSkydomeDraws(Engine.Instance.GL, chunkSource.Sm2, chunkSource.TexCache);
+            if (AllEntities(chunkRoot!).Select(x => x.Get<CrashEngine.Importer.SkydomeMarker>()).FirstOrDefault(m => m is not null) is { } sky)
+            {
+                sky.Brightness = sky.BakedBrightness = 1f;
+                sky.BaseColors = null;
+            }
             _browser.Log($"Swap Skydome: {log} Not undoable — Reload Level discards it. Save Chunk + Build ISO to keep it.");
         }
         catch (Exception ex) { _browser.Log($"Swap Skydome: {ex.Message}"); }

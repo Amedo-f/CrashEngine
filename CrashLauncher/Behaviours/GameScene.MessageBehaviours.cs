@@ -42,10 +42,8 @@ public sealed partial class GameScene
     private (BaseTwinSection? localBeh, BaseTwinSection? globalBeh, BaseTwinSection? localObjs, BaseTwinSection? globalObjs) GetCodeSections()
     {
         var src = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
-        BaseTwinSection? Sec(Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2? rm2, int sub) =>
-            rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)sub);
-        return (Sec(src?.Rm2, TwinConstants.CODE_BEHAVIOURS_SECTION), Sec(src?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION),
-                Sec(src?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION), Sec(src?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION));
+        return (MeshDecoder.CodeSection(src?.Rm2, TwinConstants.CODE_BEHAVIOURS_SECTION), MeshDecoder.CodeSection(src?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION),
+                MeshDecoder.CodeSection(src?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION), MeshDecoder.CodeSection(src?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION));
     }
 
     private void DrawMessageBehaviours(PS2AnyObject obj)

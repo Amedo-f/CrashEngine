@@ -72,8 +72,7 @@ public sealed partial class GameScene : Scene
             return;
         }
 
-        var objSec = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+        var objSec = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
         if (objSec is null)
         {
             ImGui.TextDisabled("Startup\\Default.rm2 has no Objects section (unexpected).");
@@ -141,8 +140,7 @@ public sealed partial class GameScene : Scene
             ImGui.Separator();
             if (ImGui.CollapsingHeader("Sounds##globalsoundshdr", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                var sndSec = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                    ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_SOUND_EFFECTS_SECTION);
+                var sndSec = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_SOUND_EFFECTS_SECTION);
                 var soundIds = obj.RefSounds.Concat(obj.SoundSlots).Where(sid => sid != 0xFFFF).Distinct().ToList();
                 if (soundIds.Count == 0)
                     ImGui.TextDisabled("Referenced slot(s) are all empty (0xFFFF) — nothing to show.");
@@ -182,8 +180,7 @@ public sealed partial class GameScene : Scene
         BaseTwinSection? globalBehSecForSlots = null;
         if (obj.RefBehaviours.Count > 0)
         {
-            globalBehSecForSlots = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            globalBehSecForSlots = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
             if (globalBehSecForSlots is not null)
             {
                 ImGui.Separator();
@@ -220,8 +217,7 @@ public sealed partial class GameScene : Scene
 
         if (obj.RefAnimations.Count > 0)
         {
-            var globalAnimSec = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_ANIMATIONS_SECTION);
+            var globalAnimSec = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_ANIMATIONS_SECTION);
             if (globalAnimSec is not null)
             {
                 ImGui.Separator();

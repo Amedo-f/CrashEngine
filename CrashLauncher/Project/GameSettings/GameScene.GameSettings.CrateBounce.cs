@@ -2,6 +2,7 @@ using CrashEngine.Importer;
 using ImGuiNET;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
+using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -78,7 +79,7 @@ public sealed partial class GameScene
     {
         try
         {
-            var freshBehSec = BehavioursOf(ReadPristineRm2(GlobalRm2Path));
+            var freshBehSec = MeshDecoder.CodeSection(ReadPristineRm2(GlobalRm2Path), TwinConstants.CODE_BEHAVIOURS_SECTION);
             var freshCmds = FindApplyVelocityCommands(freshBehSec?.GetItem<PS2BehaviourGraph>(id));
             return freshCmds.Count > 0 ? GetArgFloat(freshCmds[0], CrateBounceArgIndex) : null;
         }

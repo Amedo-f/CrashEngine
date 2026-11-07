@@ -115,7 +115,8 @@ public sealed partial class GameScene : Scene
 				entity2.AddChild(entity3);
 			}
 			Entity entity4 = new Entity("Skydome");
-			entity4.Add(new SkydomeMarker());
+			SkydomeMarker skydomeMarker = entity4.Add(new SkydomeMarker());
+			if (useShadowDir) RestoreSkydomeMeta(skydomeMarker);
 			entity.AddChild(entity4);
 			_enemyCount = 0;
 			foreach (Entity item3 in AllEntities(entity))

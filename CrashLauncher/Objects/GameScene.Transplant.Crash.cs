@@ -132,11 +132,9 @@ public sealed partial class GameScene : Scene
                           "to keep it, then Build ISO + test.");
 
             const uint TextMasterId = 0x0332;
-            var srcObjSecForTm = sourceRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+            var srcObjSecForTm = MeshDecoder.CodeSection(sourceRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
             if (srcObjSecForTm is not null && srcObjSecForTm.ContainsItem(TextMasterId) &&
-                !chunkSource.Rm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)!
-                    .GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION)!.ContainsItem(TextMasterId))
+                !MeshDecoder.CodeSection(chunkSource.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)!.ContainsItem(TextMasterId))
             {
                 var tmRec = MeshDecoder.TransplantObjectFull(Engine.Instance.GL, chunkSource.Rm2, chunkSource.MeshTables,
                     chunkSource.TexCache, sourceRm2, TextMasterId, out string tmLog);

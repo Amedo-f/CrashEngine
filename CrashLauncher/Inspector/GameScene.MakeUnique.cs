@@ -1,7 +1,6 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
@@ -31,8 +30,7 @@ public sealed partial class GameScene
     private PS2AnyObject? LevelObject(ChunkSource src, uint objectId)
     {
         foreach (var rm2 in new[] { src.Rm2, src.GlobalRm2 })
-            if (rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                   ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION) is { } objs && objs.ContainsItem(objectId))
+            if (MeshDecoder.CodeSection(rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION) is { } objs && objs.ContainsItem(objectId))
                 return objs.GetItem<PS2AnyObject>(objectId);
         return null;
     }
@@ -41,8 +39,7 @@ public sealed partial class GameScene
     private PS2BehaviourGraph? ObjectGraph(ChunkSource src, PS2AnyObject? obj, uint sharedId, out bool own)
     {
         own = false;
-        var behSec = src.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+        var behSec = MeshDecoder.CodeSection(src.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
         var shared = behSec is not null && behSec.ContainsItem(sharedId) ? behSec.GetItem<PS2BehaviourGraph>(sharedId) : null;
         if (obj is null || shared is null) return shared;
         if (MeshDecoder.ObjectBehaviourNamed(src.Rm2, src.GlobalRm2, obj, shared.Name) is { } g && g.GetID() >= MeshDecoder.UniqueBehaviourIdFloor)
@@ -121,8 +118,7 @@ public sealed partial class GameScene
 
         if (!MeshDecoder.IsUniqueObject(src.Rm2, inst.ObjectId))
         {
-            bool global = src.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION)?.ContainsItem(inst.ObjectId) == true;
+            bool global = MeshDecoder.CodeSection(src.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)?.ContainsItem(inst.ObjectId) == true;
             ImGui.TextWrapped($"Shared: '{obj.Name}' is used by {users} placement(s) in this level" +
                               (global ? " and by every level (it lives in Default.rm2)." : "."));
             int group = _selectedSet.Contains(e) ? _selectedSet.Count(x => x.Get<InstanceData>()?.ObjectId == inst.ObjectId) : 1;

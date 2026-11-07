@@ -7,6 +7,7 @@ using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.I
 using TwinBehaviourStarter = Twinsanity.TwinsanityInterchange.Common.AgentLab.TwinBehaviourStarter;
 using BaseTwinItem = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinItem;
 using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
+using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -64,7 +65,7 @@ public sealed partial class GameScene : Scene
             var freshRm2 = TryReadPristineRm2(isGlobal ? GlobalRm2Path : _rm2);
             if (freshRm2 is null) return null;
 
-            var freshBehSec = BehavioursOf(freshRm2);
+            var freshBehSec = MeshDecoder.CodeSection(freshRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
             var freshGraph = freshBehSec?.GetItem<PS2BehaviourGraph>(bid);
             return freshGraph is null ? null : GraphToEditableText(freshGraph);
         }

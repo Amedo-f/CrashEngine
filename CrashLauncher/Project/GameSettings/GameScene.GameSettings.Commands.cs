@@ -3,7 +3,6 @@ using CrashEngine.Importer;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using ImGuiNET;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
-using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
 
@@ -47,9 +46,6 @@ public sealed partial class GameScene
         public float Multiplier = 1f;
         public bool Active;
     }
-
-    private static BaseTwinSection? BehavioursOf(PS2AnyTwinsanityRM2 rm2) =>
-        rm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
 
     private void DrawMultiplierSetting(MultiplierSetting s, BaseTwinSection? behSec, ChunkSource? chunkSource)
     {
@@ -117,7 +113,7 @@ public sealed partial class GameScene
     {
         try
         {
-            var freshCmds = s.Find(BehavioursOf(ReadPristineRm2(s.Global ? GlobalRm2Path : _rm2)));
+            var freshCmds = s.Find(MeshDecoder.CodeSection(ReadPristineRm2(s.Global ? GlobalRm2Path : _rm2), TwinConstants.CODE_BEHAVIOURS_SECTION));
             var values = freshCmds.SelectMany(c => new[] { GetArgFloat(c, s.Arg1), GetArgFloat(c, s.Arg2) }).ToList();
             return values.Count == expectedCount * 2 ? values : null;
         }
@@ -128,7 +124,7 @@ public sealed partial class GameScene
     {
         try
         {
-            var freshCmds = s.Find(BehavioursOf(ReadPristineRm2(s.Global ? GlobalRm2Path : _rm2)));
+            var freshCmds = s.Find(MeshDecoder.CodeSection(ReadPristineRm2(s.Global ? GlobalRm2Path : _rm2), TwinConstants.CODE_BEHAVIOURS_SECTION));
             var liveCmds = s.Find(behSec);
             for (int i = 0; i < liveCmds.Count && i < freshCmds.Count; i++)
             {

@@ -19,14 +19,6 @@ public static partial class MeshDecoder
     private const ushort UniqueBehaviourIdCeiling = 0x7FFE;
 
     // Amedo
-    private static BaseTwinSection? CodeSection(PS2AnyTwinsanityRM2? rm2, int id) =>
-        rm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)id);
-
-    // Amedo
-    private static BaseTwinSection? GraphicsSection(PS2AnyTwinsanityRM2? rm2, int id) =>
-        rm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION)?.GetItem<BaseTwinSection>((uint)id);
-
-    // Amedo
     public static bool IsUniqueObject(PS2AnyTwinsanityRM2 rm2, uint objectId) =>
         objectId >= UniqueObjectIdFloor && CodeSection(rm2, Constants.CODE_GAME_OBJECTS_SECTION)?.ContainsItem(objectId) == true;
 

@@ -261,13 +261,11 @@ public sealed partial class GameScene
 
             // Amedo 2026-09-19
             uint instanceObjectId;
-            var srcObjSec = sourceRm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-                                    ?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
+            var srcObjSec = MeshDecoder.CodeSection(sourceRm2, Constants.CODE_GAME_OBJECTS_SECTION);
             bool isGlobalObject = srcObjSec?.GetItem<PS2AnyObject>(entry.ObjectId) is null;
             if (isGlobalObject)
             {
-                var globalObjSec = chunkSource.GlobalRm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-                                                        ?.GetItem<BaseTwinSection>((uint)Constants.CODE_GAME_OBJECTS_SECTION);
+                var globalObjSec = MeshDecoder.CodeSection(chunkSource.GlobalRm2, Constants.CODE_GAME_OBJECTS_SECTION);
                 if (globalObjSec?.GetItem<PS2AnyObject>(entry.ObjectId) is null)
                 {
                     _browser.Log($"Import Object: object 0x{entry.ObjectId:X4} isn't in source level '{entry.SourceLevel}' nor in the global data — can't import.");

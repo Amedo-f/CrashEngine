@@ -3,6 +3,8 @@ using System.Numerics;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
+using CrashEngine.Importer;
+using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -93,7 +95,7 @@ public sealed partial class GameScene
         origBounce = null;
         try
         {
-            var freshBehSec = BehavioursOf(ReadPristineRm2(_rm2));
+            var freshBehSec = MeshDecoder.CodeSection(ReadPristineRm2(_rm2), TwinConstants.CODE_BEHAVIOURS_SECTION);
             var freshDmgCmds = FindStompDamageCommands(freshBehSec);
             var freshBounceCmds = FindStompBounceCommands(freshBehSec);
             if (freshBounceCmds.Count > 0) origBounce = GetArgFloat(freshBounceCmds[0], StompBounceArgIndex);
@@ -106,7 +108,7 @@ public sealed partial class GameScene
     {
         try
         {
-            var freshBehSec = BehavioursOf(ReadPristineRm2(_rm2));
+            var freshBehSec = MeshDecoder.CodeSection(ReadPristineRm2(_rm2), TwinConstants.CODE_BEHAVIOURS_SECTION);
             var freshDmgCmds = FindStompDamageCommands(freshBehSec);
             var liveDmgCmds = FindStompDamageCommands(behSec);
             for (int i = 0; i < liveDmgCmds.Count && i < freshDmgCmds.Count; i++)

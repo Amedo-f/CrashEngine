@@ -5,7 +5,6 @@ using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
-using Twinsanity.TwinsanityInterchange.Common;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2.Sections;
 
@@ -215,18 +214,7 @@ public static partial class MeshDecoder
 
                 if (newModel is not null)
                 {
-                    var subMats = new List<(Texture2D? Tex, TwinShader? Shader)>();
-                    foreach (var matId in newRm.Materials)
-                    {
-                        Texture2D? tex = null; TwinShader? shader = null;
-                        if (materialsById.TryGetValue(matId, out var mat))
-                        {
-                            foreach (var sh in mat.Shaders)
-                            { shader ??= sh; if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null) break; }
-                            RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
-                        }
-                        subMats.Add((tex, shader));
-                    }
+                    var subMats = SubMaterials(newRm.Materials, materialsById, texCache);
                     var gpuList = DecodeModel(gl, newModel, subMats);
                     if (gpuList.Count > 0) { tables.ModelGpu[newRmId] = gpuList; anyMesh = true; }
                 }

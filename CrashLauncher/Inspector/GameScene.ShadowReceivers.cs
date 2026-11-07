@@ -15,18 +15,10 @@ namespace CrashLauncher;
 public sealed partial class GameScene
 {
     // Amedo
-    private static BaseTwinSection? CodeSectionOf(PS2AnyTwinsanityRM2? rm2, int id) =>
-        rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)id);
-
-    // Amedo
-    private static BaseTwinSection? GraphicsSectionOf(PS2AnyTwinsanityRM2? rm2, int id) =>
-        rm2?.GetItem<PS2AnyGraphicsSection>((uint)TwinConstants.LEVEL_GRAPHICS_SECTION)?.GetItem<BaseTwinSection>((uint)id);
-
-    // Amedo
     private static T? FindIn<T>(PS2AnyTwinsanityRM2?[] order, int sectionId, uint id, bool code) where T : BaseTwinItem
     {
         foreach (var rm2 in order)
-            if ((code ? CodeSectionOf(rm2, sectionId) : GraphicsSectionOf(rm2, sectionId)) is { } sec && sec.ContainsItem(id))
+            if ((code ? MeshDecoder.CodeSection(rm2, sectionId) : MeshDecoder.GraphicsSection(rm2, sectionId)) is { } sec && sec.ContainsItem(id))
                 return sec.GetItem<T>(id);
         return null;
     }
@@ -96,7 +88,7 @@ public sealed partial class GameScene
                 if (!sh.AlphaCorrectionValue) { sh.AlphaCorrectionValue = true; changed++; }
         }
         var order = new[] { src.Rm2, src.GlobalRm2 };
-        if (CodeSectionOf(src.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION) is { } objs)
+        if (MeshDecoder.CodeSection(src.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION) is { } objs)
             for (int i = 0; i < objs.GetItemsAmount(); i++)
             {
                 if (objs.GetItem(i) is not PS2AnyObject o || !o.Name.StartsWith("CE_", StringComparison.Ordinal)) continue;

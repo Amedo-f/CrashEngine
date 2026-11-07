@@ -477,6 +477,7 @@ public sealed partial class GameScene : Scene
     {
         public float Intensity { get; set; } = 1f;
         public float SceneryBrightness { get; set; } = 1f;
+        public float SkydomeBrightness { get; set; } = 1f;
     }
 
     private string GetWorldLightingMetaPath()
@@ -487,27 +488,39 @@ public sealed partial class GameScene : Scene
         return Path.Combine(root, rel + ".json");
     }
 
-    private void SaveWorldLightingMeta(WorldLightingSettings settings)
+    private void SaveWorldLightingMeta(WorldLightingSettings settings, SkydomeMarker? sky)
     {
         try
         {
             var path = GetWorldLightingMetaPath();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
-                new WorldLightingMeta { Intensity = settings.Intensity, SceneryBrightness = settings.SceneryBrightness },
+                new WorldLightingMeta { Intensity = settings.Intensity, SceneryBrightness = settings.SceneryBrightness, SkydomeBrightness = sky?.Brightness ?? 1f },
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
+    }
+
+    private WorldLightingMeta? ReadWorldLightingMeta()
+    {
+        try
+        {
+            var path = GetWorldLightingMetaPath();
+            return File.Exists(path) ? System.Text.Json.JsonSerializer.Deserialize<WorldLightingMeta>(File.ReadAllText(path)) : null;
+        }
+        catch { return null; }
+    }
+
+    private void RestoreSkydomeMeta(SkydomeMarker sky)
+    {
+        if (ReadWorldLightingMeta() is { } meta) sky.Brightness = sky.BakedBrightness = meta.SkydomeBrightness;
     }
 
     private void RestoreWorldLightingMeta(WorldLightingSettings settings)
     {
         try
         {
-            var path = GetWorldLightingMetaPath();
-            if (!File.Exists(path)) return;
-            var meta = System.Text.Json.JsonSerializer.Deserialize<WorldLightingMeta>(File.ReadAllText(path));
-            if (meta is null) return;
+            if (ReadWorldLightingMeta() is not { } meta) return;
             float f = meta.Intensity;
             if (f > 0.001f)
             {
@@ -588,7 +601,7 @@ public sealed partial class GameScene : Scene
 
         if (ambientSynced > 0 || directionalSynced > 0) sceneryItem.HasLighting = true;
 
-        SaveWorldLightingMeta(settings); // Amedo 2026-09-21
+        SaveWorldLightingMeta(settings, AllEntities(chunkRoot).Select(c => c.Get<SkydomeMarker>()).FirstOrDefault(s => s is not null)); // Amedo 2026-09-21
 
         _browser.Log($"Synced world lighting: {ambientSynced} ambient + {directionalSynced} directional light(s) (intensity x{settings.Intensity:F2}), " +
                      $"fog = {CrashEngine.Importer.MeshDecoder.FogColorNames[fogIdxToSave]}, HasLighting={sceneryItem.HasLighting}.");

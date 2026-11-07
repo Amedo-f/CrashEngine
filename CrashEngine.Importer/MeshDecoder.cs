@@ -291,14 +291,7 @@ public static partial class MeshDecoder // Amedo 2026-10-05
 
     public static bool ResetCharacterSkin(object tablesHandle, uint targetObjectId, ushort originalOgiId, ushort cloneOgiId, out string log)
     {
-        log = "";
-        if (tablesHandle is not RmTables tables) { log = "tables handle invalid"; return false; }
-        if (!tables.Objects.TryGetValue(targetObjectId, out var targetObj))
-        { log = $"ObjectId 0x{targetObjectId:X4} not found"; return false; }
-
-        for (int i = 0; i < targetObj.OGISlots.Count; i++)
-            if (targetObj.OGISlots[i] == cloneOgiId) targetObj.OGISlots[i] = originalOgiId;
-
+        if (!SwapOgiSlot(tablesHandle, targetObjectId, cloneOgiId, originalOgiId, out log)) return false;
         log = $"Reset ObjectId 0x{targetObjectId:X4} back to its original OGI 0x{originalOgiId:X4} " +
               $"(reskin clone 0x{cloneOgiId:X4} left in place, unreferenced, in case you want it back).";
         return true;
@@ -306,15 +299,20 @@ public static partial class MeshDecoder // Amedo 2026-10-05
 
     public static bool RedoReskin(object tablesHandle, uint targetObjectId, ushort originalOgiId, ushort cloneOgiId, out string log)
     {
+        if (!SwapOgiSlot(tablesHandle, targetObjectId, originalOgiId, cloneOgiId, out log)) return false;
+        log = $"Re-applied existing reskin clone 0x{cloneOgiId:X4} (any Bone Mapping on it is preserved).";
+        return true;
+    }
+
+    private static bool SwapOgiSlot(object tablesHandle, uint targetObjectId, ushort from, ushort to, out string log)
+    {
         log = "";
         if (tablesHandle is not RmTables tables) { log = "tables handle invalid"; return false; }
         if (!tables.Objects.TryGetValue(targetObjectId, out var targetObj))
         { log = $"ObjectId 0x{targetObjectId:X4} not found"; return false; }
 
         for (int i = 0; i < targetObj.OGISlots.Count; i++)
-            if (targetObj.OGISlots[i] == originalOgiId) targetObj.OGISlots[i] = cloneOgiId;
-
-        log = $"Re-applied existing reskin clone 0x{cloneOgiId:X4} (any Bone Mapping on it is preserved).";
+            if (targetObj.OGISlots[i] == from) targetObj.OGISlots[i] = to;
         return true;
     }
 
@@ -572,6 +570,12 @@ public static partial class MeshDecoder // Amedo 2026-10-05
                 result.Add((o.GetID(), string.IsNullOrWhiteSpace(o.Name) ? $"Object_{o.GetID():X4}" : o.Name.Replace("|", "_")));
         return result.OrderBy(t => t.Item2, StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    public static BaseTwinSection? CodeSection(PS2AnyTwinsanityRM2? rm2, int id) =>
+        rm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)id);
+
+    public static BaseTwinSection? GraphicsSection(PS2AnyTwinsanityRM2? rm2, int id) =>
+        rm2?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION)?.GetItem<BaseTwinSection>((uint)id);
 
     public static Matrix4x4 TwinMatToSys(TwinMat4 m)
     {

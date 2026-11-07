@@ -43,8 +43,7 @@ public sealed partial class GameScene : Scene
         if (thisObj is not null && thisObj.RefBehaviours.Contains((ushort)IronSpringCrateLandedOnId) &&
             scriptChunkSrc is not null)
         {
-            var globalBehSecForSpring = scriptChunkSrc.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var globalBehSecForSpring = MeshDecoder.CodeSection(scriptChunkSrc.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
             if (ImGui.CollapsingHeader("Spring Crate Bounce##springbouncehdr", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 DrawMultiplierSetting(_springCrateBounce, globalBehSecForSpring, scriptChunkSrc);
@@ -110,8 +109,7 @@ public sealed partial class GameScene : Scene
             : 0;
         if (matchingCrateBounceId != 0 && scriptChunkSrc is not null)
         {
-            var globalBehSecForCrateBounce = scriptChunkSrc.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+            var globalBehSecForCrateBounce = MeshDecoder.CodeSection(scriptChunkSrc.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
             if (ImGui.CollapsingHeader("Crate Landing Bounce##cratebouncehdr", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 DrawCrateLandingBounceForId(scriptChunkSrc, globalBehSecForCrateBounce, matchingCrateBounceId);

@@ -1,7 +1,6 @@
 using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
-using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.AgentLab;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
@@ -47,8 +46,7 @@ public sealed partial class GameScene
         }
 
         var chunkSource = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
-        var behSec = chunkSource?.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+        var behSec = MeshDecoder.CodeSection(chunkSource?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
         var explodeGraph = behSec?.GetItem<PS2BehaviourGraph>(CrateExplodeBehaviourId);
 
         if (chunkSource is null)

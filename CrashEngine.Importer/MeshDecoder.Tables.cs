@@ -265,25 +265,7 @@ public static partial class MeshDecoder
             }
 
             RenderPipeline.SkydomeDraws.Clear();
-            var skySec = gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION);
-            if (skySec is not null)
-            {
-                for (int i = 0; i < skySec.GetItemsAmount(); i++)
-                {
-                    if (skySec.GetItem(i) is not PS2AnySkydome sky) continue;
-                    foreach (var meshId in sky.Meshes)
-                    {
-                        if (!meshById.TryGetValue(meshId, out var entry)) continue;
-                        foreach (var (gpuMesh, mat) in entry)
-                        {
-                            mat.FogEnabled = true; // Amedo 2026-09-26
-                            mat.DepthWrite = false;
-                            RenderPipeline.SkydomeDraws.Add((gpuMesh, mat));
-                        }
-                    }
-                    Console.WriteLine($"[MeshDecoder] Skydome {sky.GetID():X8}: {sky.Meshes.Count} meshes");
-                }
-            }
+            AddSkydomeDraws(gfx, meshById);
         }
         else if (gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION) is { } ownSky) // Amedo 2026-09-29
         {
@@ -634,6 +616,29 @@ public static partial class MeshDecoder
         return dict;
     }
 
+    private static List<(Texture2D? Tex, TwinShader? Shader)> SubMaterials(List<uint> materialIds,
+        Dictionary<uint, PS2AnyMaterial> materialsById, Dictionary<uint, Texture2D> texCache)
+    {
+        var subMats = new List<(Texture2D? Tex, TwinShader? Shader)>();
+        foreach (var matId in materialIds)
+        {
+            Texture2D? tex = null;
+            TwinShader? shader = null;
+            if (materialsById.TryGetValue(matId, out var mat))
+            {
+                foreach (var sh in mat.Shaders)
+                {
+                    shader ??= sh;
+                    if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null)
+                        break;
+                }
+                RegisterUpperLayers(mat, texCache);
+            }
+            subMats.Add((tex, shader));
+        }
+        return subMats;
+    }
+
     private static Dictionary<uint, List<(GpuMesh, Material)>> BuildMeshLookup(
         PS2AnyGraphicsSection gfx,
         Dictionary<uint, ITwinModel> modelById,
@@ -673,23 +678,7 @@ public static partial class MeshDecoder
 
             if (!modelById.TryGetValue(rm.Model, out var model)) continue;
 
-            var subMats = new List<(Texture2D? Tex, TwinShader? Shader)>();
-            foreach (var matId in rm.Materials)
-            {
-                Texture2D?  tex    = null;
-                TwinShader? shader = null;
-                if (materialsById.TryGetValue(matId, out var mat))
-                {
-                    foreach (var sh in mat.Shaders)
-                    {
-                        shader ??= sh;
-                        if (texCache.TryGetValue(sh.TextureId, out tex) && tex is not null)
-                            break;
-                    }
-                    RegisterUpperLayers(mat, texCache); // Amedo 2026-09-26
-                }
-                subMats.Add((tex, shader));
-            }
+            var subMats = SubMaterials(rm.Materials, materialsById, texCache);
 
             var gpuList = DecodeModel(gl, model, subMats);
             if (gpuList.Count > 0)

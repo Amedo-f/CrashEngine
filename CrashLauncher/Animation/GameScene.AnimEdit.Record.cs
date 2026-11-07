@@ -7,7 +7,6 @@ using TwinAnimation = Twinsanity.TwinsanityInterchange.Common.Animation.TwinAnim
 using TransformType = Twinsanity.TwinsanityInterchange.Common.Animation.Enums.TransformType;
 using static CrashLauncher.AnimChannelOps;
 using PS2AnyTwinsanityRM2 = Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
@@ -146,7 +145,7 @@ public sealed partial class GameScene
 
 	private static bool HoldsAnimation(PS2AnyTwinsanityRM2? rm2, PS2AnyAnimation anim)
 	{
-		var sec = rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_ANIMATIONS_SECTION);
+		var sec = MeshDecoder.CodeSection(rm2, TwinConstants.CODE_ANIMATIONS_SECTION);
 		if (sec is null) return false;
 		for (int i = 0; i < sec.GetItemsAmount(); i++)
 			if (ReferenceEquals(sec.GetItem(i), anim)) return true;

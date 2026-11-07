@@ -3,7 +3,6 @@ using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
 using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
 using PS2AnyPath = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPath;
@@ -67,8 +66,7 @@ public sealed partial class GameScene : Scene
             {
                 var srcRm2 = new PS2AnyTwinsanityRM2();
                 using (var reader = new BinaryReader(stream)) srcRm2.Read(reader, (int)stream.Length);
-                var objSec = srcRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                    ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+                var objSec = MeshDecoder.CodeSection(srcRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
                 if (objSec is not null)
                 {
                     for (int i = 0; i < objSec.GetItemsAmount(); i++)
@@ -84,8 +82,7 @@ public sealed partial class GameScene : Scene
             {
                 var globalRm2 = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
                 using (var reader = new BinaryReader(globalStream)) globalRm2.Read(reader, (int)globalStream.Length);
-                var gObjSec = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                    ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+                var gObjSec = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
                 if (gObjSec is not null)
                 {
                     for (int i = 0; i < gObjSec.GetItemsAmount(); i++)
@@ -147,8 +144,7 @@ public sealed partial class GameScene : Scene
                 sourceRm2.Read(reader, (int)stream.Length);
 
             PS2AnyTwinsanityRM2 effectiveSourceRm2 = sourceRm2;
-            var localObjSecCheck = sourceRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+            var localObjSecCheck = MeshDecoder.CodeSection(sourceRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
             if (localObjSecCheck?.GetItem<PS2AnyObject>(objectId) is null)
             {
                 using var globalStream = pkg.OpenByPath(@"Startup\Default.rm2");
@@ -156,8 +152,7 @@ public sealed partial class GameScene : Scene
                 {
                     var globalRm2 = new Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2Default();
                     using (var reader = new BinaryReader(globalStream)) globalRm2.Read(reader, (int)globalStream.Length);
-                    var gObjSecCheck = globalRm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-                        ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+                    var gObjSecCheck = MeshDecoder.CodeSection(globalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
                     if (gObjSecCheck?.GetItem<PS2AnyObject>(objectId) is not null)
                         effectiveSourceRm2 = globalRm2;
                 }

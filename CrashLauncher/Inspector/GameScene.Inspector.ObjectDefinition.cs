@@ -2,7 +2,6 @@ using CrashEngine.Core;
 using CrashEngine.Importer;
 using ImGuiNET;
 using System.Numerics;
-using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2AnyObject = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject;
 
@@ -13,16 +12,12 @@ public sealed partial class GameScene : Scene
     private void DrawInspectorObjectDefinition(Entity e, InstanceData inst)
     {
         var scriptChunkSrc = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
-        var objSecForInsp = scriptChunkSrc?.Rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
-        var behSecForInsp = scriptChunkSrc?.Rm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+        var objSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
+        var behSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.Rm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
         var localObjForInsp = objSecForInsp?.GetItem<PS2AnyObject>(inst.ObjectId);
-        var globalObjSecForInsp = scriptChunkSrc?.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+        var globalObjSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
         var globalObjForInsp = globalObjSecForInsp?.GetItem<PS2AnyObject>(inst.ObjectId);
-        var globalBehSecForInsp = scriptChunkSrc?.GlobalRm2?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);
+        var globalBehSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
 
         var thisObj = globalObjForInsp ?? localObjForInsp;
         bool editingGlobal = globalObjForInsp is not null;

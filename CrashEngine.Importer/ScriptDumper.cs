@@ -85,10 +85,21 @@ public static class ScriptDumper
     public static SpawnScriptInfo? ResolveSpawnScript(
         PS2AnyTwinsanityRM2 localRm2, PS2AnyTwinsanityRM2? globalRm2, uint scriptId, int maxDepth = 8)
     {
-        var localBeh = localRm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)Constants.CODE_BEHAVIOURS_SECTION);
-        var globalBeh = globalRm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)Constants.CODE_BEHAVIOURS_SECTION);
+        if (WalkSpawnStarters(localRm2, globalRm2, scriptId, maxDepth) is not ({ } graph, var id, var isGlobal, var depth)) return null;
+        string name = string.IsNullOrEmpty(graph.Name) ? $"Script_{id:X4}" : graph.Name;
+        try { return new SpawnScriptInfo(id, name, AgentLabDecompiler.Decompile(graph), isGlobal, depth); }
+        catch (Exception ex) { return new SpawnScriptInfo(id, name, $"// Decompile failed: {ex.Message}\n", isGlobal, depth); }
+    }
+
+    public static PS2BehaviourGraph? ResolveSpawnScriptGraph(
+        PS2AnyTwinsanityRM2 localRm2, PS2AnyTwinsanityRM2? globalRm2, uint scriptId, int maxDepth = 8) =>
+        WalkSpawnStarters(localRm2, globalRm2, scriptId, maxDepth)?.Graph;
+
+    private static (PS2BehaviourGraph Graph, uint Id, bool IsGlobal, int Depth)? WalkSpawnStarters(
+        PS2AnyTwinsanityRM2 localRm2, PS2AnyTwinsanityRM2? globalRm2, uint scriptId, int maxDepth)
+    {
+        var localBeh = MeshDecoder.CodeSection(localRm2, Constants.CODE_BEHAVIOURS_SECTION);
+        var globalBeh = MeshDecoder.CodeSection(globalRm2, Constants.CODE_BEHAVIOURS_SECTION);
 
         uint currentId = scriptId;
         for (int depth = 0; depth < maxDepth; depth++)
@@ -98,39 +109,7 @@ public static class ScriptDumper
             if (item is null) { item = globalBeh?.GetItem<BaseTwinItem>(currentId); isGlobal = true; }
             if (item is null) return null;
 
-            if (item is PS2BehaviourGraph graph)
-            {
-                string name = string.IsNullOrEmpty(graph.Name) ? $"Script_{currentId:X4}" : graph.Name;
-                try { return new SpawnScriptInfo(currentId, name, AgentLabDecompiler.Decompile(graph), isGlobal, depth); }
-                catch (Exception ex) { return new SpawnScriptInfo(currentId, name, $"// Decompile failed: {ex.Message}\n", isGlobal, depth); }
-            }
-            if (item is TwinBehaviourStarter starter)
-            {
-                if (starter.Assigners.Count == 0) return null;
-                currentId = (uint)(starter.Assigners[0].Behaviour - 1);
-                continue;
-            }
-            return null;
-        }
-        return null;
-    }
-
-    public static PS2BehaviourGraph? ResolveSpawnScriptGraph(
-        PS2AnyTwinsanityRM2 localRm2, PS2AnyTwinsanityRM2? globalRm2, uint scriptId, int maxDepth = 8)
-    {
-        var localBeh = localRm2.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)Constants.CODE_BEHAVIOURS_SECTION);
-        var globalBeh = globalRm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)Constants.CODE_BEHAVIOURS_SECTION);
-
-        uint currentId = scriptId;
-        for (int depth = 0; depth < maxDepth; depth++)
-        {
-            BaseTwinItem? item = localBeh?.GetItem<BaseTwinItem>(currentId);
-            if (item is null) item = globalBeh?.GetItem<BaseTwinItem>(currentId);
-            if (item is null) return null;
-
-            if (item is PS2BehaviourGraph graph) return graph;
+            if (item is PS2BehaviourGraph graph) return (graph, currentId, isGlobal, depth);
             if (item is TwinBehaviourStarter starter)
             {
                 if (starter.Assigners.Count == 0) return null;

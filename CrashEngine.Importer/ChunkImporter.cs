@@ -236,11 +236,15 @@ public static class ChunkImporter
         return rm2;
     }
 
-    private static Dictionary<uint, Texture2D> BuildTextures(GL gl, PS2AnyTwinsanityRM2 rm2)
+    private static Dictionary<uint, Texture2D> BuildTextures(GL gl, PS2AnyTwinsanityRM2 rm2) =>
+        DecodeTextures(gl, rm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION));
+
+    private static Dictionary<uint, Texture2D> BuildSm2Textures(GL gl, PS2AnyTwinsanitySM2 sm2) =>
+        DecodeTextures(gl, sm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.SCENERY_GRAPHICS_SECTION));
+
+    private static Dictionary<uint, Texture2D> DecodeTextures(GL gl, PS2AnyGraphicsSection? gfx)
     {
         var map = new Dictionary<uint, Texture2D>();
-
-        var gfx = rm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
         if (gfx is null) return map;
 
         var texSec = gfx.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
@@ -373,26 +377,6 @@ public static class ChunkImporter
             new StbImageWriteSharp.ImageWriter().WritePng(rgba, w, h, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, fs);
         }
         catch (IOException) { }
-    }
-
-    private static Dictionary<uint, Texture2D> BuildSm2Textures(GL gl, PS2AnyTwinsanitySM2 sm2)
-    {
-        var map = new Dictionary<uint, Texture2D>();
-        var gfx = sm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.SCENERY_GRAPHICS_SECTION);
-        if (gfx is null) return map;
-
-        var texSec = gfx.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION);
-        if (texSec is null) return map;
-
-        for (int i = 0; i < texSec.GetItemsAmount(); i++)
-        {
-            if (texSec.GetItem(i) is PS2AnyTexture tex)
-            {
-                var t = DecodeTexture(gl, tex);
-                if (t is not null) map[tex.GetID()] = t;
-            }
-        }
-        return map;
     }
 
     private static Dictionary<uint, PatrolPath> ExtractPaths(PS2AnyTwinsanityRM2 rm2)
@@ -535,6 +519,7 @@ public sealed class LoadZoneBoxMarker : CrashEngine.Core.Component
 public sealed class SkydomeMarker : CrashEngine.Core.Component
 {
     public float Brightness = 1f;
+    public float BakedBrightness = 1f;
     public Dictionary<object, List<Twinsanity.TwinsanityInterchange.Common.Vector4>>? BaseColors;
 }
 

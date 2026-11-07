@@ -118,9 +118,7 @@ public sealed partial class GameScene
         {
             var freshRm2 = ReadPristineRm2(rm2Scope);
 
-            var freshSndSec = freshRm2.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>(
-                    (uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
-                ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>((uint)sectionId);
+            var freshSndSec = MeshDecoder.CodeSection(freshRm2, sectionId);
             var original = freshSndSec?.GetItem<PS2AnySound>(sid);
             if (original is null)
             {
@@ -175,9 +173,7 @@ public sealed partial class GameScene
             {
                 var scopeRm2 = rm2Scope.Equals(@"Startup\Default.rm2", StringComparison.OrdinalIgnoreCase)
                     ? chunkSrc?.GlobalRm2 : chunkSrc?.Rm2;
-                var sndSec = scopeRm2
-                    ?.GetItem<BaseTwinSection>((uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
-                    ?.GetItem<BaseTwinSection>((uint)sectionId);
+                var sndSec = MeshDecoder.CodeSection(scopeRm2, sectionId);
                 short channels = 1;
                 uint sampleRate = sndSec?.GetItem<PS2AnySound>(sid)?.GetFreq() ?? 32000u;
                 using var fs = File.Create(SoundGainBaselinePath(sid, rm2Scope, sectionId));
@@ -221,9 +217,7 @@ public sealed partial class GameScene
         BaseTwinSection? section = null;
         try
         {
-            section = TryReadPristineRm2(rm2Scope)?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>(
-                    (uint)Twinsanity.TwinsanityInterchange.Enumerations.Constants.LEVEL_CODE_SECTION)
-                ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection>((uint)sectionId);
+            section = MeshDecoder.CodeSection(TryReadPristineRm2(rm2Scope), sectionId);
         }
         catch
         {

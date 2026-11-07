@@ -524,6 +524,11 @@ public static partial class MeshDecoder
         var modelById = BuildModelLookup(gfx);
         var meshById  = BuildMeshLookup(gfx, modelById, gl, texCache);
 
+        AddSkydomeDraws(gfx, meshById);
+    }
+
+    private static void AddSkydomeDraws(PS2AnyGraphicsSection gfx, Dictionary<uint, List<(GpuMesh, Material)>> meshById)
+    {
         var skySec = gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION);
         if (skySec is null) return;
         for (int i = 0; i < skySec.GetItemsAmount(); i++)
@@ -534,7 +539,7 @@ public static partial class MeshDecoder
                 if (!meshById.TryGetValue(meshId, out var entry)) continue;
                 foreach (var (gpuMesh, mat) in entry)
                 {
-                    mat.FogEnabled = true; // Amedo 2026-09-26
+                    mat.FogEnabled = true;
                     mat.DepthWrite = false;
                     RenderPipeline.SkydomeDraws.Add((gpuMesh, mat));
                 }

@@ -44,12 +44,8 @@ public sealed partial class GameScene : Scene
         var deletedTransplantObjIds = new HashSet<uint>();
 
         var chunkSourceForPlaceholder = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
-        var objSecForPlaceholder = chunkSourceForPlaceholder?.Rm2
-            .GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
-        var globalObjSecForPlaceholder = chunkSourceForPlaceholder?.GlobalRm2
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION)
-            ?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_GAME_OBJECTS_SECTION);
+        var objSecForPlaceholder = MeshDecoder.CodeSection(chunkSourceForPlaceholder?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
+        var globalObjSecForPlaceholder = MeshDecoder.CodeSection(chunkSourceForPlaceholder?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
         ushort? placeholderObjectId = objSecForPlaceholder is not null
             ? GetOrCreateEmptyPlaceholderObjectId(objSecForPlaceholder, globalObjSecForPlaceholder)
             : null;

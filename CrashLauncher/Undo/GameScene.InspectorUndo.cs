@@ -105,7 +105,7 @@ public sealed partial class GameScene
                 if (GameShadowDefs.Object(src.GlobalRm2, data.ObjectId) is { } g && !ReferenceEquals(g, GameShadowDefs.Object(src.Rm2, data.ObjectId))) Item(g, true);
             }
             foreach (var (rm, global) in new[] { (src.Rm2, false), (src.GlobalRm2, true) })
-                if (CodeSectionOf(rm, TwinConstants.CODE_BEHAVIOURS_SECTION) is { } beh)
+                if (MeshDecoder.CodeSection(rm, TwinConstants.CODE_BEHAVIOURS_SECTION) is { } beh)
                     for (int i = 0; i < beh.GetItemsAmount(); i++)
                         if (beh.GetItem(i) is BaseTwinItem g) Item(g, global);
             if (src.Sm2?.GetItem<PS2AnyScenery>((uint)TwinConstants.SCENERY_SECENERY_ITEM) is { } scenery)

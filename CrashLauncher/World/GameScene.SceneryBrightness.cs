@@ -62,9 +62,10 @@ public sealed partial class GameScene : Scene
         if (chunkSource?.Sm2 is null || gfx is null || skySec is null)
         { _browser.Log("Skydome Brightness: this level has no skydome data."); return; }
 
-        marker.BaseColors ??= CaptureBaseColors(gfx, SkydomeMeshIds(skySec), 1f);
+        marker.BaseColors ??= CaptureBaseColors(gfx, SkydomeMeshIds(skySec), marker.BakedBrightness > 0.001f ? marker.BakedBrightness : 1f);
         ScaleBaseColors(marker.BaseColors, marker.Brightness);
         RefreshSceneryModels(chunkSource, gfx, SkydomeMeshIds(skySec));
+        marker.BakedBrightness = marker.Brightness;
 
         _browser.Log($"Skydome brightness set to {marker.Brightness:F2}x ({marker.BaseColors.Count} real submodel(s)). " +
                       "3D preview updates immediately, no reload needed. Save Chunk to keep it, then Build ISO + test.");
