@@ -109,10 +109,17 @@ public sealed partial class SceneSimulation
     {
         foreach (var agent in World.Agents.ToList())
         {
-            if (ReferenceEquals(agent, World.Player) || agent.Information is not { } info) continue;
-            if (World.ChunkNamed_1F0F58(info.Chunk) is not { } target) continue;
-            if (ReferenceEquals(agent.Chunk, target) && agent.GameMatrix == info.Matrix) continue;
-            Restart_197428(agent, info);
+            if (ReferenceEquals(agent, World.Player)) continue;
+            var info = agent.Information ?? agent.Places?.Entries.FirstOrDefault(e => e.Chunk == agent.Places.Chunk);
+            if (info is not null && World.ChunkNamed_1F0F58(info.Chunk) is { } target)
+            {
+                if (ReferenceEquals(agent.Chunk, target) && agent.GameMatrix == info.Matrix) continue;
+                Restart_197428(agent, info);
+                continue;
+            }
+            if (info is null && agent.Places is null || info is not null && (info.Flags & 1) != 0) continue;
+            agent.ChunkMakeGlobal_1F1B40();
+            ReleaseGlobal_197570(agent);
         }
     }
 }

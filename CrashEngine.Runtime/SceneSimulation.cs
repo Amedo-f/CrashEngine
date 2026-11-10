@@ -178,7 +178,16 @@ public sealed partial class SceneSimulation
     private void CreateAgents()
     {
         foreach (var s in _snapshot)
-            if (!s.Skipped) CreateAgent(s.Entity, s.Entity.Get<InstanceData>()!, s.Chunk ?? World.RootChunk); // Amedo 2026-09-29
+        {
+            if (s.Skipped) continue;
+            if (s.Chunk is not null && InstancesOf(s.Chunk) is { } home && !Under(s.Entity, home))
+            {
+                RememberHome(s.Entity);
+                s.Entity.Parent?.RemoveChild(s.Entity);
+                home.AddChild(s.Entity);
+            }
+            CreateAgent(s.Entity, s.Entity.Get<InstanceData>()!, s.Chunk ?? World.RootChunk); // Amedo 2026-09-29
+        }
     }
 
     // Amedo 2026-09-29

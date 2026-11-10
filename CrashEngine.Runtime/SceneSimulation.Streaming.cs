@@ -853,6 +853,7 @@ public sealed partial class SceneSimulation
         foreach (var agent in World.Agents) agent.ForgetReleased();
         foreach (var snap in _snapshot.Where(x => ReferenceEquals(x.Chunk, s.Chunk)))
             if (snap.Entity.Get<AgentLabAgent>() is not { } alive || ReferenceEquals(alive.Chunk, s.Chunk)) Restore(snap); // Amedo 2026-09-29
+        KeepSlotCharacters(s.Chunk);
         _snapshot.RemoveAll(x => ReferenceEquals(x.Chunk, s.Chunk));
         World.RemoveChunk(s.Chunk);
         World.Sounds?.RemoveLevel(s.Chunk.Rm2); // Amedo 2026-09-29
@@ -943,6 +944,19 @@ public sealed partial class SceneSimulation
         _log?.Invoke($"[stream] respawn: {player.Entity.Name} goes to {target.Name} (0x1954A8 -> 0x1ED188), root {World.RootChunk.Name}");
     }
 
+    private void KeepSlotCharacters(WorldChunk unloading)
+    {
+        for (int i = 0; i < _snapshot.Count; i++)
+        {
+            var snap = _snapshot[i];
+            if (!ReferenceEquals(snap.Chunk, unloading) || snap.Skipped || snap.Entity.Get<AgentLabAgent>() is not { Destroyed: false } kept) continue;
+            int slot = CharacterSlot(kept.Instance);
+            if (slot == 6 || ReferenceEquals(kept.Chunk, unloading) || !ReferenceEquals(World.PlayerSlot_570(slot), kept)) continue;
+            _snapshot[i] = snap with { Chunk = kept.Chunk };
+            _log?.Invoke($"[stream] {unloading.Name} unloads: {kept.Entity.Name} (slot {slot}) lives on in {kept.Chunk.Name} and is kept for a reset there");
+        }
+    }
+
     // Amedo 2026-09-29
     private void PlaceSecond_171E90(WorldChunk target)
     {
@@ -998,6 +1012,7 @@ public sealed partial class SceneSimulation
     // Amedo 2026-09-29
     private void ReleaseAgent(AgentLabAgent agent)
     {
+        agent.ReleaseParts_23CF38();
         if (!agent.Rendered) agent.SetRendered(true);
         agent.Instance.ShadowOverride = null;
         agent.Instance.RuntimeShadowSlots = null; // Amedo
