@@ -9,6 +9,36 @@ public sealed partial class GameScene
 {
     private volatile bool _buildingPc;
 
+    private const string BuiltGameName = "Crash Twinsanity";
+    private string _pcOutputPath = "";
+    private bool _pcPathLoaded;
+    private string PcOutputPathFile => Path.Combine(ProjectRoot(), ".pc_output_path.txt");
+
+    private void EnsurePcOutputPathLoaded()
+    {
+        if (_pcPathLoaded) return;
+        _pcPathLoaded = true;
+        try { if (File.Exists(PcOutputPathFile)) _pcOutputPath = File.ReadAllText(PcOutputPathFile).Trim(); }
+        catch { }
+    }
+
+    private void SavePcOutputPath()
+    {
+        try { File.WriteAllText(PcOutputPathFile, _pcOutputPath ?? ""); } catch { }
+    }
+
+    private void ChoosePcOutputPath(Action? then)
+    {
+        ShowFolderDialog($"Choose where Build to PC puts the game (it builds into a \"{BuiltGameName}\" folder inside it)",
+            _pcOutputPath.Trim(), path =>
+            {
+                if (path is null) return;
+                _pcOutputPath = path;
+                SavePcOutputPath();
+                then?.Invoke();
+            });
+    }
+
     // Amedo 2026-09-30
     private static string? FindCrashGameProject()
     {
@@ -31,7 +61,7 @@ public sealed partial class GameScene
         var outDir = Path.Combine(ProjectRoot(), "LaunchPlayer");
         if (!File.Exists(Path.Combine(outDir, "CrashGame.exe")) || PlayerIsStale(outDir))
         {
-            _browser.Log($"Launch Player: preparing the test copy of the game in {outDir} (Build\\PC is not touched)...");
+            _browser.Log($"Launch Player: preparing the test copy of the game in {outDir} (the Build to PC folder is not touched)...");
             BuildGameInto(outDir, "Launch Player", StartLaunchedGame);
             return;
         }
@@ -67,25 +97,42 @@ public sealed partial class GameScene
     }
 
     // Amedo
-    private void StartLaunchedGame(string outDir)
+    private void StartLaunchedGame(string outDir) => _playerProcess = StartGame(outDir, "CrashGame", "Launch Player");
+
+    private void RunBuiltGame(string outDir) => StartGame(outDir, BuiltGameName, "Build And Run")?.Dispose();
+
+    private Process? StartGame(string outDir, string exeName, string label)
     {
-        var exe = Path.Combine(outDir, "CrashGame.exe");
+        var exe = Path.Combine(outDir, exeName + ".exe");
         try
         {
-            _playerProcess = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = outDir, UseShellExecute = false });
-            _browser.Log($"Launch Player: started {exe} (pid {_playerProcess?.Id}; Esc quits).");
+            var process = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = outDir, UseShellExecute = false });
+            _browser.Log($"{label}: started {exe} (pid {process?.Id}; Esc quits).");
+            return process;
         }
         catch (Exception ex)
         {
-            _browser.Log("Launch Player: failed to start -- " + ex.Message);
+            _browser.Log($"{label}: failed to start -- " + ex.Message);
+            return null;
         }
     }
 
     // Amedo 2026-09-30
-    private void BuildPc() => BuildGameInto(Path.Combine(ProjectRoot(), "Build", "PC"), "Build to PC", null); // Amedo
+    private void BuildPc(bool run = false)
+    {
+        if (_buildingPc) return;
+        EnsurePcOutputPathLoaded();
+        if (string.IsNullOrWhiteSpace(_pcOutputPath))
+        {
+            _browser.Log("Build to PC: choose the folder first (kept for this project until you change it).");
+            ChoosePcOutputPath(() => BuildPc(run));
+            return;
+        }
+        BuildGameInto(Path.Combine(_pcOutputPath.Trim(), BuiltGameName), run ? "Build And Run" : "Build to PC", run ? RunBuiltGame : null, BuiltGameName);
+    }
 
     // Amedo
-    private void BuildGameInto(string outDir, string label, Action<string>? then)
+    private void BuildGameInto(string outDir, string label, Action<string>? then, string exeName = "CrashGame")
     {
         if (_buildingPc) return;
         if (Roots.Any(r => r.Has<ChunkSource>()) && !SaveChunk(confirm: false)) // Amedo 2026-10-04
@@ -101,7 +148,7 @@ public sealed partial class GameScene
             var player = Path.Combine(AppContext.BaseDirectory, "Player");
             if (!File.Exists(Path.Combine(player, "CrashGame.exe")))
             {
-                _browser.Log($"{label}: no game player was found (expected a Player folder next to CrashLauncher.exe, or the CrashGame project next to CrashEngine).");
+                _browser.Log($"{label}: no game player was found (expected a Player folder next to CrashLauncher.exe, or the CrashGame project inside CrashEngine).");
                 return;
             }
             _buildingPc = true;
@@ -112,7 +159,8 @@ public sealed partial class GameScene
                 {
                     CopyPlayer(player, outDir);
                     WriteGameConfig(outDir, projectRoot, level);
-                    LogBuilt(label, outDir, level); // Amedo
+                    NameGameExe(outDir, exeName);
+                    LogBuilt(label, outDir, level, exeName); // Amedo
                     then?.Invoke(outDir); // Amedo
                 }
                 catch (Exception ex)
@@ -150,7 +198,8 @@ public sealed partial class GameScene
                     return;
                 }
                 WriteGameConfig(outDir, projectRoot, level); // Amedo
-                LogBuilt(label, outDir, level); // Amedo
+                NameGameExe(outDir, exeName);
+                LogBuilt(label, outDir, level, exeName); // Amedo
                 then?.Invoke(outDir); // Amedo
             }
             catch (Exception ex)
@@ -182,9 +231,15 @@ public sealed partial class GameScene
     }
 
     // Amedo
-    private void LogBuilt(string label, string outDir, string? level)
+    private void LogBuilt(string label, string outDir, string? level, string exeName)
     {
-        _browser.Log($"{label}: done -> {Path.Combine(outDir, "CrashGame.exe")} (starts in {level ?? "the default level"}; Esc quits, F1 stats, F3 frame rate)");
+        _browser.Log($"{label}: done -> {Path.Combine(outDir, exeName + ".exe")} (starts in {level ?? "the default level"}; Esc quits, F1 stats, F3 frame rate)");
+    }
+
+    private static void NameGameExe(string outDir, string exeName)
+    {
+        if (exeName == "CrashGame") return;
+        File.Move(Path.Combine(outDir, "CrashGame.exe"), Path.Combine(outDir, exeName + ".exe"), overwrite: true);
     }
 
     // Amedo

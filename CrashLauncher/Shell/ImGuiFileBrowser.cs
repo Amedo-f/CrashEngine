@@ -5,7 +5,7 @@ namespace CrashLauncher;
 
 public sealed class ImGuiFileBrowser
 {
-    private enum Mode { None, Open, Save }
+    private enum Mode { None, Open, Save, Folder }
 
     private readonly struct Entry
     {
@@ -52,7 +52,15 @@ public sealed class ImGuiFileBrowser
     public void OpenSave(string title, string filter, string defaultFileName, Action<string?> onPicked)
     {
         BeginRequest(Mode.Save, title, filter, onPicked);
-        _typedName = defaultFileName;
+        _typedName = Path.GetFileName(defaultFileName);
+        if (Path.GetDirectoryName(defaultFileName) is { Length: > 0 } dir && Directory.Exists(dir)) NavigateTo(dir, recordHistory: false);
+    }
+
+    public void OpenFolder(string title, string startDir, Action<string?> onPicked)
+    {
+        BeginRequest(Mode.Folder, title, "", onPicked);
+        _typedName = "";
+        if (startDir.Length > 0 && Directory.Exists(startDir)) NavigateTo(startDir, recordHistory: false);
     }
 
     private void BeginRequest(Mode mode, string title, string filter, Action<string?> onPicked)
@@ -111,6 +119,7 @@ public sealed class ImGuiFileBrowser
             _pathEditBuf = dir;
             _search = "";
             _checkedNames.Clear();
+            if (_mode == Mode.Folder) _typedName = "";
             s_lastDir = dir;
             _error = null;
 
@@ -154,6 +163,7 @@ public sealed class ImGuiFileBrowser
                 try { mod = Directory.GetLastWriteTime(d); } catch {  }
                 _entries.Add(new Entry(Path.GetFileName(d) ?? d, true, mod, -1));
             }
+            if (_mode == Mode.Folder) return;
 
             var files = Directory.GetFiles(_currentDir)
                 .Where(f => MatchesCurrentFilter(Path.GetFileName(f)))
@@ -170,8 +180,19 @@ public sealed class ImGuiFileBrowser
 
     private string CandidatePath => Path.Combine(_currentDir, _typedName);
 
+    private string CandidateFolder => _typedName.Length > 0 ? Path.Combine(_currentDir, _typedName) : _currentDir;
+
     private void Confirm()
     {
+        if (_mode == Mode.Folder)
+        {
+            string folder = CandidateFolder;
+            if (!Directory.Exists(folder)) { _error = "That folder doesn't exist."; return; }
+            var picked = _callback;
+            Close();
+            picked?.Invoke(folder);
+            return;
+        }
         if (string.IsNullOrWhiteSpace(_typedName)) return;
         string path = CandidatePath;
 
@@ -404,10 +425,11 @@ public sealed class ImGuiFileBrowser
                 else             ImGui.Dummy(IconSize);
                 ImGui.SameLine();
 
-                bool selected = !entry.IsDir && (_checkedNames.Contains(entry.Name) || _typedName == entry.Name);
+                bool pickable = _mode == Mode.Folder ? entry.IsDir : !entry.IsDir;
+                bool selected = pickable && (_checkedNames.Contains(entry.Name) || _typedName == entry.Name);
                 if (ImGui.Selectable(entry.Name, selected, ImGuiSelectableFlags.SpanAllColumns))
                 {
-                    if (!entry.IsDir) _typedName = entry.Name;
+                    if (pickable) _typedName = entry.Name;
                 }
                 if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                 {
@@ -446,6 +468,12 @@ public sealed class ImGuiFileBrowser
                 $"{_checkedNames.Count} files checked — only the last one checked ('{_typedName}') " +
                 "will be used (multi-file import isn't wired up here yet).");
 
+        if (_mode == Mode.Folder)
+        {
+            DrawFolderFooter();
+            return;
+        }
+
         float filterW = 220f;
         float buttonsW = 220f;
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - filterW - buttonsW - 16f);
@@ -472,6 +500,26 @@ public sealed class ImGuiFileBrowser
         ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.15f, 0.38f, 0.75f, 1f));
         ImGui.BeginDisabled(!canConfirm);
         if (ImGui.Button(_mode == Mode.Save ? "Save" : "Open", new Vector2(100f, 0f)))
+            Confirm();
+        ImGui.EndDisabled();
+        ImGui.PopStyleColor(3);
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Vector2(100f, 0f)))
+            Cancel();
+    }
+
+    private void DrawFolderFooter()
+    {
+        string folder = CandidateFolder;
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 236f);
+        ImGui.InputText("##filebrowserfolder", ref folder, 512, ImGuiInputTextFlags.ReadOnly);
+
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.45f, 0.85f, 1f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.28f, 0.53f, 0.93f, 1f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.15f, 0.38f, 0.75f, 1f));
+        ImGui.BeginDisabled(!Directory.Exists(CandidateFolder));
+        if (ImGui.Button("Select Folder", new Vector2(120f, 0f)))
             Confirm();
         ImGui.EndDisabled();
         ImGui.PopStyleColor(3);

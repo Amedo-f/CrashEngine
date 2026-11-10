@@ -9,4 +9,7 @@ public sealed partial class GameScene : Scene
 
     private void ShowSaveFileDialog(string title, string filter, string defaultFileName, Action<string?> callback) =>
         _fileBrowser.OpenSave(title, filter, defaultFileName, callback);
+
+    private void ShowFolderDialog(string title, string startDir, Action<string?> callback) =>
+        _fileBrowser.OpenFolder(title, startDir, callback);
 }

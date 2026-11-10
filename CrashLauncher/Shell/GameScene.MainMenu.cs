@@ -38,18 +38,7 @@ public sealed partial class GameScene
         if (ImGui.MenuItem("Reset ALL Levels From Disc (delete all saved edits)...")) _openResetAllConfirmPopup = true;
         ImGui.PopStyleColor();
         ImGui.Separator();
-        if (ImGui.MenuItem("Build ISO (PS2)")) BuildIso();
-        if (ImGui.BeginMenu("ISO Output Path"))
-        {
-            EnsureIsoOutputPathLoaded();
-            ImGui.TextDisabled("ISO output file (kept for this project until you change it):");
-            ImGui.SetNextItemWidth(360f);
-            if (ImGui.InputTextWithHint("##isoOutPath", "not set — Build ISO asks for it", ref _isoOutputPath, 512u)) SaveIsoOutputPath();
-            ImGui.SameLine();
-            if (ImGui.Button("...##isoOutBrowse")) ChooseIsoOutputPath(null);
-            ImGui.EndMenu();
-        }
-        if (ImGui.MenuItem(_buildingPc ? "Building PC..." : "Build to PC", null, false, !_buildingPc)) BuildPc();
+        if (ImGui.MenuItem("Build...")) _showBuildWindow = true;
         ImGui.EndDisabled();
         ImGui.Separator();
         if (ImGui.MenuItem("Import Object (OBJ + textures)..."))

@@ -327,6 +327,8 @@ public sealed partial class GameScene : Scene
 		int height = Engine.Instance.Height;
 		float y = (float)height - 32f - 180f - 2f;
 		DrawTopBar(width);
+		_windowChrome.SetWorkArea(new System.Numerics.Vector2(0f, 32f), new System.Numerics.Vector2(width, (float)height - 32f));
+		DrawBuildWindow();
 		_fileBrowser.Draw();
 		DrawUiBrowser();
 		DrawGameSettings();
