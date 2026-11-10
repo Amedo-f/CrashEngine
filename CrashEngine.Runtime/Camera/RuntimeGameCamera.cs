@@ -561,7 +561,9 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
             SwitchCamera_177A90(c); // Amedo 2026-10-30
         }
         Camera.SetTime((uint)_world.NowTicks, dtTicks);
-        if (play) PlayUpdate(pad, c, player);
+        RequestZones_131320(c, player);
+        if (play) PlayUpdate(pad, c);
+        else Camera.PlayerCameraUpdate_172A48(_comp, GameCamera.TimeStruct, _inst, _c); // Amedo 2026-11-09
         FinishUpdate(Memory.U(Camera.Handle(_comp + 0x20) + 8));
     }
 
@@ -586,7 +588,15 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     }
 
     // Amedo 2026-09-29
-    private void PlayUpdate(CharacterPad pad, CharacterController c, AgentLabAgent player)
+    private void PlayUpdate(CharacterPad pad, CharacterController c)
+    {
+        Camera.SetInput(_comp + 0x50, Axis(pad, 0), Axis(pad, 1), Axis(pad, 2), Axis(pad, 3), Axis(pad, 4), Button(pad), 0f, 0f);
+        c.LookStickX = Axis(pad, 0); // Amedo 2026-09-29
+        c.LookStickY = Axis(pad, 1);
+        Camera.PlayerCameraUpdate_172A48(_comp, GameCamera.TimeStruct, _inst, _c);
+    }
+
+    private void RequestZones_131320(CharacterController c, AgentLabAgent player)
     {
         uint p = _comp + 0x30;
         Camera.ZoneRequestReset_15E9D8(p);
@@ -601,10 +611,6 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
             _overlapping.Add(z.Address);
             Camera.ZoneRequest_15E9F0(p, z.Address, z.Priority, _c);
         }
-        Camera.SetInput(_comp + 0x50, Axis(pad, 0), Axis(pad, 1), Axis(pad, 2), Axis(pad, 3), Axis(pad, 4), Button(pad), 0f, 0f);
-        c.LookStickX = Axis(pad, 0); // Amedo 2026-09-29
-        c.LookStickY = Axis(pad, 1);
-        Camera.PlayerCameraUpdate_172A48(_comp, GameCamera.TimeStruct, _inst, _c);
     }
 
     // Amedo 2026-09-29
