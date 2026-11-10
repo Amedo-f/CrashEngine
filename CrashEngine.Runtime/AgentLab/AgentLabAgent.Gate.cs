@@ -102,14 +102,11 @@ public sealed partial class AgentLabAgent
             _hullOgi    = ogi;
             _localHulls = CrashEngine.Runtime.Physics.OgiHulls.Of(ogi).ToList(); // Amedo
         }
-        var joints = JointsOf(ogi);
         var min = new Vector3(float.MaxValue);
         var max = new Vector3(float.MinValue);
         for (int i = 0; i < _localHulls!.Count; i++)
         {
-            var world = m;
-            int joint = CrashEngine.Runtime.Physics.OgiHulls.Joint(ogi, i); // Amedo
-            if (joint != 0xFF && joints.TryGetValue(joint, out var jw)) world = jw * m;
+            var world = HullMatrix_1EB268(ogi, i, m); // Amedo 2026-11-09
             var (hmin, hmax) = _localHulls[i].Bounds(world);
             min = Vector3.Min(min, hmin);
             max = Vector3.Max(max, hmax);
@@ -120,6 +117,19 @@ public sealed partial class AgentLabAgent
         _hullBox       = (min, max);
         return _hullBox;
     }
+
+    // Amedo 2026-11-09
+    internal Matrix4x4 HullMatrix_1EB268(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI ogi, int hull, Matrix4x4 m)
+    {
+        int joint = CrashEngine.Runtime.Physics.OgiHulls.Joint(ogi, hull);
+        return joint == 0xFF ? m : CopyMatrixAtIndex_1EADE0(ogi, joint) * m;
+    }
+
+    // Amedo 2026-11-09
+    private Matrix4x4 CopyMatrixAtIndex_1EADE0(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI ogi, int joint) =>
+        _jointsPosed_19DE40 && JointsOf(ogi).TryGetValue(joint, out var jw) ? jw : Matrix4x4.Identity;
+
+    private bool _jointsPosed_19DE40; // Amedo 2026-11-09
 
     private AgentCell? _cell; // Amedo
     internal AgentCell Cell => _cell ??= new AgentCell(this);
@@ -250,6 +260,7 @@ public sealed partial class AgentLabAgent
     // Amedo 2026-10-01
     internal void AnimGroup_19DE40()
     {
+        if (!_destroyed) _jointsPosed_19DE40 = true; // Amedo 2026-11-09
         if (Anim is not { } anim || _destroyed) return;
         anim.LogicDriven = true;
         bool gate = World.GateActive && InTree;

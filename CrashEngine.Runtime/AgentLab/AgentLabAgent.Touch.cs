@@ -86,10 +86,7 @@ public sealed partial class AgentLabAgent
         }
         for (int i = 0; i < _localHulls!.Count; i++)
         {
-            var world = m;
-            int joint = OgiHulls.Joint(ogi!, i); // Amedo
-            if (joint != 0xFF && JointsOf(ogi).TryGetValue(joint, out var jw)) world = jw * m; // Amedo 2026-09-30
-            _collisionBody.Parts.Add((_localHulls[i], world));
+            _collisionBody.Parts.Add((_localHulls[i], HullMatrix_1EB268(ogi!, i, m))); // Amedo 2026-11-09
         }
         return _collisionBody;
     }
@@ -110,11 +107,7 @@ public sealed partial class AgentLabAgent
     {
         var m = GameMatrix;
         if (_ownHull_4 is not null) return m; // Amedo
-        if (Ogi is { } ogi && part >= 0 && part < OgiHulls.Count(ogi)) // Amedo
-        {
-            int joint = OgiHulls.Joint(ogi, part);
-            if (joint != 0xFF && JointsOf(ogi).TryGetValue(joint, out var jw)) return jw * m; // Amedo 2026-09-30
-        }
+        if (Ogi is { } ogi && part >= 0 && part < OgiHulls.Count(ogi)) return HullMatrix_1EB268(ogi, part, m); // Amedo 2026-11-09
         return m;
     }
 

@@ -170,9 +170,7 @@ public sealed partial class AgentLabAgent
         var hulls = new List<ConvexHull>();
         for (int i = 0; i < OgiHulls.Count(ogi); i++) // Amedo
         {
-            var m = Matrix4x4.Identity;
-            if (OgiHulls.Joint(ogi, i) is var j and not 0xFF) // Amedo
-                m = JointsOf(ogi).TryGetValue(j, out var joint) ? joint : Matrix4x4.Identity;
+            var m = HullMatrix_1EB268(ogi, i, Matrix4x4.Identity); // Amedo 2026-11-09
             m.Translation -= Vector3.TransformNormal(body.ComOffset, m);
             var hull = OgiHulls.Fresh(ogi, i); // Amedo
             hull.Transform(m);
