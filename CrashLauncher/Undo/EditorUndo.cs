@@ -1,5 +1,9 @@
 using System.Numerics;
 using CrashEngine.Core;
+using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
+using ITwinItem = Twinsanity.TwinsanityInterchange.Interfaces.ITwinItem;
+using PS2AnyAIPath = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPath;
+using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 
 namespace CrashLauncher;
 
@@ -366,6 +370,52 @@ public sealed class LoadLinkPairDeleteAction : IEditAction
     }
 
     public IEnumerable<Entity> AffectedEntities => Entities.Select(x => x.Entity);
+}
+
+public sealed class AiPositionDeleteAction : IEditAction
+{
+    public required Entity Parent;
+    public required Entity Entity;
+    public required ITwinItem Position;
+    public required IReadOnlyList<BaseTwinSection> Layouts;
+
+    private readonly List<(BaseTwinSection Section, ITwinItem[] Items)> _before = new();
+    private int _childIndex = -1;
+
+    public void Redo()
+    {
+        _before.Clear();
+        foreach (var layout in Layouts)
+            foreach (int kind in (ReadOnlySpan<int>)[TwinConstants.LAYOUT_AI_POSITIONS_SECTION, TwinConstants.LAYOUT_AI_PATHS_SECTION])
+                if (layout.GetItem<BaseTwinSection>((uint)kind) is { } section)
+                    _before.Add((section, Enumerable.Range(0, section.GetItemsAmount()).Select(section.GetItem).ToArray()));
+
+        uint apId = Position.GetID();
+        foreach (var layout in Layouts)
+        {
+            layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION)?.RemoveItem(Position);
+            var pathSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_PATHS_SECTION);
+            if (pathSec is not null)
+                for (int i = pathSec.GetItemsAmount() - 1; i >= 0; i--)
+                    if (pathSec.GetItem(i) is PS2AnyAIPath pth
+                        && (pth.Args[0] == apId || pth.Args[1] == apId))
+                        pathSec.RemoveItem(pth);
+        }
+        _childIndex = Parent.Children.ToList().IndexOf(Entity);
+        Parent.RemoveChild(Entity);
+    }
+
+    public void Undo()
+    {
+        foreach (var (section, items) in _before)
+        {
+            section.ClearItems();
+            foreach (var item in items) section.AddItem(item);
+        }
+        Parent.InsertChild(Math.Clamp(_childIndex, 0, Parent.Children.Count), Entity);
+    }
+
+    public IEnumerable<Entity> AffectedEntities { get { yield return Entity; } }
 }
 
 public sealed class LoadZoneBoxAddAction : IEditAction

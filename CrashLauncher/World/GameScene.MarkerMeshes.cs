@@ -54,6 +54,41 @@ public sealed partial class GameScene : Scene
         _cubeWireMesh = new GpuMesh(gl, bl.ToArray(), PrimitiveType.Lines);
     }
 
+    // Amedo
+    private sealed record MarkerModel(GpuMesh Mesh, byte[] Pixels, int TexWidth, int TexHeight, float Height,
+                                      Vector3[] Positions, uint[] Indices, Vector3 Min, Vector3 Max);
+    private static readonly Vector3 MarkerModelLight = Vector3.Normalize(new Vector3(-0.35f, 0.85f, 0.6f));
+
+    private static MarkerModel? LoadMarkerModel(GL gl, string fileName)
+    {
+        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Models", fileName);
+        if (!System.IO.File.Exists(path)) return null;
+        var parts = CrashEngine.Assets.ModelImporter.ExtractRawSubmeshes(path);
+        if (parts is not { Count: > 0 }) return null;
+        var verts = new List<GpuMesh.Vertex>();
+        var idx = new List<uint>();
+        byte[]? px = null; int tw = 0, th = 0;
+        float minY = float.MaxValue, maxY = float.MinValue;
+        foreach (var p in parts)
+        {
+            uint baseIndex = (uint)verts.Count;
+            for (int i = 0; i < p.Positions.Length; i++)
+            {
+                float shade = 0.55f + 0.45f * MathF.Max(0f, Vector3.Dot(p.Normals[i], MarkerModelLight));
+                verts.Add(new GpuMesh.Vertex { Position = p.Positions[i], Normal = p.Normals[i], UV = p.UVs[i], Color = new Vector4(shade, shade, shade, 1f) });
+                minY = MathF.Min(minY, p.Positions[i].Y); maxY = MathF.Max(maxY, p.Positions[i].Y);
+            }
+            foreach (uint i in p.Indices) idx.Add(baseIndex + i);
+            if (px is null && p.DiffusePixelsRGBA is { } d && p.TexWidth > 0 && p.TexHeight > 0) { px = d; tw = p.TexWidth; th = p.TexHeight; }
+        }
+        if (px is null || maxY <= minY) return null;
+        var positions = new Vector3[verts.Count];
+        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+        for (int i = 0; i < verts.Count; i++) { positions[i] = verts[i].Position; lo = Vector3.Min(lo, positions[i]); hi = Vector3.Max(hi, positions[i]); }
+        var indices = idx.ToArray();
+        return new MarkerModel(new GpuMesh(gl, verts.ToArray(), indices), px, tw, th, maxY - minY, positions, indices, lo, hi);
+    }
+
     // Amedo 2026-09-19
     private GpuMesh? _lightIconQuad;
     private void EnsureLightIconQuad(GL gl)

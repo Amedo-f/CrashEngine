@@ -64,45 +64,12 @@ public sealed partial class GameScene : Scene
 
             if (parent is not null && e.Get<InstanceData>() is { } data)
             {
-                if (data.IsUserAdded)
-                {
-                    var add = new InstanceAddAction { Parent = parent, Entity = e, Section = data.Section, Item = (ITwinItem)data.Source };
-                    add.Undo();
-                    actions.Add(new InverseEditAction { Inner = add });
-                }
-                else
-                {
-                    var neuter = new InstanceNeuterAction { Entity = e, Parent = parent, Item = data.Source, PlaceholderObjectId = placeholderObjectId };
-                    neuter.Redo();
-                    actions.Add(neuter);
-                }
+                DeleteInstance(e, parent, data, placeholderObjectId, actions);
                 deletedTransplantObjIds.Add(data.ObjectId);
             }
             else if (parent is not null && e.Get<SceneryTile>() is { } tile)
             {
-                var bbox = FindTileBoundingBox(tile);
-                if (bbox is null) continue;
-                var add = new SceneryAddAction
-                {
-                    Parent = parent, Entity = e, Node = tile.Node,
-                    IsLod = tile.IsLod, SourceId = tile.SourceId, Matrix = tile.Source, BoundingBox = bbox,
-                };
-                add.Undo();
-
-                // Amedo 2026-09-20
-                var csBake = chunkSourceForPlaceholder;
-                if (csBake?.Sm2 is not null && csBake.SceneryBakes.TryGetValue(tile.SourceId, out var bakeRec))
-                {
-                    MeshDecoder.RemoveSceneryBake(csBake.Sm2, bakeRec, csBake.SceneryTexCache);
-                    csBake.SceneryBakes.Remove(tile.SourceId);
-                    importCount++;
-                    _browser.Log($"Deleted imported scenery (mesh 0x{tile.SourceId:X}) and freed its baked graphics " +
-                                  $"({bakeRec.ModelIds.Count} model, {bakeRec.MaterialIds.Count} material, {bakeRec.TextureIds.Count} texture) — chunk stays clean.");
-                }
-                else
-                {
-                    actions.Add(new InverseEditAction { Inner = add });
-                }
+                if (DeleteSceneryTile(e, parent, tile, chunkSourceForPlaceholder, actions)) importCount++;
             }
             else if (parent is not null && e.Get<TriggerMarker>() is { } trigMarker)
             {
@@ -137,37 +104,13 @@ public sealed partial class GameScene : Scene
             }
             else if (parent is not null && e.Get<AiPositionMarker>() is { } aiMarker)
             {
-                var ap = aiMarker.Source;
-                uint apId = ap.GetID();
-                var rm2 = chunkSourceForPlaceholder?.Rm2;
-                if (rm2 is not null)
-                    for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
-                    {
-                        var layout = rm2.GetItem<BaseTwinSection>((uint)lid);
-                        layout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION)?.RemoveItem(ap);
-                        var pathSec = layout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_PATHS_SECTION);
-                        if (pathSec is not null)
-                            for (int i = pathSec.GetItemsAmount() - 1; i >= 0; i--)
-                                if (pathSec.GetItem(i) is Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPath pth
-                                    && (pth.Args[0] == apId || pth.Args[1] == apId))
-                                    pathSec.RemoveItem(pth);
-                    }
-                parent.RemoveChild(e);
+                DeleteAiPosition(e, parent, aiMarker, chunkSourceForPlaceholder, actions);
                 aiPosDelCount++;
             }
             // Amedo 2026-09-19
             else if (parent is not null && e.Get<CrashEngine.Importer.SceneryLightMarker>() is { } lightMarker && lightMarker.Source is not null)
             {
-                var scenery = chunkSourceForPlaceholder?.Sm2
-                    ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery>((uint)TwinConstants.SCENERY_SECENERY_ITEM);
-                if (scenery is not null)
-                {
-                    if (lightMarker.IsNegative && lightMarker.Source is Twinsanity.TwinsanityInterchange.Common.Lights.NegativeLight nl)
-                        scenery.NegativeLights.Remove(nl);
-                    else if (!lightMarker.IsNegative && lightMarker.Source is Twinsanity.TwinsanityInterchange.Common.Lights.PointLight pl)
-                        scenery.PointLights.Remove(pl);
-                }
-                parent.RemoveChild(e);
+                DeleteSceneryLight(e, parent, lightMarker, chunkSourceForPlaceholder);
                 aiPosDelCount++;
             }
             else if (e.Has<PositionMarker>())
@@ -197,30 +140,7 @@ public sealed partial class GameScene : Scene
 
         var chunkSourceForCleanup = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
         if (chunkSourceForCleanup?.MeshTables is not null)
-        {
-            foreach (var objId in deletedTransplantObjIds)
-            {
-                if (!chunkSourceForCleanup.Transplants.TryGetValue(objId, out var rec)) continue;
-                bool stillUsed = FlatEntities().Any(fe => fe.Get<InstanceData>()?.ObjectId == objId);
-                if (stillUsed) continue;
-                MeshDecoder.RemoveTransplant(chunkSourceForCleanup.Rm2,
-                    chunkSourceForCleanup.MeshTables, chunkSourceForCleanup.TexCache, rec);
-                chunkSourceForCleanup.Transplants.Remove(objId);
-                _browser.Log($"Removed transplant data for object 0x{objId:X4} (last instance deleted) — chunk is clean.");
-            }
-
-            foreach (var objId in deletedTransplantObjIds)
-            {
-                if (!chunkSourceForCleanup.FullTransplants.TryGetValue(objId, out var fullRec)) continue;
-                bool stillUsed = FlatEntities().Any(fe => fe.Get<InstanceData>()?.ObjectId == objId);
-                if (stillUsed) continue;
-                MeshDecoder.RemoveFullTransplant(chunkSourceForCleanup.Rm2,
-                    chunkSourceForCleanup.MeshTables, chunkSourceForCleanup.TexCache, fullRec);
-                chunkSourceForCleanup.FullTransplants.Remove(objId);
-                _browser.Log($"Removed full transplant data for object 0x{objId:X4} (last instance deleted) — " +
-                              "object graph + scripts + graphics all cleaned up.");
-            }
-        }
+            RemoveUnusedTransplants(chunkSourceForCleanup, deletedTransplantObjIds);
 
         if (actions.Count > 0)
             _undoStack.Push(actions.Count == 1 ? actions[0] : new CompositeEditAction { Actions = actions });
@@ -230,6 +150,98 @@ public sealed partial class GameScene : Scene
         SyncSelSnapshot(); // Amedo 2026-09-20
         _browser.Log($"Deleted {actions.Count + cubeCount + importCount} object(s)" +
                      (actions.Count > 0 && (cubeCount + importCount) > 0 ? " (mixed — only PS2 objects are undo-able)." : "."));
+    }
+
+    private static void DeleteInstance(Entity e, Entity parent, InstanceData data, ushort? placeholderObjectId, List<IEditAction> actions)
+    {
+        if (data.IsUserAdded)
+        {
+            var add = new InstanceAddAction { Parent = parent, Entity = e, Section = data.Section, Item = (ITwinItem)data.Source };
+            add.Undo();
+            actions.Add(new InverseEditAction { Inner = add });
+        }
+        else
+        {
+            var neuter = new InstanceNeuterAction { Entity = e, Parent = parent, Item = data.Source, PlaceholderObjectId = placeholderObjectId };
+            neuter.Redo();
+            actions.Add(neuter);
+        }
+    }
+
+    private bool DeleteSceneryTile(Entity e, Entity parent, SceneryTile tile, ChunkSource? chunkSourceForPlaceholder, List<IEditAction> actions)
+    {
+        var bbox = FindTileBoundingBox(tile);
+        if (bbox is null) return false;
+        var add = new SceneryAddAction
+        {
+            Parent = parent, Entity = e, Node = tile.Node,
+            IsLod = tile.IsLod, SourceId = tile.SourceId, Matrix = tile.Source, BoundingBox = bbox,
+        };
+        add.Undo();
+
+        // Amedo 2026-09-20
+        var csBake = chunkSourceForPlaceholder;
+        if (csBake?.Sm2 is not null && csBake.SceneryBakes.TryGetValue(tile.SourceId, out var bakeRec))
+        {
+            MeshDecoder.RemoveSceneryBake(csBake.Sm2, bakeRec, csBake.SceneryTexCache);
+            csBake.SceneryBakes.Remove(tile.SourceId);
+            _browser.Log($"Deleted imported scenery (mesh 0x{tile.SourceId:X}) and freed its baked graphics " +
+                          $"({bakeRec.ModelIds.Count} model, {bakeRec.MaterialIds.Count} material, {bakeRec.TextureIds.Count} texture) — chunk stays clean.");
+            return true;
+        }
+        actions.Add(new InverseEditAction { Inner = add });
+        return false;
+    }
+
+    private static void DeleteAiPosition(Entity e, Entity parent, AiPositionMarker aiMarker, ChunkSource? chunkSourceForPlaceholder, List<IEditAction> actions)
+    {
+        var layouts = new List<BaseTwinSection>();
+        if (chunkSourceForPlaceholder?.Rm2 is { } rm2)
+            for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
+                if (rm2.GetItem<BaseTwinSection>((uint)lid) is { } layout) layouts.Add(layout);
+        var delete = new AiPositionDeleteAction { Parent = parent, Entity = e, Position = aiMarker.Source, Layouts = layouts };
+        delete.Redo();
+        actions.Add(delete);
+    }
+
+    private static void DeleteSceneryLight(Entity e, Entity parent, CrashEngine.Importer.SceneryLightMarker lightMarker, ChunkSource? chunkSourceForPlaceholder)
+    {
+        var scenery = chunkSourceForPlaceholder?.Sm2
+            ?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SM2.PS2AnyScenery>((uint)TwinConstants.SCENERY_SECENERY_ITEM);
+        if (scenery is not null)
+        {
+            if (lightMarker.IsNegative && lightMarker.Source is Twinsanity.TwinsanityInterchange.Common.Lights.NegativeLight nl)
+                scenery.NegativeLights.Remove(nl);
+            else if (!lightMarker.IsNegative && lightMarker.Source is Twinsanity.TwinsanityInterchange.Common.Lights.PointLight pl)
+                scenery.PointLights.Remove(pl);
+        }
+        parent.RemoveChild(e);
+    }
+
+    private void RemoveUnusedTransplants(ChunkSource chunkSourceForCleanup, HashSet<uint> deletedTransplantObjIds)
+    {
+        foreach (var objId in deletedTransplantObjIds)
+        {
+            if (!chunkSourceForCleanup.Transplants.TryGetValue(objId, out var rec)) continue;
+            bool stillUsed = FlatEntities().Any(fe => fe.Get<InstanceData>()?.ObjectId == objId);
+            if (stillUsed) continue;
+            MeshDecoder.RemoveTransplant(chunkSourceForCleanup.Rm2,
+                chunkSourceForCleanup.MeshTables, chunkSourceForCleanup.TexCache, rec);
+            chunkSourceForCleanup.Transplants.Remove(objId);
+            _browser.Log($"Removed transplant data for object 0x{objId:X4} (last instance deleted) — chunk is clean.");
+        }
+
+        foreach (var objId in deletedTransplantObjIds)
+        {
+            if (!chunkSourceForCleanup.FullTransplants.TryGetValue(objId, out var fullRec)) continue;
+            bool stillUsed = FlatEntities().Any(fe => fe.Get<InstanceData>()?.ObjectId == objId);
+            if (stillUsed) continue;
+            MeshDecoder.RemoveFullTransplant(chunkSourceForCleanup.Rm2,
+                chunkSourceForCleanup.MeshTables, chunkSourceForCleanup.TexCache, fullRec);
+            chunkSourceForCleanup.FullTransplants.Remove(objId);
+            _browser.Log($"Removed full transplant data for object 0x{objId:X4} (last instance deleted) — " +
+                          "object graph + scripts + graphics all cleaned up.");
+        }
     }
 
     private void DeleteLoadLinkPair(TwinChunkLink link, List<IEditAction> actions)

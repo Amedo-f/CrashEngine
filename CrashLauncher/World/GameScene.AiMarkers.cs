@@ -64,42 +64,13 @@ public sealed partial class GameScene : Scene
     private const float AiIconLift = AiIconScale * 1.6f; // Amedo
     private const float AiRingRadius = AiIconScale * 1.6f * 1.4f; // Amedo
 
-    // Amedo
-    private sealed record AiSkullModel(GpuMesh Mesh, byte[] Pixels, int TexWidth, int TexHeight, float Height,
-                                       Vector3[] Positions, uint[] Indices, Vector3 Min, Vector3 Max);
-    private AiSkullModel? _aiSkull;
+    private MarkerModel? _aiSkull;
     private bool _aiSkullTried;
-    private static readonly Vector3 AiSkullLight = Vector3.Normalize(new Vector3(-0.35f, 0.85f, 0.6f));
-    private AiSkullModel? EnsureAiSkullModel(GL gl)
+    private MarkerModel? EnsureAiSkullModel(GL gl)
     {
         if (_aiSkullTried) return _aiSkull;
         _aiSkullTried = true;
-        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Models", "AiSkull.glb");
-        if (!System.IO.File.Exists(path)) return null;
-        var parts = CrashEngine.Assets.ModelImporter.ExtractRawSubmeshes(path);
-        if (parts is not { Count: > 0 }) return null;
-        var verts = new List<GpuMesh.Vertex>();
-        var idx = new List<uint>();
-        byte[]? px = null; int tw = 0, th = 0;
-        float minY = float.MaxValue, maxY = float.MinValue;
-        foreach (var p in parts)
-        {
-            uint baseIndex = (uint)verts.Count;
-            for (int i = 0; i < p.Positions.Length; i++)
-            {
-                float shade = 0.55f + 0.45f * MathF.Max(0f, Vector3.Dot(p.Normals[i], AiSkullLight));
-                verts.Add(new GpuMesh.Vertex { Position = p.Positions[i], Normal = p.Normals[i], UV = p.UVs[i], Color = new Vector4(shade, shade, shade, 1f) });
-                minY = MathF.Min(minY, p.Positions[i].Y); maxY = MathF.Max(maxY, p.Positions[i].Y);
-            }
-            foreach (uint i in p.Indices) idx.Add(baseIndex + i);
-            if (px is null && p.DiffusePixelsRGBA is { } d && p.TexWidth > 0 && p.TexHeight > 0) { px = d; tw = p.TexWidth; th = p.TexHeight; }
-        }
-        if (px is null || maxY <= minY) return null;
-        var positions = new Vector3[verts.Count];
-        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
-        for (int i = 0; i < verts.Count; i++) { positions[i] = verts[i].Position; lo = Vector3.Min(lo, positions[i]); hi = Vector3.Max(hi, positions[i]); }
-        var indices = idx.ToArray();
-        return _aiSkull = new AiSkullModel(new GpuMesh(gl, verts.ToArray(), indices), px, tw, th, maxY - minY, positions, indices, lo, hi);
+        return _aiSkull = LoadMarkerModel(gl, "AiSkull.glb");
     }
 
     // Amedo
@@ -214,8 +185,10 @@ public sealed partial class GameScene : Scene
             {
                 if (!e.Active || !IsAiIconMarker(e)) continue;
                 var icon = e.Children[0];
-                var to = eye - icon.Transform.World.Translation;
-                icon.Transform.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(to.X, to.Z));
+                if (!Matrix4x4.Invert(e.Transform.World, out var toLocal)) continue;
+                var to = Vector3.TransformNormal(eye - icon.Transform.World.Translation, toLocal);
+                float flat = MathF.Sqrt(to.X * to.X + to.Z * to.Z);
+                icon.Transform.Rotation = Quaternion.CreateFromYawPitchRoll(MathF.Atan2(to.X, to.Z), -MathF.Atan2(to.Y, flat), 0f);
             }
         }
         if (_aiLineRdr is null || !ReferenceEquals(_aiLineRdr.Entity.Parent, root))

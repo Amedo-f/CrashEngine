@@ -1,5 +1,6 @@
 using CrashEngine.Core;
 using CrashEngine.Renderer;
+using Silk.NET.OpenGL;
 using System.Numerics;
 
 namespace CrashLauncher;
@@ -29,6 +30,18 @@ public sealed partial class GameScene : Scene
 
         var tint = isNegative ? new Vector4(1f, 0.4f, 0.4f, 1f) : new Vector4(1f, 1f, 1f, 1f);
 
+        if (EnsureLightBulbModel(Engine.Instance.GL) is { } bulb)
+        {
+            var icon = new Entity($"{name}_icon");
+            icon.Transform.Scale = new Vector3(LightBulbWorldHeight / (ent.Transform.Scale.Y * bulb.Height));
+            var bulbRdr = icon.Add(new DirectCubeRenderer { Mesh = bulb.Mesh, Color = tint });
+            bulbRdr.Albedo           = new Texture2D(Engine.Instance.GL, bulb.Pixels, (uint)bulb.TexWidth, (uint)bulb.TexHeight);
+            bulbRdr.Mat.Culling      = Material.CullMode.Both;
+            bulbRdr.Mat.AlwaysOnTop  = false;
+            ent.AddChild(icon);
+            return ent;
+        }
+
         Texture2D? tex = null;
         try
         {
@@ -53,6 +66,16 @@ public sealed partial class GameScene : Scene
             fillRdr.Mat.AlphaBlend = true; fillRdr.Mat.DepthWrite = false; fillRdr.Mat.IgnoreDepthTest = true;
         }
         return ent;
+    }
+
+    private const float LightBulbWorldHeight = 1.4f;
+    private MarkerModel? _lightBulb;
+    private bool _lightBulbTried;
+    private MarkerModel? EnsureLightBulbModel(GL gl)
+    {
+        if (_lightBulbTried) return _lightBulb;
+        _lightBulbTried = true;
+        return _lightBulb = LoadMarkerModel(gl, "LightBulb.glb");
     }
 
     // Amedo 2026-09-26
