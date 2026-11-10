@@ -193,7 +193,8 @@ public sealed partial class AgentLabWorld
     public void ContinueLevelSwitch(AgentLabWorld from)
     {
         const ulong states = (0x3Ful << 50) | (0x3Ful << 44) | (0x3Ful << 38);
-        Word_00 = (from.Word_00 & ~states) | ((ulong)NoMode << 50) | ((ulong)ModeLoadingLevel << 44) | ((ulong)ModeLoadingLevel << 38);
+        ulong loading = (ulong)from.GameMode; // Amedo 2026-11-09
+        Word_00 = (from.Word_00 & ~states) | ((ulong)NoMode << 50) | (loading << 44) | (loading << 38);
         GalleryWord_08 = from.GalleryWord_08;
         TitleChunk_30BB00 = from.TitleChunk_30BB00;
         AutosaveTime_20 = from.AutosaveTime_20;
@@ -213,7 +214,7 @@ public sealed partial class AgentLabWorld
         _snapshotTaken = true;
         PauseChunkClocks_1918A8();
         PauseRun_181400();
-        Log?.Invoke($"[mode {Now:0.00}s] level switch: continuing the load of {StartChunk_500} (kind {RestartKind}, autosave {SaveManager_309724?.Autosave})");
+        Log?.Invoke($"[mode {Now:0.00}s] level switch: continuing the load of {StartChunk_500} (mode 0x{loading:X}, kind {RestartKind}, autosave {SaveManager_309724?.Autosave})");
     }
 
     // Amedo
