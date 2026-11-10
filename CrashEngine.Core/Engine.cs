@@ -151,16 +151,6 @@ public sealed class Engine
     public int ViewHeight => SceneViewport?.H ?? Height;
     private (int W, int H) _viewSize;
 
-    // Amedo 2026-09-30
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct PowerThrottlingState { public uint Version, ControlMask, StateMask; }
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetProcessInformation(IntPtr process, int infoClass, ref PowerThrottlingState info, uint size);
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern IntPtr GetCurrentProcess();
-
     public static bool PowerThrottlingOff { get; private set; }
     public static bool KeepFullSpeedInBackground { get; set; } // Amedo 2026-09-30
 
@@ -168,13 +158,7 @@ public sealed class Engine
     private static void DisablePowerThrottling()
     {
         if (!OperatingSystem.IsWindows()) return;
-        var state = new PowerThrottlingState { Version = 1, ControlMask = 0x1 | 0x4, StateMask = 0 };
-        try
-        {
-            PowerThrottlingOff = SetProcessInformation(GetCurrentProcess(), 4, ref state,
-                (uint)System.Runtime.InteropServices.Marshal.SizeOf<PowerThrottlingState>());
-        }
-        catch { PowerThrottlingOff = false; }
+        PowerThrottlingOff = CrashEngine.Platform.Windows.PowerThrottling.Disable();
         Console.WriteLine($"[Engine] Windows power throttling {(PowerThrottlingOff ? "disabled" : "unchanged")}");
     }
 
@@ -264,7 +248,7 @@ public sealed class Engine
             () => CustomFontSetup?.Invoke(ImGui.GetIO().Fonts));
         _imguiRenderer = new ImGuiRenderer(_gl); // Amedo
         var io = ImGui.GetIO();
-        Win32Clipboard.Hook(io);
+        ImGuiClipboard.Hook(io);
 
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         // Amedo 2026-09-21

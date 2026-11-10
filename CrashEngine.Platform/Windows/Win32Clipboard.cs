@@ -1,8 +1,6 @@
 using System.Runtime.InteropServices;
-using System.Text;
-using ImGuiNET;
 
-namespace CrashEngine.Core;
+namespace CrashEngine.Platform.Windows;
 
 public static class Win32Clipboard
 {
@@ -18,7 +16,7 @@ public static class Win32Clipboard
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GlobalLock(IntPtr hMem);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GlobalUnlock(IntPtr hMem);
 
-    private static string GetClipboardTextRaw()
+    public static string GetText()
     {
         if (!OpenClipboard(IntPtr.Zero)) return "";
         try
@@ -33,7 +31,7 @@ public static class Win32Clipboard
         finally { CloseClipboard(); }
     }
 
-    private static void SetClipboardTextRaw(string text)
+    public static void SetText(string text)
     {
         if (!OpenClipboard(IntPtr.Zero)) return;
         try
@@ -49,33 +47,5 @@ public static class Win32Clipboard
             SetClipboardData(CF_UNICODETEXT, hMem);
         }
         finally { CloseClipboard(); }
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate IntPtr GetFn(IntPtr userData);
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void SetFn(IntPtr userData, IntPtr utf8Text);
-
-    private static readonly GetFn s_get = _ =>
-    {
-        var text = GetClipboardTextRaw();
-        var utf8 = Encoding.UTF8.GetBytes(text + '\0');
-        if (s_getBuffer != IntPtr.Zero) Marshal.FreeHGlobal(s_getBuffer);
-        s_getBuffer = Marshal.AllocHGlobal(utf8.Length);
-        Marshal.Copy(utf8, 0, s_getBuffer, utf8.Length);
-        return s_getBuffer;
-    };
-    private static readonly SetFn s_set = (_, utf8Text) =>
-        SetClipboardTextRaw(Marshal.PtrToStringUTF8(utf8Text) ?? "");
-
-    private static IntPtr s_getBuffer = IntPtr.Zero;
-    private static readonly IntPtr s_getPtr = Marshal.GetFunctionPointerForDelegate(s_get);
-    private static readonly IntPtr s_setPtr = Marshal.GetFunctionPointerForDelegate(s_set);
-
-    public static unsafe void Hook(ImGuiIOPtr io)
-    {
-        if (!OperatingSystem.IsWindows()) return; // Amedo 2026-10-26
-        io.NativePtr->GetClipboardTextFn = s_getPtr;
-        io.NativePtr->SetClipboardTextFn = s_setPtr;
     }
 }

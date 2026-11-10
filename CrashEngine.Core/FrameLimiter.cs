@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using CrashEngine.Platform.Windows;
 
 namespace CrashEngine.Core;
 
@@ -9,23 +9,14 @@ public enum FrameMode { VSync, Fps60, Fps144, Unlimited, Fps240, Fps360 } // Ame
 // Amedo 2026-09-29
 internal sealed class FrameLimiter : IDisposable
 {
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern IntPtr CreateWaitableTimerExW(IntPtr lpTimerAttributes, string? lpTimerName, uint dwFlags, uint dwDesiredAccess);
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool SetWaitableTimer(IntPtr hTimer, ref long lpDueTime, int lPeriod, IntPtr pfnCompletionRoutine, IntPtr lpArgToCompletionRoutine, bool fResume);
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CloseHandle(IntPtr hObject);
-
-    private const uint CREATE_WAITABLE_TIMER_HIGH_RESOLUTION = 0x2;
-    private const uint TIMER_ALL_ACCESS = 0x1F0003;
-
     private static readonly long SpinTicks = Stopwatch.Frequency / 1000;
-    private IntPtr _timer;
+    private HighResolutionTimer? _timer;
     private long _next;
 
     public FrameLimiter()
     {
         if (!OperatingSystem.IsWindows()) return;
-        try { _timer = CreateWaitableTimerExW(IntPtr.Zero, null, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS); }
-        catch { _timer = IntPtr.Zero; }
+        _timer = HighResolutionTimer.TryCreate();
     }
 
     public void Wait(int fps)
@@ -53,16 +44,12 @@ internal sealed class FrameLimiter : IDisposable
                 Thread.SpinWait(64);
                 continue;
             }
-            if (_timer != IntPtr.Zero)
+            if (_timer is not null)
             {
                 long due = -(left - SpinTicks) * 10_000_000 / Stopwatch.Frequency;
-                if (due < 0 && SetWaitableTimer(_timer, ref due, 0, IntPtr.Zero, IntPtr.Zero, false))
-                {
-                    WaitForSingleObject(_timer, 0xFFFFFFFF);
-                    continue;
-                }
+                if (due < 0 && _timer.Wait(due)) continue;
             }
-            if (_timer == IntPtr.Zero) // Amedo 2026-10-27
+            if (_timer is null) // Amedo 2026-10-27
             {
                 Thread.Sleep(Math.Max(1, (int)((left - SpinTicks) * 1000 / Stopwatch.Frequency)));
                 continue;
@@ -73,8 +60,7 @@ internal sealed class FrameLimiter : IDisposable
 
     public void Dispose()
     {
-        if (_timer == IntPtr.Zero) return;
-        CloseHandle(_timer);
-        _timer = IntPtr.Zero;
+        _timer?.Dispose();
+        _timer = null;
     }
 }

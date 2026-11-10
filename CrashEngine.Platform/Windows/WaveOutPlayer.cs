@@ -1,11 +1,11 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-namespace CrashEngine.Runtime.Audio;
+namespace CrashEngine.Platform.Windows;
 
 // Amedo 2026-09-28
 [SupportedOSPlatform("windows")]
-public sealed class WaveOutPlayer : IAudioOutput // Amedo 2026-10-26
+public sealed class WaveOutPlayer : IDisposable
 {
     [StructLayout(LayoutKind.Sequential, Pack = 2)]
     private struct WaveFormat
@@ -38,7 +38,7 @@ public sealed class WaveOutPlayer : IAudioOutput // Amedo 2026-10-26
     private const int Buffers = 4;
     private const int Frames = 768;
 
-    private readonly SoundMixer _mixer;
+    private readonly Action<short[], int> _render;
     private readonly AutoResetEvent _event = new(false);
     private readonly IntPtr[] _headers = new IntPtr[Buffers];
     private readonly IntPtr[] _data = new IntPtr[Buffers];
@@ -52,12 +52,12 @@ public sealed class WaveOutPlayer : IAudioOutput // Amedo 2026-10-26
     public string? Error { get; }
     public int BuffersWritten { get; private set; }
 
-    public WaveOutPlayer(SoundMixer mixer)
+    public WaveOutPlayer(uint sampleRate, Action<short[], int> render)
     {
-        _mixer = mixer;
+        _render = render;
         var format = new WaveFormat
         {
-            Tag = 1, Channels = 2, SamplesPerSec = SoundMixer.SampleRate, AvgBytesPerSec = SoundMixer.SampleRate * 4,
+            Tag = 1, Channels = 2, SamplesPerSec = sampleRate, AvgBytesPerSec = sampleRate * 4,
             BlockAlign = 4, BitsPerSample = 16,
         };
         int rc = waveOutOpen(out _device, WaveMapper, ref format, _event.SafeWaitHandle.DangerousGetHandle(), IntPtr.Zero, CallbackEvent);
@@ -98,7 +98,7 @@ public sealed class WaveOutPlayer : IAudioOutput // Amedo 2026-10-26
                 _event.WaitOne(20);
                 continue;
             }
-            _mixer.Render(_pcm, Frames);
+            _render(_pcm, Frames);
             Marshal.Copy(_pcm, 0, _data[next], _pcm.Length);
             SetDone(next, false);
             waveOutWrite(_device, _headers[next], _headerSize);
