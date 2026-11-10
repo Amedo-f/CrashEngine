@@ -230,6 +230,7 @@ public sealed partial class AgentLabAgent
         {
             target = participant == RefFocusObject ? FocusObject : Participant(participant);
             if (target is null && participant != RefFocusObject) return unchanged;
+            if (participant == RefFocusObject && FocusIsCamera && FocusObjectPosition is { } camera) { pos = camera; found = true; }
         }
         else if (key != SourceNone)
         {
@@ -241,7 +242,10 @@ public sealed partial class AgentLabAgent
                 case RefSlot11C: target = Alive(ref _slot11C); break;
                 case RefSlot118: target = Alive(ref _slot118); break;
                 case RefRouteNode: if (RouteNode(_routeIndex) is { } rn) { pos = rn.Position; found = true; } break;
-                case RefFocusObject: target = FocusObject; break;
+                case RefFocusObject:
+                    if (FocusIsCamera && FocusObjectPosition is { } cam) { pos = cam; found = true; }
+                    else target = FocusObject;
+                    break;
                 case RefFocusPosition: if (FocusPosition is { } fp) { pos = fp; found = true; } break;
                 case RefNextKey:
                     NextKey();

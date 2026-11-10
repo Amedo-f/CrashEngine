@@ -236,7 +236,10 @@ public sealed partial class AgentLabAgent
                 if (World.SetRespawn(this, level) && level) World.Autosave_176F28((ushort)Instance.Source.GetID());
                 return;
             }
-            case 517: World.RestartFromCheckpoint_17B6C0(); return; // Amedo
+            case 517: // Amedo
+                World.Log?.Invoke($"[AgentLab {World.Now:0.00}s] ResetGame by {Entity.Name} in '{Behaviour?.Name ?? "-"}'");
+                World.RestartFromCheckpoint_17B6C0();
+                return;
             case 92:
             case 93:
             case 585: World.AddLives((int)Arg(0), this); return;

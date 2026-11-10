@@ -172,6 +172,8 @@ public sealed partial class AgentLabAgent : Component
                                AgentLabAgent? requester = null)
     {
         Trace($"start behaviour '{graph.Name}' ({graph.ScriptStates.Count} states, start {graph.StartState}){(_channel != 0 ? $" on channel {_channel}" : "")}"); // Amedo 2026-09-30
+        if (IsCharacterObject && !ReferenceEquals(this, World.Player) && graph.Name?.Contains("DEATH", StringComparison.Ordinal) == true)
+            World.Log?.Invoke($"[AgentLab {World.Now:0.00}s] {Entity.Name} (not the player) starts '{graph.Name}' (by {(requester ?? originator)?.Entity.Name ?? "-"})");
         if (Behaviour is not null) Cleanup_23D820(); // Amedo 2026-09-30
         EndPacket();
         AssignParticipants(starter, originator ?? this);
