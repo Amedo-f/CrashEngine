@@ -360,7 +360,6 @@ public sealed partial class AgentLabWorld
         Spawned.Clear();
         _byInstance.Clear();
         Player = null;
-        Crash = null; // Amedo
         PlayerCharacter = null;
         Current = null;
         _nextPhase = 0;

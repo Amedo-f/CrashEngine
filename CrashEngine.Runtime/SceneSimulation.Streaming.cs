@@ -767,8 +767,7 @@ public sealed partial class SceneSimulation
         {
             var inst = ent.Get<InstanceData>();
             if (inst?.Source is null) continue;
-            var taken = inst.ObjectId == 0 ? World.Crash ?? World.Player : CharacterSlotTaken(inst); // Amedo
-            if (inst.ObjectId == 0 && taken is null) continue;
+            var taken = CharacterSlotTaken(inst); // Amedo 2026-11-09
             var anim = ent.Get<AnimatedObject>();
             _snapshot.Add(new Snapshot(ent, ent.Transform.LocalMatrix, ent.Transform.Position, ent.Transform.Rotation,
                                        ent.Transform.Scale, ent.Active, anim?.CurrentGroup, anim?.Frame ?? 0f,

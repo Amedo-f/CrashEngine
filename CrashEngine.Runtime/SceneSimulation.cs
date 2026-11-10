@@ -259,7 +259,7 @@ public sealed partial class SceneSimulation
         if (!_playerPhysics) return;
         foreach (var agent in agents)
         {
-            if (agent.OwnCharacter is not null || ReferenceEquals(agent, World.Player) || agent.Instance.ObjectId == 0) continue;
+            if (agent.OwnCharacter is not null || ReferenceEquals(agent, World.Player)) continue; // Amedo 2026-11-09
             if (!agent.IsCharacterObject || agent.Chunk.Collision is not { } collision) continue;
             var npc = BindCharacter(agent, collision);
             npc.ActivePlayer = false;

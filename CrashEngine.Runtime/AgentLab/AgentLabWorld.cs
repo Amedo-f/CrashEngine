@@ -26,10 +26,9 @@ public sealed partial class AgentLabWorld
     // Amedo 2026-09-29
     public AgentLabAgent? PlayerSlot_570(int n)
     {
-        if (n == 0) return Crash; // Amedo
         foreach (var a in Agents)
         {
-            if (a.Destroyed || a.ControllerType != 12 || ReferenceEquals(a, Crash)) continue; // Amedo
+            if (a.Destroyed || a.ControllerType != 12) continue; // Amedo 2026-11-09
             var p3 = a.Instance.Source?.ParamList3;
             if (p3 is { Count: > 0 } && (int)p3[0] == n) return a;
         }
@@ -43,7 +42,6 @@ public sealed partial class AgentLabWorld
     public AgentLabAgent? Current { get; private set; }
     public AgentLabAgent? Player { get; private set; }
     public Character.CharacterPad? Pad1 { get; set; } // Amedo
-    public AgentLabAgent? Crash { get; private set; } // Amedo
     public Func<int, bool, bool>? SwitchCharacter_177A90 { get; set; } // Amedo
 
     // Amedo
@@ -321,7 +319,6 @@ public sealed partial class AgentLabWorld
         _orderDirty = true; // Amedo 2026-10-01
         _byInstance[(agent.Instance.Section, agent.Instance.Source.GetID())] = agent;
         if (Player is null && agent.Instance.ObjectId == 0) Player = agent;
-        if (Crash is null && agent.Instance.ObjectId == 0) Crash = agent; // Amedo
         RegisterGlobalAgent_25D748(agent); // Amedo
     }
 
