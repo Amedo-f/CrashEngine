@@ -35,6 +35,7 @@ public sealed partial class SceneSimulation
         var stack = new Stack<Entity>();
         if (_chunkRoot?.Scene is { } scene) foreach (var e in scene.Roots) stack.Push(e);
         foreach (var (_, kept) in _built) stack.Push(kept.Root);
+        foreach (var agent in World.Agents) if (!agent.Destroyed) stack.Push(agent.Entity); // Amedo 2026-11-10
         foreach (var (mesh, material) in Renderer.RenderPipeline.SkydomeDraws) AddUsed(used, mesh, material);
         if (Renderer.RenderPipeline.SkydomeOverride is { } sky) foreach (var (mesh, material) in sky) AddUsed(used, mesh, material);
         while (stack.Count > 0)
@@ -471,7 +472,10 @@ public sealed partial class SceneSimulation
             if (!r.Waited_2AA020(wait, World.ClockTicks) && !block) continue;
             if (r.WantsObjects && !r.ObjectsLoaded) // Amedo 2026-10-06
             {
-                if (_sceneryOnly.Remove(r, out var held)) UpgradeScenery(r, root, held);
+                if (_sceneryOnly.ContainsKey(r))
+                {
+                    if (ObjectsWaitForUnload(r, root) is null && _sceneryOnly.Remove(r, out var held)) UpgradeScenery(r, root, held); // Amedo 2026-11-10
+                }
                 else RequestParse(r);
             }
             else if (!r.WantsObjects && r.ObjectsLoaded) UnloadObjects(r, r.WantsScenery); // Amedo 2026-10-06
@@ -508,6 +512,15 @@ public sealed partial class SceneSimulation
 
     private bool _tapeLoadsFree; // Amedo
 
+    // Amedo 2026-11-10
+    private StreamResource? ObjectsWaitForUnload(StreamResource r, StreamResource root)
+    {
+        if (Streamer is not { } streamer) return null;
+        foreach (var x in streamer.Resources)
+            if (!ReferenceEquals(x, r) && !ReferenceEquals(x, root) && x.ObjectsLoaded && !x.WantsObjects) return x;
+        return null;
+    }
+
     // Amedo 2026-09-29
     private bool TryFinish(StreamResource r, StreamResource root, Task<object?> task, double budgetMs)
     {
@@ -518,18 +531,20 @@ public sealed partial class SceneSimulation
             if (result is PreparedChunk { Root: { } unwanted } kept) KeepBuilt(r.Name, (unwanted, kept.Uploads)); // Amedo 2026-09-29
             return false;
         }
-        if (!r.WantsObjects) // Amedo 2026-10-06
+        var heldBy = r.WantsObjects ? ObjectsWaitForUnload(r, root) : null; // Amedo 2026-11-10
+        string waits = heldBy is null ? "" : $"; its objects wait until {heldBy.Name} unloads"; // Amedo 2026-11-10
+        if (!r.WantsObjects || heldBy is not null) // Amedo 2026-10-06
         {
             if (result is PreparedChunk scenery)
             {
                 if (budgetMs <= 0 && scenery.Uploads.Done < scenery.Uploads.Count) return false;
                 if (!scenery.Uploads.Upload(budgetMs)) return false;
                 _parsing.Remove(r.Name);
-                AttachScenery(r, root, scenery.Root, scenery.Uploads, scenery.Cached ? "from the cache" : "background build");
+                AttachScenery(r, root, scenery.Root, scenery.Uploads, (scenery.Cached ? "from the cache" : "background build") + waits);
                 return true;
             }
             _parsing.Remove(r.Name);
-            AttachScenery(r, root, result is null || _chunkHost is null ? null : _chunkHost.Build(r.Name, result), null, "built");
+            AttachScenery(r, root, result is null || _chunkHost is null ? null : _chunkHost.Build(r.Name, result), null, "built" + waits);
             return true;
         }
         if (result is PreparedChunk prepared)
