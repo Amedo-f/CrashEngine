@@ -84,6 +84,7 @@ public sealed partial class AgentLabWorld
     {
         int kind = RestartKind;
         Progress.Reset_167D38(kind, GcNowTicks);
+        ChooseRespawn_167D38(kind); // Amedo 2026-11-09
         if (RespawnChunkName is { } chunk) StartChunk_500 = chunk;
         if (kind == 2)
         {
@@ -92,8 +93,18 @@ public sealed partial class AgentLabWorld
             StartChunk_500 = SaveController_594.Name_0C;
             return ModeLoadingLevel;
         }
+        if (StartChunk_500.Length > 0 && !ChunkObjectsLoaded_2AC8B0(StartChunk_500)) return ModeLoadingLevel; // Amedo 2026-11-09
         ResetGame_173040(kind);
         return ModeExitCutscene;
+    }
+
+    // Amedo 2026-11-09
+    private bool ChunkObjectsLoaded_2AC8B0(string name)
+    {
+        string wanted = Streaming.StreamLink.Normalize(name);
+        foreach (var c in Chunks)
+            if (string.Equals(c.Name, wanted, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 
     // Amedo
@@ -207,6 +218,28 @@ public sealed partial class AgentLabWorld
     {
         foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590])
             if (ReferenceEquals(cp.Agent, agent)) cp.Agent = null;
+    }
+
+    // Amedo 2026-11-09
+    private void CarryCheckpoints(AgentLabWorld from)
+    {
+        string root = RootChunk.Name;
+        Matrix4x4? oldRoot = from.Temp_588.Set_00 && from.Temp_588.Chunk_04 == root ? from.Temp_588.ToAnchor
+                           : from.Level_590.Set_00 && from.Level_590.Chunk_04 == root ? from.Level_590.ToAnchor
+                           : from.RespawnChunkName == root ? from.RespawnToAnchor : null;
+        var rebase = oldRoot is { } r && Matrix4x4.Invert(r, out var inv) ? inv * RootChunk.ToAnchor : (Matrix4x4?)null;
+        foreach (var (cp, old) in new[] { (Temp_588, from.Temp_588), (Level_590, from.Level_590) })
+        {
+            cp.Set_00 = old.Set_00;
+            cp.Restored_02 = old.Restored_02;
+            cp.PlayerMode = old.PlayerMode;
+            cp.Chunk_04 = old.Chunk_04;
+            cp.Placement_20 = old.Placement_20;
+            cp.ToAnchor = old.Chunk_04 == root ? RootChunk.ToAnchor : rebase is { } m ? old.ToAnchor * m : old.ToAnchor;
+            string? name = old.Agent?.Entity.Name;
+            cp.Agent = name is null ? null : Agents.FirstOrDefault(a => a.Chunk.Name == old.Chunk_04 && a.Entity.Name == name);
+            if (cp.Set_00) Log?.Invoke($"[AgentLab {Now:0.00}s] level switch keeps the {(ReferenceEquals(cp, Level_590) ? "level" : "temporary")} respawn point {name ?? "-"} in {cp.Chunk_04}{(cp.Agent is null && name is not null ? " (not in this level yet)" : "")}");
+        }
     }
 
     // Amedo
