@@ -190,7 +190,13 @@ public sealed partial class GameScene
         if (_playHost is not null && ReferenceEquals(_playHostSource, sharedSource)) return _playHost;
         DropPlayHost();
         _playHostSource = sharedSource;
-        return _playHost = new CrashEngine.Runtime.Streaming.ChunkHost
+        return _playHost = NewPlayHost(sharedSource); // Amedo 2026-11-09
+    }
+
+    // Amedo 2026-11-09
+    private CrashEngine.Runtime.Streaming.ChunkHost NewPlayHost(ChunkSource? sharedSource)
+    {
+        return new CrashEngine.Runtime.Streaming.ChunkHost
         {
             Parse = ParseStreamedChunk,
             Build = (name, parsed) => ChunkImporter.BuildChunk(Engine.Instance.GL, null, (ChunkImporter.ParsedChunk)parsed, out _,
@@ -222,9 +228,9 @@ public sealed partial class GameScene
     }
 
     // Amedo 2026-10-02
-    private void RememberStartupChunks()
+    private void RememberStartupChunks(string? level = null)
     {
-        if (_playHost is not { } host || PlayLevelKey is not { } key) return;
+        if (_playHost is not { } host || (level ?? PlayLevelKey) is not { } key) return; // Amedo 2026-11-09
         var map = StartupChunks();
         if (map.TryGetValue(key, out var was) && was.SequenceEqual(host.StartupChunks)) return;
         map[key] = host.StartupChunks.ToList();
@@ -335,7 +341,7 @@ public sealed partial class GameScene
         ReadPad(sim.Pad);
         ApplySimulatorTouch(sim.Pad); // Amedo 2026-10-26
         sim.Tick(EngineTime.Delta);
-        if (_switchTo is not null) // Amedo
+        if (_switchTo is { } next && SwitchReady(next)) // Amedo 2026-11-09
         {
             ApplyLevelSwitch();
             return;

@@ -527,6 +527,38 @@ public static partial class MeshDecoder
         AddSkydomeDraws(gfx, meshById);
     }
 
+    // Amedo 2026-11-09
+    private static void SetGlobalLook(PS2AnyTwinsanitySM2 sm2)
+    {
+        var sceneryItem = sm2.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
+        if (sceneryItem is null) return;
+        uint fogIdx = sceneryItem.FogColor;
+        LastFogColor = fogIdx < FogColors.Length ? FogColors[fogIdx] : new SysVec3(0.58f, 0.72f, 0.88f);
+        LastFogColorIndex = fogIdx < FogColors.Length ? (int)fogIdx : null;
+        Console.WriteLine($"[MeshDecoder] Fog colour index {fogIdx} → {LastFogColor}");
+
+        LastWorldLighting = DecodeWorldLighting(sm2);
+        if (LastWorldLighting is { } wl)
+            Console.WriteLine($"[MeshDecoder] World lighting: ambient={wl.Ambient}, {wl.Directional.Count} directional light(s)");
+    }
+
+    // Amedo 2026-11-09
+    public static void ApplyGlobalEffects(PS2AnyTwinsanitySM2 sm2, Entity chunkRoot)
+    {
+        SetGlobalLook(sm2);
+        RenderPipeline.SkydomeDraws.Clear();
+        var scenery = chunkRoot.Children.FirstOrDefault(c => c.Name == "Scenery");
+        if (scenery?.Get<SkydomeSet>() is not { } set) return;
+        if (sm2.GetItem<PS2AnyGraphicsSection>((uint)Constants.SCENERY_GRAPHICS_SECTION)?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION) is { } skySec)
+            for (int i = 0; i < skySec.GetItemsAmount(); i++)
+            {
+                if (skySec.GetItem(i) is not PS2AnySkydome sky || !set.Draws.TryGetValue(sky.GetID(), out var draws)) continue;
+                RenderPipeline.SkydomeDraws.AddRange(draws);
+                Console.WriteLine($"[MeshDecoder] Skydome {sky.GetID():X8}: {sky.Meshes.Count} meshes");
+            }
+        scenery.RemoveComponent<SkydomeSet>();
+    }
+
     private static void AddSkydomeDraws(PS2AnyGraphicsSection gfx, Dictionary<uint, List<(GpuMesh, Material)>> meshById)
     {
         var skySec = gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_SKYDOMES_SECTION);

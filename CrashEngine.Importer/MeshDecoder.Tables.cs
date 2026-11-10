@@ -251,19 +251,7 @@ public static partial class MeshDecoder
 
         if (applyGlobalEffects)
         {
-            var sceneryItem = sm2.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
-            if (sceneryItem is not null)
-            {
-                uint fogIdx = sceneryItem.FogColor;
-                LastFogColor = fogIdx < FogColors.Length ? FogColors[fogIdx] : new SysVec3(0.58f, 0.72f, 0.88f);
-                LastFogColorIndex = fogIdx < FogColors.Length ? (int)fogIdx : null;
-                Console.WriteLine($"[MeshDecoder] Fog colour index {fogIdx} → {LastFogColor}");
-
-                LastWorldLighting = DecodeWorldLighting(sm2);
-                if (LastWorldLighting is { } wl)
-                    Console.WriteLine($"[MeshDecoder] World lighting: ambient={wl.Ambient}, {wl.Directional.Count} directional light(s)");
-            }
-
+            SetGlobalLook(sm2); // Amedo 2026-11-09
             RenderPipeline.SkydomeDraws.Clear();
             AddSkydomeDraws(gfx, meshById);
         }

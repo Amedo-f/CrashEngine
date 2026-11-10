@@ -666,6 +666,17 @@ public sealed partial class SceneSimulation
         }
     }
 
+    // Amedo 2026-11-09
+    public static Task<T?> OnBuildLane<T>(Func<T?> work) where T : class
+    {
+        lock (LaneLock)
+        {
+            var job = _lane.ContinueWith(_ => work(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            _lane = job;
+            return job;
+        }
+    }
+
     // Amedo 2026-10-02
     public static void PrepareBeforePlay(ChunkHost host, IEnumerable<string> names, Action<string>? log)
     {
@@ -1107,6 +1118,15 @@ public sealed partial class SceneSimulation
         foreach (var agent in fresh) agent.Begin();
         if (World.PlayerCharacter is not null) BindCharacters(fresh); // Amedo 2026-09-29
         _log?.Invoke($"[stream] loaded {r.Name} again at {World.Now:0.00}s (A{r.DepthA} B{r.DepthB}; the editor's scene: {fresh.Count} agents)");
+    }
+
+    // Amedo 2026-11-09
+    public void UnloadForLevelSwitch()
+    {
+        StopStreaming();
+        ResetLook();
+        Renderer.RenderPipeline.SkydomeDraws.Clear();
+        _log?.Invoke("[stream] level switch: every streamed scene unloaded before the next level loads (0x2AA3E8 UnloadEverything)");
     }
 
     private void StopStreaming()
