@@ -407,10 +407,11 @@ public sealed partial class SceneSimulation
         return true;
     }
 
-    private void ReturnToAnchor()
+    private void ReturnToAnchor(bool reviveUnloaded = true)
     {
         if (_anchorChunk is null) return;
-        ShowAnchor(); // Amedo 2026-09-29
+        bool revive = reviveUnloaded || !_anchorUnloaded; // Amedo 2026-11-10
+        if (revive) ShowAnchor(); // Amedo 2026-09-29
         for (int i = _moved.Count - 1; i >= 0; i--) // Amedo
         {
             var (e, homeParent, index) = _moved[i];
@@ -420,6 +421,7 @@ public sealed partial class SceneSimulation
         }
         _moved.Clear();
         SnapDisplay(); // Amedo 2026-09-30
+        if (!revive) return; // Amedo 2026-11-10
         World.SetRoot(_anchorChunk);
         if (Streamer is not null && _anchorResource is not null) Streamer.Root = _anchorResource; // Amedo
         PlaceLinked_1E9C18(); // Amedo
@@ -969,12 +971,12 @@ public sealed partial class SceneSimulation
         _log?.Invoke($"[stream] respawn: {player.Entity.Name} goes to {target.Name} (0x1954A8 -> 0x1ED188), root {World.RootChunk.Name}");
     }
 
-    private void KeepSlotCharacters(WorldChunk unloading)
+    private void KeepSlotCharacters(WorldChunk unloading, bool anchor = false)
     {
         for (int i = 0; i < _snapshot.Count; i++)
         {
             var snap = _snapshot[i];
-            if (!ReferenceEquals(snap.Chunk, unloading) || snap.Skipped || snap.Entity.Get<AgentLabAgent>() is not { Destroyed: false } kept) continue;
+            if (!(anchor ? snap.Chunk is null : ReferenceEquals(snap.Chunk, unloading)) || snap.Skipped || snap.Entity.Get<AgentLabAgent>() is not { Destroyed: false } kept) continue; // Amedo 2026-11-10
             int slot = CharacterSlot(kept.Instance);
             if (slot == 6 || ReferenceEquals(kept.Chunk, unloading) || !ReferenceEquals(World.PlayerSlot_570(slot), kept)) continue;
             _snapshot[i] = snap with { Chunk = kept.Chunk };
@@ -1067,6 +1069,7 @@ public sealed partial class SceneSimulation
         var agents = World.Agents.Where(a => ReferenceEquals(a.Chunk, chunk)).ToList();
         foreach (var agent in agents)
             if (!ReleaseOnUnload_197570(agent, chunk)) ReleaseAgent(agent); // Amedo
+        KeepSlotCharacters(chunk, anchor: true); // Amedo 2026-11-10
         if (_gameSpace is not null)
         {
             World.ReleaseSpawnedUnder(_gameSpace);

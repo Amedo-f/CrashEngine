@@ -179,7 +179,7 @@ public sealed partial class SceneSimulation
     {
         foreach (var s in _snapshot)
         {
-            if (s.Skipped) continue;
+            if (s.Skipped || s.Chunk is null && _anchorUnloaded) continue; // Amedo 2026-11-10
             if (s.Chunk is not null && InstancesOf(s.Chunk) is { } home && !Under(s.Entity, home))
             {
                 RememberHome(s.Entity);
@@ -691,7 +691,7 @@ public sealed partial class SceneSimulation
     private void ResetScene()
     {
         SnapDisplay(); // Amedo 2026-09-30
-        ReturnToAnchor(); // Amedo 2026-09-28
+        ReturnToAnchor(reviveUnloaded: false); // Amedo 2026-11-10
         World.StopFilteredObjectNodes_263C30(); // Amedo
         World.Particles?.KillParticles_1B9AB0(); // Amedo
         World.Music?.StopAll();
