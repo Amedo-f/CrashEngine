@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Amedo 2026-09-30 -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>CrashGame</AssemblyName>
+    <RootNamespace>CrashGame</RootNamespace>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <GarbageCollectionAdaptationMode>0</GarbageCollectionAdaptationMode>
+    <CrashEngineRoot Condition="'$(CrashEngineRoot)' == ''">$(MSBuildThisFileDirectory)..</CrashEngineRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(CrashEngineRoot)\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="$(CrashEngineRoot)\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
+    <ProjectReference Include="$(CrashEngineRoot)\CrashEngine.Importer\CrashEngine.Importer.csproj" />
+    <ProjectReference Include="$(CrashEngineRoot)\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="game.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('game.json')" />
+  </ItemGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+  </ItemGroup>
+</Project>
