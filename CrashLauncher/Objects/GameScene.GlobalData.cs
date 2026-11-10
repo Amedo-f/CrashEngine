@@ -57,11 +57,7 @@ public sealed partial class GameScene : Scene
         }
 
         ImGui.SetNextWindowSize(new Vector2(1040f, 560f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Default.rm2 Data##globaldata", ref _showGlobalData))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Default.rm2 Data##globaldata", ref _showGlobalData)) return;
 
         var chunkSource = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
         var globalRm2 = chunkSource?.GlobalRm2;

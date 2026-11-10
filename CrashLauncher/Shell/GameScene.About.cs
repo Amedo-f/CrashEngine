@@ -12,11 +12,7 @@ public sealed partial class GameScene
         if (!_showAbout) return;
 
         ImGui.SetNextWindowSize(new Vector2(440f, 260f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("About##about", ref _showAbout, ImGuiWindowFlags.NoCollapse))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("About##about", ref _showAbout)) return;
 
         ImGui.TextUnformatted("CrashEngine");
         ImGui.Spacing();

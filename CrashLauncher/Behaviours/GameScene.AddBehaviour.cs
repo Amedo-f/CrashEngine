@@ -56,7 +56,7 @@ public sealed partial class GameScene
     {
         if (!_showAddBehLevelPicker) return;
         ImGui.SetNextWindowSize(new Vector2(480f, 420f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add Behaviour: pick a source level##addbehlevel", ref _showAddBehLevelPicker)) { ImGui.End(); return; }
+        if (!_windowChrome.Begin("Add Behaviour: pick a source level##addbehlevel", ref _showAddBehLevelPicker)) return;
         ImGui.TextDisabled("Pick the level that has the object whose behaviours you want to copy.");
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##addBehLevelFilter", "Search levels...", ref _addBehLevelFilter, 128);
@@ -82,7 +82,7 @@ public sealed partial class GameScene
     {
         if (!_showAddBehObjectPicker) return;
         ImGui.SetNextWindowSize(new Vector2(560f, 460f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"Add Behaviour: pick source object from {_addBehSelectedLevel}##addbehobj", ref _showAddBehObjectPicker)) { ImGui.End(); return; }
+        if (!_windowChrome.Begin($"Add Behaviour: pick source object from {_addBehSelectedLevel}##addbehobj", ref _showAddBehObjectPicker)) return;
         ImGui.TextDisabled("Pick the object to copy behaviours FROM (e.g. an enemy).");
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##addBehObjFilter", "Search objects...", ref _addBehObjectFilter, 128);
@@ -113,7 +113,7 @@ public sealed partial class GameScene
     {
         if (!_showAddBehListPicker) return;
         ImGui.SetNextWindowSize(new Vector2(460f, 440f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"Add Behaviour: {_addBehSourceObjName} -> object 0x{_addBehTargetObjId:X}##addbehlist", ref _showAddBehListPicker)) { ImGui.End(); return; }
+        if (!_windowChrome.Begin($"Add Behaviour: {_addBehSourceObjName} -> object 0x{_addBehTargetObjId:X}##addbehlist", ref _showAddBehListPicker)) return;
 
         if (_addBehList.Count == 0)
         {

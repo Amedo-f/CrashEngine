@@ -18,11 +18,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showGroundColorPicker) return;
         ImGui.SetNextWindowSize(new Vector2(420f, 480f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Copy All Ground Colors From Level##groundcolorpicker", ref _showGroundColorPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Copy All Ground Colors From Level##groundcolorpicker", ref _showGroundColorPicker)) return;
 
         ImGui.TextDisabled("Pick a level — every scenery mesh sharing the exact same underlying\n" +
                             "mesh id with the current level gets its vertex colors copied over,\n" +

@@ -38,11 +38,7 @@ public sealed partial class GameScene : Scene
         uint targetId = targetInst.Source.GetID();
 
         ImGui.SetNextWindowSize(new Vector2(460f, 480f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"Add Condition For '{targetEnt.Name}'##condpicker", ref _showConditionPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin($"Add Condition For '{targetEnt.Name}'##condpicker", ref _showConditionPicker)) return;
 
         ImGui.TextDisabled($"Pick any Trigger or Instance in this level — it will message\n" +
                             $"'{targetEnt.Name}' once its own condition fires (adds this\n" +

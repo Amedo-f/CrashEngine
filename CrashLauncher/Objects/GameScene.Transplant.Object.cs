@@ -27,11 +27,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showObjectTransplantLevelPicker) return;
         ImGui.SetNextWindowSize(new Vector2(480f, 420f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add Object: pick a source level##objtransplantlevel", ref _showObjectTransplantLevelPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Add Object: pick a source level##objtransplantlevel", ref _showObjectTransplantLevelPicker)) return;
         ImGui.TextDisabled("Pick the level to copy an object from (full script/OGI/animation/sound transplant).");
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##objTransplantLevelFilter", "Search levels...", ref _objectTransplantLevelFilter, 128);
@@ -101,11 +97,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showObjectTransplantObjectPicker) return;
         ImGui.SetNextWindowSize(new Vector2(560f, 460f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"Add Object: pick an object from {_objectTransplantSelectedLevel}##objtransplantobj", ref _showObjectTransplantObjectPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin($"Add Object: pick an object from {_objectTransplantSelectedLevel}##objtransplantobj", ref _showObjectTransplantObjectPicker)) return;
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##objTransplantObjFilter", "Search by name or hex id...", ref _objectTransplantObjectFilter, 128);
         ImGui.BeginChild("##objTransplantObjList", new Vector2(-1f, -1f), ImGuiChildFlags.Border);

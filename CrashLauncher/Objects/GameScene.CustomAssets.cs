@@ -44,11 +44,7 @@ public sealed partial class GameScene
         var scenery = sm2?.GetItem<PS2AnyScenery>((uint)Constants.SCENERY_SECENERY_ITEM);
 
         ImGui.SetNextWindowSize(new Vector2(360f, 220f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add to Assets##addtoassets", ref _showAddToAssetsPopup, ImGuiWindowFlags.NoCollapse))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Add to Assets##addtoassets", ref _showAddToAssetsPopup)) return;
 
         if (scenery is null || sm2 is null)
         {
@@ -163,8 +159,7 @@ public sealed partial class GameScene
         var target = _addObjectTarget;
         var inst = target?.Get<InstanceData>();
         ImGui.SetNextWindowSize(new Vector2(360f, 250f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add Object to Assets##addobjtoassets", ref _showAddObjectToAssetsPopup, ImGuiWindowFlags.NoCollapse))
-        { ImGui.End(); return; }
+        if (!_windowChrome.Begin("Add Object to Assets##addobjtoassets", ref _showAddObjectToAssetsPopup)) return;
         if (target is null || inst?.Source is null)
         {
             ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "No object instance selected.");

@@ -20,11 +20,7 @@ public sealed partial class GameScene : Scene
         var chunkRoot   = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
         var chunkSource = chunkRoot?.Get<ChunkSource>();
         ImGui.SetNextWindowSize(new Vector2(560f, 480f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Scripts (CODE_BEHAVIOURS_SECTION)##scriptsbrowser", ref _showScriptsBrowser))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Scripts (CODE_BEHAVIOURS_SECTION)##scriptsbrowser", ref _showScriptsBrowser)) return;
         if (chunkSource?.Rm2 is null) { ImGui.TextDisabled("No level loaded."); ImGui.End(); return; }
         var code   = chunkSource.Rm2.GetItem<BaseTwinSection>((uint)TwinConstants.LEVEL_CODE_SECTION);
         var behSec = code?.GetItem<BaseTwinSection>((uint)TwinConstants.CODE_BEHAVIOURS_SECTION);

@@ -12,6 +12,8 @@ public sealed partial class GameScene
 {
     private bool _inspectedBehaviourIsGlobal;
     private bool _focusBehaviourTab;
+    private bool _showBehaviour = true;
+    private const string BehaviourWindowName = "Behaviour##panel";
     private bool _behaviourTabReadable = true;
     private readonly CodeEditor.CodeEditor _behaviourCode = new(); // Amedo 2026-11-04
     private string? _behaviourCodeSynced;
@@ -31,9 +33,16 @@ public sealed partial class GameScene
 
     private void DrawBehaviourTab()
     {
-        if (_focusBehaviourTab) { ImGui.SetNextWindowFocus(); _focusBehaviourTab = false; }
+        if (_focusBehaviourTab)
+        {
+            _showBehaviour = true;
+            _windowChrome.Reveal(BehaviourWindowName);
+            ImGui.SetNextWindowFocus();
+            _focusBehaviourTab = false;
+        }
+        if (!_showBehaviour) return;
         ImGui.SetNextWindowSize(new Vector2(900f, 500f), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Behaviour##panel", ImGuiWindowFlags.NoCollapse);
+        if (!_windowChrome.Begin(BehaviourWindowName, ref _showBehaviour)) return;
 
         if (_inspectedBehaviourId is not uint bid || _inspectedBehaviourGraph is null)
         {

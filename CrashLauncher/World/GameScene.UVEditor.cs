@@ -77,11 +77,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_uvEditorOpen) return;
         ImGui.SetNextWindowSize(new Vector2(900f, 640f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"UV Editor — {_uvEditorLabel}###uveditor", ref _uvEditorOpen))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin($"UV Editor — {_uvEditorLabel}###uveditor", ref _uvEditorOpen)) return;
         if (_uvCurrentPart >= _uvParts.Count) _uvCurrentPart = 0;
         var part = _uvParts[_uvCurrentPart];
 

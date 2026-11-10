@@ -143,7 +143,7 @@ public sealed partial class GameScene
 		if (!WorldToScreen(o, sw, sh, out var c)) return;
 		float wpp = _camera.WorldPerPixel(Vector3.Distance(_camera.Transform.Position, o), sh);
 		float len = TipLen * wpp * sh * GizmoScreenScale;
-		var dl = ImGui.GetForegroundDrawList();
+		var dl = ImGui.GetBackgroundDrawList();
 		var mouse = ImGui.GetMousePos();
 		var drag = _gizmoDrag;
 		bool canHover = drag is null && !ImGui.GetIO().WantCaptureMouse;

@@ -23,6 +23,7 @@ public sealed partial class GameScene
         if (ImGui.BeginMenu("Window")) { DrawWindowMenu(); ImGui.EndMenu(); }
         if (ImGui.BeginMenu("Help")) { DrawHelpMenu(); ImGui.EndMenu(); }
         ImGui.TextDisabled("|");
+        _windowChrome.DrawMinimizedTabs();
     }
 
     // Amedo
@@ -262,6 +263,23 @@ public sealed partial class GameScene
     // Amedo
     private void DrawWindowMenu()
     {
+        if (_workspace == Workspace.Scene)
+        {
+            ImGui.MenuItem("Hierarchy", null, ref _showHierarchy);
+            ImGui.MenuItem("Inspector", null, ref _showInspector);
+            ImGui.MenuItem("Project", null, ref _showProject);
+            ImGui.MenuItem("Console", null, ref _showConsole);
+            ImGui.MenuItem("Behaviour", null, ref _showBehaviour);
+        }
+        else
+        {
+            ImGui.MenuItem("Characters", null, ref _showAnimCharacters);
+            ImGui.MenuItem("Bones", null, ref _showAnimBones);
+            ImGui.MenuItem("Inspector", null, ref _showInspector);
+            ImGui.MenuItem("Timeline", null, ref _showAnimTimeline);
+        }
+        ImGui.Separator();
+        ImGui.MenuItem("Build", null, ref _showBuildWindow);
         ImGui.MenuItem("Game Settings", null, ref _showGameSettings);
         ImGui.MenuItem("UI Browser", null, ref _showUiBrowser);
         ImGui.MenuItem("Default.rm2 Data", null, ref _showGlobalData);

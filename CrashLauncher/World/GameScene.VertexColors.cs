@@ -35,11 +35,7 @@ public sealed partial class GameScene : Scene
         ImGui.SetNextWindowSize(new Vector2(640f, 480f), ImGuiCond.FirstUseEver);
         var title = targets.Count == 1 ? "Copy Vertex Colors From Level##vcpicker"
                                         : $"Copy Vertex Colors To {targets.Count} Selected Tiles From Level##vcpicker";
-        if (!ImGui.Begin(title, ref _showVertexColorPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin(title, ref _showVertexColorPicker)) return;
 
         if (_vertexColorPickerLevel is null)
         {

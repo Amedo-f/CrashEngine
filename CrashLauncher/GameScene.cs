@@ -107,6 +107,7 @@ public sealed partial class GameScene : Scene
     private string _editMeshIdBuf = "";
     private System.Diagnostics.Process? _playerProcess;
     private readonly ImGuiFileBrowser _fileBrowser = new();
+    private readonly WindowChrome _windowChrome = new();
     private readonly Dictionary<uint, string> _scriptTextCache = new Dictionary<uint, string>();
     private readonly Dictionary<uint, CrashEngine.Importer.ScriptDumper.SpawnScriptInfo?> _spawnScriptInfoCache = new();
     private uint? _inspectedBehaviourId;
@@ -375,5 +376,6 @@ public sealed partial class GameScene : Scene
 		else DrawAnimationWorkspace();
 		DrawViewGizmo(); // Amedo 2026-10-04
 		DrawGizmoModeButtons(); // Amedo
+		_windowChrome.DrawEffects();
 	}
 }

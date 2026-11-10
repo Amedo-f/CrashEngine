@@ -21,96 +21,107 @@ public sealed partial class GameScene
 	private static string JointLabel(TwinJoint j) =>
 		ReactNames.TryGetValue(j.ReactId, out var n) ? $"Bone {j.Index}  ({n} · {j.ReactId})" : $"Bone {j.Index}";
 
+	private bool _showAnimCharacters = true, _showAnimBones = true, _showAnimTimeline = true;
+
 	private void DrawAnimationWorkspace()
 	{
 		DrawArmatureOverlay();
 		var anim = PreviewAnim;
 		var ogi = anim is null ? null : SkeletonOf(anim);
 
-		if (ImGui.Begin("Characters##anim", ImGuiWindowFlags.NoCollapse))
+		if (_showAnimCharacters)
 		{
-			if (ImGui.SmallButton("Refresh##animrefresh")) RefreshAnimCharacters();
-			ImGui.SameLine();
-			ImGui.TextDisabled($"{_animCharacters.Count} in the level");
-			if (ImGui.BeginChild("##animchars", new Vector2(0f, 120f), ImGuiChildFlags.Border))
+			if (_windowChrome.Begin("Characters##anim", ref _showAnimCharacters))
 			{
-				foreach (var e in _animCharacters)
-				{
-					if (ImGui.Selectable($"{e.Name}##animchar{e.GetHashCode()}", e == _animTarget) && e != _animTarget)
-						SetAnimTarget(e);
-				}
-			}
-			ImGui.EndChild();
-			if (anim is not null && ogi is not null)
-			{
-				ImGui.TextUnformatted(_animTarget!.Name);
-				ImGui.TextDisabled($"Skeleton: OGI 0x{ogi.GetID():X4}, {ogi.Joints.Count} joints, {ogi.ExitPoints.Count} exit points");
-				ImGui.TextDisabled(ogi.SkinID != 0 ? $"Skin: 0x{ogi.SkinID:X4}" : "Skin: none");
-				ImGui.TextDisabled(ogi.BlendSkinID != 0 ? $"Blend skin (face shapes): 0x{ogi.BlendSkinID:X4}" : "Blend skin: none");
-				ImGui.TextDisabled($"Rigid parts: {ogi.RigidModelIds.Count}   Collision parts: {ogi.Collisions.Count}");
-				if (ImGui.Button("T-pose##animtpose"))
-				{
-					anim.Stop();
-					_animGroup = null;
-				}
+				if (ImGui.SmallButton("Refresh##animrefresh")) RefreshAnimCharacters();
 				ImGui.SameLine();
-				ImGui.TextDisabled($"{anim.Groups.Count} animations");
-				if (ImGui.BeginChild("##animlist", Vector2.Zero, ImGuiChildFlags.Border))
+				ImGui.TextDisabled($"{_animCharacters.Count} in the level");
+				if (ImGui.BeginChild("##animchars", new Vector2(0f, 120f), ImGuiChildFlags.Border))
 				{
-					foreach (var g in anim.Groups.OrderBy(g => g.SlotIndex))
+					foreach (var e in _animCharacters)
 					{
-						string face = g.Anim.HasFacialAnimationData ? "  face" : "";
-						string label = $"Slot {g.SlotIndex,2}   0x{g.AnimId:X4}   {g.Anim.TotalFrames} f @ {g.Anim.DefaultFPS}{face}##animslot{g.SlotIndex}";
-						if (ImGui.Selectable(label, g == _animGroup))
-						{
-							_animGroup = g;
-							UseCloneIfAny(g);
-							anim.Loop = true;
-							anim.Play(g);
-						}
+						if (ImGui.Selectable($"{e.Name}##animchar{e.GetHashCode()}", e == _animTarget) && e != _animTarget)
+							SetAnimTarget(e);
 					}
 				}
 				ImGui.EndChild();
+				if (anim is not null && ogi is not null)
+				{
+					ImGui.TextUnformatted(_animTarget!.Name);
+					ImGui.TextDisabled($"Skeleton: OGI 0x{ogi.GetID():X4}, {ogi.Joints.Count} joints, {ogi.ExitPoints.Count} exit points");
+					ImGui.TextDisabled(ogi.SkinID != 0 ? $"Skin: 0x{ogi.SkinID:X4}" : "Skin: none");
+					ImGui.TextDisabled(ogi.BlendSkinID != 0 ? $"Blend skin (face shapes): 0x{ogi.BlendSkinID:X4}" : "Blend skin: none");
+					ImGui.TextDisabled($"Rigid parts: {ogi.RigidModelIds.Count}   Collision parts: {ogi.Collisions.Count}");
+					if (ImGui.Button("T-pose##animtpose"))
+					{
+						anim.Stop();
+						_animGroup = null;
+					}
+					ImGui.SameLine();
+					ImGui.TextDisabled($"{anim.Groups.Count} animations");
+					if (ImGui.BeginChild("##animlist", Vector2.Zero, ImGuiChildFlags.Border))
+					{
+						foreach (var g in anim.Groups.OrderBy(g => g.SlotIndex))
+						{
+							string face = g.Anim.HasFacialAnimationData ? "  face" : "";
+							string label = $"Slot {g.SlotIndex,2}   0x{g.AnimId:X4}   {g.Anim.TotalFrames} f @ {g.Anim.DefaultFPS}{face}##animslot{g.SlotIndex}";
+							if (ImGui.Selectable(label, g == _animGroup))
+							{
+								_animGroup = g;
+								UseCloneIfAny(g);
+								anim.Loop = true;
+								anim.Play(g);
+							}
+						}
+					}
+					ImGui.EndChild();
+				}
+				else if (_animCharacters.Count == 0)
+					ImGui.TextDisabled("This level has no animated characters.");
+				ImGui.End();
 			}
-			else if (_animCharacters.Count == 0)
-				ImGui.TextDisabled("This level has no animated characters.");
 		}
-		ImGui.End();
 
 		var viewOgi = _animGroup?.Ogi ?? ogi;
-		if (ImGui.Begin("Bones##anim", ImGuiWindowFlags.NoCollapse))
+		if (_showAnimBones)
 		{
-			if (viewOgi is null) ImGui.TextDisabled("Pick a character.");
-			else
+			if (_windowChrome.Begin("Bones##anim", ref _showAnimBones))
 			{
-				if (_animGroup is not null && _animGroup.Ogi != ogi)
-					ImGui.TextDisabled($"This animation's own skeleton: OGI 0x{viewOgi.GetID():X4}, {viewOgi.Joints.Count} joints");
-				foreach (var j in viewOgi.Joints)
-					if (j.ParentIndex < 0 || j.ParentIndex >= viewOgi.Joints.Count || j.ParentIndex == j.Index)
-						DrawJointNode(viewOgi, j, 0);
+				if (viewOgi is null) ImGui.TextDisabled("Pick a character.");
+				else
+				{
+					if (_animGroup is not null && _animGroup.Ogi != ogi)
+						ImGui.TextDisabled($"This animation's own skeleton: OGI 0x{viewOgi.GetID():X4}, {viewOgi.Joints.Count} joints");
+					foreach (var j in viewOgi.Joints)
+						if (j.ParentIndex < 0 || j.ParentIndex >= viewOgi.Joints.Count || j.ParentIndex == j.Index)
+							DrawJointNode(viewOgi, j, 0);
+				}
+				ImGui.End();
 			}
 		}
-		ImGui.End();
 
-		if (ImGui.Begin("Timeline##anim", ImGuiWindowFlags.NoCollapse))
+		if (_showAnimTimeline)
 		{
-			if (anim is null || _animGroup is null) ImGui.TextDisabled("Pick an animation from the Characters panel.");
-			else
+			if (_windowChrome.Begin("Timeline##anim", ref _showAnimTimeline))
 			{
-				int frames = Math.Max(1, _animGroup.Anim.MainAnimation.AnimatedTransformations.Count);
-				if (ImGui.Button(anim.Playing ? "Pause##animplay" : "Play##animplay")) anim.Playing = !anim.Playing;
-				ImGui.SameLine();
-				bool loop = anim.Loop;
-				if (ImGui.Checkbox("Loop##animloop", ref loop)) anim.Loop = loop;
-				ImGui.SameLine();
-				ImGui.TextDisabled($"Slot {_animGroup.SlotIndex} · {frames} frames · {_animGroup.Anim.DefaultFPS} fps · {AnimatedObject.NaturalDuration(_animGroup):0.00} s · frame {anim.Frame:0.0}");
-				ImGui.SameLine();
-				ImGui.Checkbox("All frames##animallframes", ref _timelineAllFrames);
-				DrawAnimRecordBar(anim, _animGroup);
-				DrawChannelTimeline(anim, _animGroup, frames);
+				if (anim is null || _animGroup is null) ImGui.TextDisabled("Pick an animation from the Characters panel.");
+				else
+				{
+					int frames = Math.Max(1, _animGroup.Anim.MainAnimation.AnimatedTransformations.Count);
+					if (ImGui.Button(anim.Playing ? "Pause##animplay" : "Play##animplay")) anim.Playing = !anim.Playing;
+					ImGui.SameLine();
+					bool loop = anim.Loop;
+					if (ImGui.Checkbox("Loop##animloop", ref loop)) anim.Loop = loop;
+					ImGui.SameLine();
+					ImGui.TextDisabled($"Slot {_animGroup.SlotIndex} · {frames} frames · {_animGroup.Anim.DefaultFPS} fps · {AnimatedObject.NaturalDuration(_animGroup):0.00} s · frame {anim.Frame:0.0}");
+					ImGui.SameLine();
+					ImGui.Checkbox("All frames##animallframes", ref _timelineAllFrames);
+					DrawAnimRecordBar(anim, _animGroup);
+					DrawChannelTimeline(anim, _animGroup, frames);
+				}
+				ImGui.End();
 			}
 		}
-		ImGui.End();
 	}
 
 	private static readonly string[] ChannelNames =

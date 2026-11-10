@@ -39,11 +39,7 @@ public sealed partial class GameScene
         if (!_showGameSettings) return;
 
         ImGui.SetNextWindowSize(new Vector2(480f, 200f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Game Settings##gamesettings", ref _showGameSettings))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Game Settings##gamesettings", ref _showGameSettings)) return;
 
         var chunkSource = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
         var behSec = MeshDecoder.CodeSection(chunkSource?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);

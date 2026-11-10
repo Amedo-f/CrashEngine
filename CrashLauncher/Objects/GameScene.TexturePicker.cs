@@ -40,11 +40,7 @@ public sealed partial class GameScene : Scene
         if (mat is null) { _showTexturePicker = false; return; }
 
         ImGui.SetNextWindowSize(new Vector2(640f, 480f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Import Texture From Level##texpicker", ref _showTexturePicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Import Texture From Level##texpicker", ref _showTexturePicker)) return;
 
         if (_texturePickerLevel is null)
         {

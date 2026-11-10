@@ -23,11 +23,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showTriggerTransplantLevelPicker) return;
         ImGui.SetNextWindowSize(new Vector2(480f, 420f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add Trigger: pick a source level##trigtransplantlevel", ref _showTriggerTransplantLevelPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Add Trigger: pick a source level##trigtransplantlevel", ref _showTriggerTransplantLevelPicker)) return;
         ImGui.TextDisabled("Pick the level to copy a trigger from.");
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##trigTransplantLevelFilter", "Search levels...", ref _triggerTransplantLevelFilter, 128);
@@ -82,11 +78,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showTriggerTransplantPicker) return;
         ImGui.SetNextWindowSize(new Vector2(560f, 460f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin($"Add Trigger: pick a trigger from {_triggerTransplantSelectedLevel}##trigtransplantpick", ref _showTriggerTransplantPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin($"Add Trigger: pick a trigger from {_triggerTransplantSelectedLevel}##trigtransplantpick", ref _showTriggerTransplantPicker)) return;
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##trigTransplantFilter", "Search by hex id or message id...", ref _triggerTransplantFilter, 128);
         ImGui.BeginChild("##trigTransplantList", new Vector2(-1f, -1f), ImGuiChildFlags.Border);

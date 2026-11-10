@@ -143,7 +143,7 @@ public sealed partial class GameScene
         if (_selected is null || _camera is null || ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopup)) return;
         var center = _selected.Transform.World.Translation;
         int sw = ViewW, sh = ViewH; // Amedo
-        var dl = ImGui.GetForegroundDrawList();
+        var dl = ImGui.GetBackgroundDrawList();
         uint ringColor = ImGui.ColorConvertFloat4ToU32(color);
         foreach (var axis in new[] { System.Numerics.Vector3.UnitX, System.Numerics.Vector3.UnitY, System.Numerics.Vector3.UnitZ })
         {

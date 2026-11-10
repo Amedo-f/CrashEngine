@@ -22,7 +22,7 @@ public sealed partial class GameScene : Scene
 			};
 			uint[] array2 = new uint[3] { 4282401023u, 4282449728u, 4294918208u };
 			uint[] array3 = new uint[3] { 1614823679u, 1614872384u, 1627340864u };
-			ImDrawListPtr foregroundDrawList = ImGui.GetForegroundDrawList();
+			ImDrawListPtr foregroundDrawList = ImGui.GetBackgroundDrawList();
 			if (WorldToScreen(vector, ViewW, ViewH, out var screen))
 			{
 				for (int i = 0; i < 3; i++)
@@ -44,7 +44,7 @@ public sealed partial class GameScene : Scene
 			System.Numerics.Vector3 position = _camera.Transform.Position;
 			uint[] array4 = new uint[4] { 4282401023u, 4282449728u, 4294918208u, 4292927712u };
 			uint[] array5 = new uint[4] { 1614823679u, 1614872384u, 1627340864u, 2162221280u };
-			ImDrawListPtr foregroundDrawList2 = ImGui.GetForegroundDrawList();
+			ImDrawListPtr foregroundDrawList2 = ImGui.GetBackgroundDrawList();
 			System.Numerics.Vector2 valueOrDefault = default(System.Numerics.Vector2);
 			for (int j = 0; j < 4; j++)
 			{
@@ -85,7 +85,7 @@ public sealed partial class GameScene : Scene
 		if (_workspace == Workspace.Scene && !blockingUi && _choosingDuplicateDirection && _camera != null)
 		{
 			float num5 = 2.25f * GizmoScale();
-			ImDrawListPtr foregroundDrawList3 = ImGui.GetForegroundDrawList();
+			ImDrawListPtr foregroundDrawList3 = ImGui.GetBackgroundDrawList();
 			if (WorldToScreen(_dupGizmoPivot, ViewW, ViewH, out var screen4))
 			{
 				for (int l = 0; l < SixDirs.Length; l++)
@@ -120,7 +120,7 @@ public sealed partial class GameScene : Scene
 			Entity camerasRoot = _camerasRoot;
 			if (camerasRoot != null && camerasRoot.Active)
 			{
-				ImDrawListPtr foregroundDrawList4 = ImGui.GetForegroundDrawList();
+				ImDrawListPtr foregroundDrawList4 = ImGui.GetBackgroundDrawList();
 				foreach (Entity child in _camerasRoot.Children)
 				{
 					if (WorldToScreen(child.Transform.World.Translation, ViewW, ViewH, out var screen7) && _cameraIconTexture is { } camIcon) // Amedo 2026-10-04

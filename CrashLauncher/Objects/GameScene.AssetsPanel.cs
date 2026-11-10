@@ -30,13 +30,16 @@ public sealed partial class GameScene
     private string _assetRenameFile   = "";
     private string _assetRenameBuffer = "";
 
+    private bool _showProject = true;
+
     private void DrawAssetsPanel()
     {
+        if (!_showProject) return;
         int sw = Engine.Instance.Width, sh = Engine.Instance.Height;
         ImGui.SetNextWindowPos(new Vector2(sw - 420f, (float)sh - 180f), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSize(new Vector2(420f, 180f), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSizeConstraints(new Vector2(240f, 120f), new Vector2(float.MaxValue, float.MaxValue));
-        ImGui.Begin("Project##panel", ImGuiWindowFlags.NoCollapse); // Amedo
+        if (!_windowChrome.Begin("Project##panel", ref _showProject)) return; // Amedo
 
         if (ImGui.SmallButton("Assets"))
         {

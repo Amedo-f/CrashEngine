@@ -99,6 +99,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=Y
 		if (_pendingWorkspaceReset)
 		{
 			_pendingWorkspaceReset = false;
+			ShowAllPanels();
 			_workspaceLayouts.Remove(_workspace);
 			ImGui.LoadIniSettingsFromMemory(DefaultLayoutOf(_workspace));
 			_savedWorkspaceLayout = null;
@@ -131,6 +132,12 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=Y
 	}
 
 	private void ResetWorkspaceLayout() => _pendingWorkspaceReset = true;
+
+	private void ShowAllPanels()
+	{
+		_showHierarchy = _showInspector = _showProject = _showConsole = _showBehaviour = true;
+		_showAnimCharacters = _showAnimBones = _showAnimTimeline = true;
+	}
 
 	private const float WorkspaceTabHeight = 24f;
 	private static Vector3? _workspaceStrip;

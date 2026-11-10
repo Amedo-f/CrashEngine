@@ -21,11 +21,7 @@ public sealed partial class GameScene : Scene
     {
         if (!_showCrashPicker) return;
         ImGui.SetNextWindowSize(new Vector2(480f, 420f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Add Crash (full, with scripts)##crashpicker", ref _showCrashPicker))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Add Crash (full, with scripts)##crashpicker", ref _showCrashPicker)) return;
         ImGui.TextDisabled("Pick a level that already has a real, working Crash to copy from\n" +
                             "(confirmed identical between beach/gpa09 — any real level works).");
         ImGui.SetNextItemWidth(-1f);

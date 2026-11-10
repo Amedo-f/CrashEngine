@@ -98,14 +98,16 @@ public sealed partial class GameScene : Scene
         ImGui.PopID();
     }
 
+	private bool _showHierarchy = true;
+
 	private void DrawHierarchyPanel(float y)
 	{
-		if (_workspace == Workspace.Scene) // Amedo 2026-10-04
+		if (_workspace == Workspace.Scene && _showHierarchy) // Amedo 2026-10-04
 		{
 		ImGui.SetNextWindowPos(new System.Numerics.Vector2(0f, 32f), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new System.Numerics.Vector2(280f, y), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSizeConstraints(new System.Numerics.Vector2(180f, 120f), new System.Numerics.Vector2(float.MaxValue, float.MaxValue));
-		ImGui.Begin("Hierarchy##panel", ImGuiWindowFlags.NoCollapse); // Amedo
+		if (!_windowChrome.Begin("Hierarchy##panel", ref _showHierarchy)) return; // Amedo
 		if (_importError != null) ImGui.TextColored(new System.Numerics.Vector4(1f, 0.4f, 0.4f, 1f), _importError); // Amedo
 		DrawHierarchyHeader(); // Amedo
 		ImGui.Separator();

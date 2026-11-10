@@ -17,11 +17,7 @@ public sealed partial class GameScene
         if (!_showUiBrowser) return;
 
         ImGui.SetNextWindowSize(new Vector2(720f, 520f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("UI Browser##uibrowser", ref _showUiBrowser))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("UI Browser##uibrowser", ref _showUiBrowser)) return;
 
         ImGui.TextDisabled("Real assets decoded straight from the disc — same pieces the game");
         ImGui.TextDisabled("itself shows. No on-screen layout data exists in these files (see");

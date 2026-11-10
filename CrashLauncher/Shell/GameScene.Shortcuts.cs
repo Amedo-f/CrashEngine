@@ -13,11 +13,7 @@ public sealed partial class GameScene
         if (!_showShortcuts) return;
 
         ImGui.SetNextWindowSize(new Vector2(440f, 460f), ImGuiCond.FirstUseEver);
-        if (!ImGui.Begin("Shortcuts##shortcuts", ref _showShortcuts, ImGuiWindowFlags.NoCollapse))
-        {
-            ImGui.End();
-            return;
-        }
+        if (!_windowChrome.Begin("Shortcuts##shortcuts", ref _showShortcuts)) return;
 
         static void Row(string key, string desc)
         {
