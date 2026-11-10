@@ -57,7 +57,7 @@ public sealed partial class AgentLabWorld
         _global.Clear();
         foreach (var agent in _globalStep)
         {
-            if (agent.Destroyed || agent.Released) continue;
+            if (agent.Destroyed || agent.Released || !agent.Global) continue; // Amedo 2026-11-10
             var info = Information_40.GetValueOrDefault(agent.Instance);
             if (info is not null && ChunkNamed_1F0F58(info.Chunk) is not null) RestartGlobal_197428?.Invoke(agent, info);
             else if (info is null || (info.Flags & 1) == 0) ReleaseGlobal_197570?.Invoke(agent);

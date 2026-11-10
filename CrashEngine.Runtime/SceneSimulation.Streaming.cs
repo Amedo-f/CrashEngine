@@ -1005,6 +1005,7 @@ public sealed partial class SceneSimulation
             agent.CanChangeChunk_23D060(target); // Amedo
             agent.Chunk = target;
         }
+        if (agent.Global) agent.LeaveGlobal(); // Amedo 2026-11-10
         agent.GameMatrix = m;
         agent.SetComebackPlacement_23CD80(m); // Amedo
         if (agent.OwnCharacter is { } c && target.Collision is { } collision) c.CollisionWorld = collision; // Amedo
