@@ -420,6 +420,12 @@ public sealed partial class AgentLabAgent
             Vector3? offset = (t.Flags & TrailOffset) != 0 ? t.Offset : null;
             if (source == 0)
                 rm = TrailEmitMatrix(t); // Amedo 2026-09-28
+            else if (source == 1) // Amedo 2026-11-09
+            {
+                rm = Matrix4x4.CreateFromQuaternion(RotationOf(_initMatrix));
+                rm.Translation = _initMatrix.Translation;
+                if (offset is { } o) rm.Translation += Vector3.TransformNormal(o, rm);
+            }
             else if (source == 2)
             {
                 rm = LocalMatrix;
