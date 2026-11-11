@@ -19,7 +19,7 @@ try
     var cfg = GameConfig.Load(args);
     Console.WriteLine($"[CrashGame] project disc {cfg.Disc}, saved chunks {cfg.SavedChunks}, level {cfg.Level}");
     GraphicsSettings.DisplayModeAvailable = !cfg.Hidden; // Amedo
-    GraphicsSettings.FrameLimits = CrashEngine.Runtime.PlaySettings.IsPalDisc(cfg.Disc) ? GraphicsSettings.PalFrameLimits : GraphicsSettings.PcFrameLimits;
+    GraphicsSettings.FrameLimits = CrashEngine.Runtime.Region.RegionProfile.ForDisc(cfg.Disc).FrameLimits; // Amedo 2026-11-11
     JitWarmup.Start(typeof(CrashEngine.Runtime.SceneSimulation).Assembly, typeof(CrashEngine.Importer.MeshDecoder).Assembly, // Amedo 2026-10-01
         typeof(CrashEngine.Renderer.RenderPipeline).Assembly, typeof(Engine).Assembly, typeof(Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2).Assembly); // Amedo
     CrashEngine.Renderer.SceneTarget.ReuseHeldFrames = true;

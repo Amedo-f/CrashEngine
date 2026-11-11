@@ -11,7 +11,7 @@ public static class ScreenFit
     public static float VirtualAspect => OverlayQueue.Widescreen_30A744 ? 16f / 9f : 4f / 3f;
 
     // Amedo
-    public static Vector2 Frame_309744(string discLanguage) => new(512f, discLanguage == PlaySettings.AmericanLanguage ? 448f : 512f);
+    public static Vector2 Frame_309744(string discLanguage) => new(512f, Region.RegionProfile.For(discLanguage).FrameHeight_309744); // Amedo 2026-11-11
 
     // Amedo
     public static (Vector2 Origin, Vector2 Size) Rect(Vector2 origin, Vector2 size, Vector2 screenOffset)

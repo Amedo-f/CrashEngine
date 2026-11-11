@@ -60,7 +60,7 @@ public sealed partial class LevelBrowserScene : Scene
 
         if (_projectPath is not null)
         {
-            GraphicsSettings.FrameLimits = CrashEngine.Runtime.PlaySettings.IsPalDisc(_extractedRoot) ? GraphicsSettings.PalFrameLimits : GraphicsSettings.PcFrameLimits;
+            GraphicsSettings.FrameLimits = CrashEngine.Runtime.Region.RegionProfile.ForDisc(_extractedRoot).FrameLimits; // Amedo 2026-11-11
             GraphicsSettings.UseFile(Path.Combine(_projectPath, "graphics.json")); // Amedo
             _project = CrashProject.Open(_projectPath);
             if (_project is { IsNewGame: true })

@@ -68,7 +68,8 @@ public sealed partial class SceneSimulation
                                          string? discLanguage = null, string? savesDirectory = null) // Amedo
     {
         discLanguage ??= PlaySettings.DetectDiscLanguage(musicDirectory); // Amedo
-        LogicTicks = discLanguage == PlaySettings.AmericanLanguage ? NtscLogicTicks : PalLogicTicks;
+        Region.RegionProfile.Current = Region.RegionProfile.For(discLanguage); // Amedo 2026-11-11
+        LogicTicks = Region.RegionProfile.Current.LogicTicks; // Amedo 2026-11-11
         ParticleWorld.Dt = LogicTicks / 9000f;
         var src = chunkRoot.Get<ChunkSource>();
         if (src?.Rm2 is null) return null;

@@ -10,8 +10,8 @@ public sealed partial class GameScreen // Amedo 2026-10-01
     public const int TicksPerSecond = 9000;
     public const string FontPath = @"Startup\Fonts\Crash.psf";
     public const string PalFontPath = @"Startup\Fonts\Crash_Euro.psf"; // Amedo
-    public static string FontPathFor(string discLanguage) => discLanguage == PlaySettings.AmericanLanguage ? FontPath : PalFontPath; // Amedo
-    public static System.Numerics.Vector2 FontSizeFor(string discLanguage) => discLanguage == PlaySettings.AmericanLanguage ? new(GameFont.GlyphWidth, GameFont.GlyphHeight) : new(GameFont.PalGlyphWidth, GameFont.PalGlyphHeight); // Amedo
+    public static string FontPathFor(string discLanguage) => Region.RegionProfile.For(discLanguage).FontPath; // Amedo 2026-11-11
+    public static System.Numerics.Vector2 FontSizeFor(string discLanguage) => Region.RegionProfile.For(discLanguage).FontSize; // Amedo 2026-11-11
     public const string FrontendPath = @"Startup\Frontend.bin"; // Amedo
 
     public GameFont? Font { get; }
