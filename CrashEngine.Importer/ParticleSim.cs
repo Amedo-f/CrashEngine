@@ -264,13 +264,26 @@ public sealed class ParticleWorld
         }
         foreach (var em in Emitters)
             if (em.Enabled) em.ProcessBounces(this);
+        if (_ghosts.Count > 0) // Amedo 2026-11-11
+        {
+            Emitters.AddRange(_ghosts);
+            _ghosts.Clear();
+        }
+        Emitters.RemoveAll(em => em.GhostOf is { } of && (!em.AnyAlive(Clock) || !Emitters.Contains(of))); // Amedo 2026-11-11
     }
+
+    // Amedo 2026-11-11
+    private readonly List<ParticleEmitterSim> _ghosts = new();
+
+    internal void AddGhost(ParticleEmitterSim ghost) => _ghosts.Add(ghost);
 
     public void Reset()
     {
         Clock = 0f;
         Frame = 0;
         _acc = 0f;
+        _ghosts.Clear(); // Amedo 2026-11-11
+        Emitters.RemoveAll(em => em.GhostOf is not null); // Amedo 2026-11-11
         CollisionSpheres_3A0B10.Clear(); // Amedo
         foreach (var em in Emitters) em.Restart(this);
     }
@@ -423,6 +436,26 @@ public sealed class ParticleEmitterSim
 
     private bool _released; // Amedo 2026-09-29
 
+    // Amedo 2026-11-11
+    internal ParticleEmitterSim? GhostOf { get; private set; }
+
+    private ParticleEmitterSim DetachLive_1B43B4(ParticleWorld world)
+    {
+        var ghost = new ParticleEmitterSim(Def, world, Phase)
+        {
+            Origin = Origin, EmitRotation = EmitRotation, RenderRotation = RenderRotation, Ground = Ground, Restitution = Restitution,
+            WorldSpace = WorldSpace, IgnoreDistance = IgnoreDistance, SceneDrawn = SceneDrawn, RenderOffset = RenderOffset,
+            Scale = Scale, Enabled = Enabled,
+        };
+        ghost._ring = _ring;
+        ghost._ringIdx = _ringIdx;
+        ghost._bounces.AddRange(_bounces);
+        ghost._spheres = Array.Empty<CollisionSphere>();
+        ghost.GhostOf = this;
+        ghost.Release_1B47E0();
+        return ghost;
+    }
+
     public bool AnyAlive(float now)
     {
         foreach (ref readonly var p in _ring.AsSpan())
@@ -464,7 +497,10 @@ public sealed class ParticleEmitterSim
             if (Def.EmitMinDist <= dist && (maxDist == 0f || dist <= maxDist))
                 _emitting = true;
             else if (_ring.Length != 0)
+            {
+                if (AnyAlive(world.Clock)) world.AddGhost(DetachLive_1B43B4(world)); // Amedo 2026-11-11
                 Clear();
+            }
         }
 
         _onLeft--;
