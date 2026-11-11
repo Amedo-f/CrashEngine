@@ -5,7 +5,7 @@ using CrashEngine.Core;
 namespace CrashEngine.Runtime.Game;
 
 // Amedo
-public abstract class SaveCode
+public abstract partial class SaveCode // Amedo 2026-11-11
 {
     public const int Messages = 0x26;
     public const uint Done = 0x10, FullDirectory = 0x20, Success = 0x10000000, AutosaveOn = 0x20000000;
@@ -231,6 +231,7 @@ public abstract class SaveCode
             switch (q)
             {
                 case 3: case 4: case 5: case 7: case 8: case 0xB: case 0xC: case 0xD: case 0xE: case 0xF:
+                    if (Region.RegionProfile.Current.Region == Region.GameRegion.Pal && CancelAnswer_Pal_2A12B0(op)) return; // Amedo 2026-11-11
                     Finish_2A75E0(false, false);
                     return;
                 case 6:

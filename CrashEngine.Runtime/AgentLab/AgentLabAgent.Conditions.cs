@@ -228,7 +228,7 @@ public sealed partial class AgentLabAgent
             case 588: return DamageKind(0x20000); // Amedo
             case 641: return World.GameMode == 0xE ? 1f : 0f; // Amedo
             case 519: return HasCrateNode && 0 < _crateWumpa ? 1f : 0f; // Amedo
-            case 177: return _hasFocusObject && FocusObject is { } same && ReferenceEquals(same.Chunk, Chunk) ? 1f : 0f; // Amedo
+            case 177: return Region.RegionProfile.Current.Region == Region.GameRegion.Pal ? FocusInSameChunk_Pal_2521F8() : 0f; // Amedo 2026-11-11
         }
         World.Unimplemented("condition", c.ConditionIndex, AgentLabWorld.ConditionName(c.ConditionIndex));
         return 0f;

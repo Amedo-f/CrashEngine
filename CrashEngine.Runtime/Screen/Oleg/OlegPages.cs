@@ -687,9 +687,9 @@ public sealed class UnseenPage : GemExtrasPage
 }
 
 // Amedo
-public sealed class ExtrasPage : OlegPage
+public sealed partial class ExtrasPage : OlegPage // Amedo 2026-11-11
 {
-    public const int HundredItem = 0x14, McDonaldsItem = 0x16;
+    public const int HundredItem = 0x14;
 
     public readonly BossesPage Bosses_50;
     public readonly ConceptPage Concept_A4;
@@ -697,7 +697,6 @@ public sealed class ExtrasPage : OlegPage
     public readonly MoviesPage Movies_14C;
     public readonly StoryboardsPage Storyboards_1A0;
     public readonly UnseenPage Unseen_1F4;
-    public bool Unlocked_248;
 
     // Amedo
     public ExtrasPage(Oleg oleg, GameTexts? texts) : base(oleg, 0x17, Exit_3B6B50, texts)
@@ -708,11 +707,9 @@ public sealed class ExtrasPage : OlegPage
         Movies_14C = new MoviesPage(oleg, 1, this, texts);
         Storyboards_1A0 = new StoryboardsPage(oleg, 4, this, texts);
         Unseen_1F4 = new UnseenPage(oleg, 5, this, texts);
-        Unlocked_248 = false;
+        bool ntsc = Region.RegionProfile.Current.Region == Region.GameRegion.Ntsc; // Amedo 2026-11-11
         var hundred = new MovieItem(oleg, 0x61, HundredItem, 0x12);
-        var spyro = new MovieItem(oleg, "spyro trailer", 0x15, 0x13);
-        var mcdonalds = new PictureItem(oleg, "mcdonalds extras", McDonaldsItem, @"Extras\McDonalds", 1, 1);
-        var back = new BackItem(0x1B, 0x1E, Exit_3B6B50, 1);
+        var back = new BackItem(0x1B, ntsc ? 0x1E : 0x1C, Exit_3B6B50, 1); // Amedo 2026-11-11
         Add_25B710(new LinkItem(0x59, 0xE, Bosses_50, 1));
         Add_25B710(new LinkItem(0x5A, 0xF, Movies_14C, 1));
         Add_25B710(new LinkItem(0x5B, 0x10, Enemies_F8, 1));
@@ -720,8 +717,7 @@ public sealed class ExtrasPage : OlegPage
         Add_25B710(new LinkItem(0x5D, 0x12, Storyboards_1A0, 1));
         Add_25B710(new LinkItem(0x5E, 0x13, Unseen_1F4, 1));
         Add_25B710(hundred);
-        Add_25B710(spyro);
-        Add_25B710(mcdonalds);
+        if (ntsc) AddPromoItems_Ntsc_163710(oleg); // Amedo 2026-11-11
         Add_25B710(back);
     }
 
@@ -749,20 +745,7 @@ public sealed class ExtrasPage : OlegPage
     // Amedo
     public override void Frame(int col, MenuInput input, MenuSounds? sounds)
     {
-        var item = Find_2573E0(McDonaldsItem)!;
-        if (Unlocked_248)
-        {
-            item.Selectable_09 = 0xFF;
-            return;
-        }
-        if (Oleg_3095C8.Game_3095C8?.Pad_34 is { } pad && pad.GetButtonState_2B3548(23, false) && !pad.GetButtonState_2B3548(22, false) &&
-            !pad.GetButtonState_2B3548(16, false) && !pad.GetButtonState_2B3548(17, false) && !pad.GetButtonState_2B3548(18, false) &&
-            !pad.GetButtonState_2B3548(19, false) && !pad.GetButtonState_2B3548(20, false) && !pad.GetButtonState_2B3548(21, false) &&
-            pad.GetButtonState_2B3548(0, false) && !pad.GetButtonState_2B3548(1, false) && pad.GetButtonState_2B3548(2, false) &&
-            !pad.GetButtonState_2B3548(3, false) && pad.GetButtonState_2B3548(7, false) && pad.GetButtonState_2B3548(6, false) &&
-            !pad.GetButtonState_2B3548(4, false) && !pad.GetButtonState_2B3548(5, false))
-            Unlocked_248 = true;
-        item.Selectable_09 = 0;
+        if (Region.RegionProfile.Current.Region == Region.GameRegion.Ntsc) Frame_Ntsc_163458(); // Amedo 2026-11-11
     }
 }
 
