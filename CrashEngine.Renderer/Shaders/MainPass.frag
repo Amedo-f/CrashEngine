@@ -1,7 +1,12 @@
 #include "Includes/ModelLayout.frag"
-#include "lygia/lighting/shadingData/shadingData.glsl"
-#include "lygia/lighting/specular/gaussian.glsl"
-#include "lygia/lighting/sphereMap.glsl"
+
+// Amedo 2026-11-10
+float GaussianHighlight(float cosAngle, float width)
+{
+    float angle = acos(cosAngle);
+    float t = angle / width;
+    return exp(-t * t);
+}
 
 const float GAME_FOG_Z_SCALE = 1677833.125; // Amedo 2026-09-26
 const float GAME_FOG_Z_BIAS = -1117.0; // Amedo 2026-09-26
@@ -203,7 +208,7 @@ void main()
         vec3 surfaceNormal = normalize(Normal);
         if (!gl_FrontFacing && twin_material.two_sided_lighting) surfaceNormal = -surfaceNormal;
         vec3 eyeDirection = normalize(EyePosition - ViewPosition);
-        specular = specularGaussian(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
+        specular = GaussianHighlight(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
     }
 #else
     vec4 screenColor = texture(Screen, screenUvs);
@@ -240,7 +245,7 @@ void main()
     // out" after the additive fix above); a plain tunable brightness knob, not derived from any
     // real per-material data (none exists for this).
 #ifndef LEAN_PIXELS
-    float specular = specularGaussian(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
+    float specular = GaussianHighlight(max(dot(surfaceNormal, eyeDirection), 0.0), 20.0) * twin_material.metalic_specular * 0.3;
 #endif
     vec4 resultBlend = vec4(resultColor, mix(1.0, resultAlpha, twin_material.alpha_blend));
     resultBlend.rgb += Color.rgb * specular;
