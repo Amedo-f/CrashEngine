@@ -26,6 +26,7 @@ public sealed class CrashProject
     public int?         AkuAkuGoldenMusicVolume { get; set; } // Amedo 2026-09-25
     public bool         ClassicAkuAku     { get; set; } // Amedo 2026-09-25
     public string?      Language          { get; set; } // Amedo 2026-10-01
+    public string?      DiscLanguage      { get; set; } // Amedo 2026-11-11
     public bool         CratesReceiveShadows { get; set; } // Amedo
 
     [JsonIgnore]

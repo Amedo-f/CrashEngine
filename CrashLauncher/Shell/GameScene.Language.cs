@@ -22,6 +22,7 @@ public sealed partial class GameScene
         var names = Directory.Exists(LanguagesRoot)
             ? Directory.GetDirectories(LanguagesRoot).Select(Path.GetFileName).OfType<string>().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList()
             : new List<string>();
+        if (CrashEngine.Runtime.PlaySettings.IsPalDisc(_extractedRoot)) DrawDiscLanguage(proj); // Amedo 2026-11-11
         const string original = "Original (disc)";
         if (ImGui.BeginCombo("Game texts##langcombo", proj.Language ?? original))
         {
@@ -59,5 +60,16 @@ public sealed partial class GameScene
             ImGui.TextDisabled($"Font for missing letters: {(font is null ? "none" : Path.GetFileName(font))}");
         }
         ImGui.TextDisabled("Words and style (font, colours, outline, shadow): select a text object\n(e.g. a UTIL_TEXTMASTER) -> Inspector -> Text.");
+    }
+
+    // Amedo 2026-11-11
+    private static void DrawDiscLanguage(CrashProject proj)
+    {
+        string system = $"Device language ({CrashEngine.Runtime.Region.Pal.Language.DiscLanguage(null)})";
+        if (!ImGui.BeginCombo("Disc language##disclang", proj.DiscLanguage ?? system)) return;
+        if (ImGui.Selectable(system, proj.DiscLanguage is null)) { proj.DiscLanguage = null; proj.Save(); }
+        foreach (var l in CrashEngine.Runtime.PlaySettings.PalLanguages)
+            if (ImGui.Selectable(l, string.Equals(proj.DiscLanguage, l, StringComparison.OrdinalIgnoreCase))) { proj.DiscLanguage = l; proj.Save(); }
+        ImGui.EndCombo();
     }
 }

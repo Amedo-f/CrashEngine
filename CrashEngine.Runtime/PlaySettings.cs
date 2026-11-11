@@ -80,7 +80,7 @@ public sealed class PlaySettings
             GoldenMusicVolume = Math.Clamp(project.AkuAkuGoldenMusicVolume ?? DefaultGoldenMusicVolume, 1, 100) / 100f,
             MusicDirectory = Path.Combine(disc, "Crash6"),
             LanguageDirectory = language,
-            DiscLanguage = ntsc ? AmericanLanguage : PalLanguages.FirstOrDefault(l => string.Equals(l, project.DiscLanguage, StringComparison.OrdinalIgnoreCase)) ?? PalLanguages[0], // Amedo
+            DiscLanguage = ntsc ? AmericanLanguage : Region.Pal.Language.DiscLanguage(project.DiscLanguage), // Amedo 2026-11-11
             SavesDirectory = savesDirectory ?? (projectFolder is null ? null : Path.Combine(projectFolder, "Saves")), // Amedo
             BootStraight = patchable && BootStraightPatched(disc, ntsc), // Amedo
         };
