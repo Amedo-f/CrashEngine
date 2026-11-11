@@ -83,6 +83,7 @@ public sealed partial class SceneSimulation
     {
         foreach (var agent in World.Agents)
         {
+            agent.ClearWarp(); // Amedo 2026-11-11
             if (agent.Entity.Transform.LocalMatrix is not { } m) continue;
             if (!_smooth.TryGetValue(agent.Entity, out var s))
             {
@@ -109,7 +110,7 @@ public sealed partial class SceneSimulation
             }
             s.Cur = m;
             s.Seen = _smoothFrame;
-            if (s.Fresh || _snapAll || Jumped(s.Prev, m)) s.Prev = m;
+            if (s.Fresh || _snapAll || agent.WarpedThisStep || Jumped(s.Prev, m)) s.Prev = m; // Amedo 2026-11-11
             s.Fresh = false;
             var shown = a >= 1f ? m : Matrix4x4.Lerp(s.Prev, m, a);
             s.Shown = shown;

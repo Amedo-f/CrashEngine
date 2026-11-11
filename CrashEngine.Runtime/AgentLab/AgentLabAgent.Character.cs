@@ -44,7 +44,16 @@ public sealed partial class AgentLabAgent
 
     private void HoldMotion() => MotionHold = true;
 
-    private void KeepWarp(Vector3 position) => _stepStart = position;
+    private void KeepWarp(Vector3 position)
+    {
+        _stepStart = position;
+        WarpedThisStep = true; // Amedo 2026-11-11
+    }
+
+    // Amedo 2026-11-11
+    internal bool WarpedThisStep { get; private set; }
+
+    internal void ClearWarp() => WarpedThisStep = false;
 
     // Amedo 2026-10-05
     public uint RenderFlags18 { get; private set; }
