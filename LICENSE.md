@@ -1,6 +1,8 @@
 # License
 
-**CrashEngine** — Copyright © 2026 Amedo. All rights reserved.
+**CrashEngine** — Copyright © 2026 Amedo. Licensed under the PolyForm Noncommercial License 1.0.0 (below).
+
+Required Notice: Copyright © 2026 Amedo (https://github.com/Amedo-f/CrashEngine)
 
 ## Scope of this License
 
@@ -15,9 +17,6 @@ particular:
 
 - The **TwinTech** library and the engine foundation originate from **TT Lab**
   by Smartkin and NeoKesha, and remain under their authors' terms.
-- The **lygia** shader library (`CrashEngine.Renderer/Shaders/lygia/`) is
-  distributed under the Prosperity Public License 3.0.0 — see its bundled
-  `LICENSE.md`.
 
 This repository contains **no copyrighted game data**. *Crash Bandicoot* and
 related assets are the property of their respective rights holders. This is an
