@@ -42,6 +42,14 @@ public sealed class WorldChunk
         return true;
     }
 
+    // Amedo 2026-11-11
+    public bool InSoundBox_1F1E68(Vector3 chunkPoint)
+    {
+        foreach (var box in SoundBoxes_198)
+            if (box.Contains_1E4BE0(chunkPoint)) return true;
+        return false;
+    }
+
     // Amedo
     public Physics.ChunkRigidBodies ChunkRigidBodiesOf_1F1CF0() => RigidBodies_164 ??= new Physics.ChunkRigidBodies();
 

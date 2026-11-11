@@ -129,6 +129,7 @@ public sealed partial class SceneSimulation
         Engine.SceneHeld = () => world.RunState_309718 == 3;
         Mark("particles"); // Amedo 2026-10-02
         world.Sounds = new RuntimeSounds(src.GlobalRm2, src.Rm2, new Audio.SoundMixer()) { Clock = () => world.Now, Language = () => world.AudioTrack_309754, Held = world.HeldSound }; // Amedo 2026-09-28
+        world.Sounds.ReverbKey_22EA78 = sim.ReverbKey_22EA78; // Amedo 2026-11-11
         Mark("sounds"); // Amedo 2026-10-02
         world.Music = new RuntimeMusic(world.Sounds.Mixer, musicDirectory, discLanguage) { Clock = () => world.Now, Unimplemented = world.Unimplemented, Listener = world.Sounds, // Amedo
             GoldenTrack = goldenMusic, GoldenVolume = goldenMusicVolume, GoldenInvincible = () => world.PlayerCharacter?.Invincible == true }; // Amedo 2026-10-04
@@ -546,6 +547,24 @@ public sealed partial class SceneSimulation
     }
     internal bool HostShowsGameCamera => _hostShowsGameCamera; // Amedo
     internal void ApplyTapeControl((Vector3 Right, Vector3 Up, Vector3 Forward)? basis) => _controlBasis = basis;
+
+    // Amedo 2026-11-11
+    private int ReverbKey_22EA78()
+    {
+        if (World.Player?.Chunk is not { } chunk || World.Sounds is not { } sounds) return 0;
+        var slot = chunk.Sounds[0];
+        bool b = chunk.SoundBoxes_198.Count != 0 && Matrix4x4.Invert(chunk.ToRoot, out var toChunk)
+            && chunk.InSoundBox_1F1E68(Vector3.Transform(World.ViewerPosition, toChunk));
+        if (b) slot = chunk.Sounds[1];
+        if (slot.Kind >= 0xFF) return 0;
+        var mixer = sounds.Mixer;
+        var (m0, m1) = (mixer.Bank(0), mixer.Bank(1));
+        int key = mixer.ClaimBank_1DFBD8(Audio.SpuReverb.ModeOf_2FAFF0(slot.Kind), (int)(slot.C * 32767f));
+        for (int core = 0; core < 2; core++)
+            if (mixer.Bank(core) != (core == 0 ? m0 : m1))
+                _log?.Invoke($"[sound {World.Now:0.00}s] reverb core {core}: mode {mixer.Bank(core).Mode} evol 0x{mixer.Bank(core).Evol:X4} ({chunk.Name} slot {(b ? "B" : "A")} kind {slot.Kind})");
+        return key;
+    }
 
     private void SetViewerCore(Matrix4x4 viewProjection, Vector3 cameraPosition) // Amedo
     {

@@ -23,6 +23,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
         public int BasePitch;
         public Func<bool>? Alive; // Amedo 2026-09-30
         public int Key = -1, State, Category; // Amedo 2026-10-06
+        public int Reverb; // Amedo 2026-11-11
         public bool Persistent;
         public PS2AnySound? Sound;
         public string Who = "";
@@ -48,6 +49,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     public Audio.SoundGroups Groups { get; } // Amedo 2026-10-06
     public Action<string>? Log { get; set; }
     public Func<double>? Clock { get; set; }
+    public Func<int>? ReverbKey_22EA78 { get; set; } // Amedo 2026-11-11
     public int Started { get; private set; }
     public int Rejected { get; private set; }
 
@@ -139,7 +141,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
             return -1;
         }
         bool loops = Loops(s); // Amedo 2026-09-30
-        int h = Begin(s, id, p, l, r, $"3D at {GameMath.Distance(position, ListenerPosition):0.0}u{(loops ? ", looped sample played once" : "")}", who, repeat: false, category: category); // Amedo 2026-10-06
+        int h = Begin(s, id, p, l, r, $"3D at {GameMath.Distance(position, ListenerPosition):0.0}u{(loops ? ", looped sample played once" : "")}", who, repeat: false, category: category, key: ReverbKey_22EA78?.Invoke() ?? 0); // Amedo 2026-11-11
         if (h >= 0 && loops && alive is not null) _tracked.Add(new Tracked { Handle = h, Id = id, Alive = alive });
         return h;
     }
@@ -168,13 +170,15 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     {
         if (Sound(id) is not { } s) return Miss(id, who);
         if (position() is not { } pos) return -1;
-        int h = Start3D(s, id, pos, volume, pitch, who, category, "tracked");
+        int reverb = ReverbKey_22EA78?.Invoke() ?? 0; // Amedo 2026-11-11
+        int h = Start3D(s, id, pos, volume, pitch, who, category, "tracked", reverb);
         if (h < 0 && !persistent) return -1;
         _nextKey = (_nextKey + 1) & 0x7FFFFFFF;
         var t = new Tracked
         {
             Handle = h, Id = id, Sound = s, Position = position, Volume = volume, Pitch = pitch, BasePitch = BasePitchOf(s),
             Key = _nextKey, State = h < 0 ? TrackVirtual : TrackReal, Category = category, Persistent = persistent, Who = who,
+            Reverb = reverb,
         };
         _tracked.Add(t);
         if (h < 0) Log?.Invoke($"[sound {Clock?.Invoke() ?? 0:0.00}s] tracked 0x{id:X} by {who}: virtual at {GameMath.Distance(pos, ListenerPosition):0.0}u");
@@ -182,10 +186,10 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
     }
 
     // Amedo 2026-10-06
-    private int Start3D(PS2AnySound s, ushort id, Vector3 pos, float volume, float pitch, string who, int category, string kind)
+    private int Start3D(PS2AnySound s, ushort id, Vector3 pos, float volume, float pitch, string who, int category, string kind, int reverb) // Amedo 2026-11-11
     {
         if (!Spatial(pos, volume, BasePitchOf(s), pitch, out int l, out int r, out int p)) return -1;
-        return Begin(s, id, p, l, r, $"{kind} 3D at {GameMath.Distance(pos, ListenerPosition):0.0}u", who, category: category);
+        return Begin(s, id, p, l, r, $"{kind} 3D at {GameMath.Distance(pos, ListenerPosition):0.0}u", who, category: category, key: reverb);
     }
 
     public int Play2D(ushort id, float volume, float pitch, string who, int category = 0) // Amedo 2026-10-06
@@ -274,7 +278,7 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
         if (t.State == TrackVirtual)
         {
             if (!t.Persistent || t.Sound is null) return false;
-            int h = Start3D(t.Sound, t.Id, pos, t.Volume, t.Pitch, t.Who, t.Category, "tracked restart");
+            int h = Start3D(t.Sound, t.Id, pos, t.Volume, t.Pitch, t.Who, t.Category, "tracked restart", t.Reverb); // Amedo 2026-11-11
             if (0 <= h)
             {
                 t.Handle = h;
@@ -300,9 +304,9 @@ public sealed class RuntimeSounds : Screen.Oleg.IMenuSoundPlayer
         return t.Persistent;
     }
 
-    private int Begin(PS2AnySound s, ushort id, int pitch, int l, int r, string kind, string who, bool repeat = true, int category = 0) // Amedo 2026-10-06
+    private int Begin(PS2AnySound s, ushort id, int pitch, int l, int r, string kind, string who, bool repeat = true, int category = 0, int key = 0) // Amedo 2026-11-11
     {
-        int h = Mixer.Start(s.Sound, pitch, l, r, repeat, Audio.SoundGroups.GroupOf_1E5DF0(category)); // Amedo 2026-10-06
+        int h = Mixer.Start(s.Sound, pitch, l, r, repeat, Audio.SoundGroups.GroupOf_1E5DF0(category), key); // Amedo 2026-11-11
         if (h < 0)
         {
             Rejected++;

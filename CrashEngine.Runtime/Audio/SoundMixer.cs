@@ -56,8 +56,11 @@ public sealed class SoundMixer
         public bool Stream;
         public bool StreamLoop = true; // Amedo 2026-09-28
         public int Group; // Amedo 2026-10-06
+        public bool Send; // Amedo 2026-11-11
     }
 
+    public const int CoreVoices = 24; // Amedo 2026-11-11
+    private readonly SpuReverb[] _reverb = [new(), new()]; // Amedo 2026-11-11
     private readonly Voice[] _voices = new Voice[VoiceCount];
     private readonly int[] _groupL = [0x1000, 0x1000, 0x1000, 0x1000], _groupR = [0x1000, 0x1000, 0x1000, 0x1000]; // Amedo 2026-10-06
     private readonly int[] _effL = new int[VoiceCount], _effR = new int[VoiceCount];
@@ -109,9 +112,69 @@ public sealed class SoundMixer
         for (int i = 0; i < VoiceCount; i++) _voices[i] = new Voice();
     }
 
-    public int Start(byte[] adpcm, int pitch, int volL, int volR, bool repeat = true, int group = 0) // Amedo 2026-10-06
+    public int Start(byte[] adpcm, int pitch, int volL, int volR, bool repeat = true, int group = 0, int key = 0) // Amedo 2026-11-11
     {
-        lock (_lock) return Claim(adpcm, pitch, volL, volR, false, repeat, group);
+        lock (_lock) return Claim(adpcm, pitch, volL, volR, false, repeat, group, key);
+    }
+
+    // Amedo 2026-11-11
+    public int ClaimBank_1DFBD8(int mode, int evol)
+    {
+        if (mode == 0) return 0;
+        lock (_lock)
+        {
+            foreach (var bank in _reverb)
+                if (bank.Mode == mode && bank.EvolL == evol) return mode;
+            int best = 0, score = -1;
+            for (int b = 0; b < _reverb.Length; b++)
+            {
+                int s = _reverb[b].Mode == 0 ? 10000 : FreeVoices(b);
+                if (score < s)
+                {
+                    score = s;
+                    best = b;
+                }
+            }
+            _reverb[best].Set_A414(mode, evol, evol);
+            return mode;
+        }
+    }
+
+    // Amedo 2026-11-11
+    public (int Mode, int Evol) Bank(int core)
+    {
+        lock (_lock) return (_reverb[core].Mode, _reverb[core].EvolL);
+    }
+
+    private int FreeVoices(int core)
+    {
+        int n = 0;
+        for (int i = core * CoreVoices; i < (core + 1) * CoreVoices; i++)
+            if (!_voices[i].On) n++;
+        return n;
+    }
+
+    private int FreeVoice(int core)
+    {
+        for (int i = core * CoreVoices; i < (core + 1) * CoreVoices; i++)
+            if (!_voices[i].On) return i;
+        return -1;
+    }
+
+    // Amedo 2026-11-11
+    private int Alloc_1DF7A0(int key)
+    {
+        int i;
+        if (key != 0)
+        {
+            for (int b = 0; b < _reverb.Length; b++)
+                if (_reverb[b].Mode == key && (i = FreeVoice(b)) >= 0) return i;
+            for (int b = 0; b < _reverb.Length; b++)
+                if (_reverb[b].Mode == 0 && (i = FreeVoice(b)) >= 0) return i;
+        }
+        for (int b = 0; b < _reverb.Length; b++)
+            if ((i = FreeVoice(b)) >= 0) return i;
+        return -1;
     }
 
     public (int Left, int Right) StartStream(byte[] left, byte[]? right, int pitch, int volL, int volR, bool loop = true, int group = 0) // Amedo 2026-10-06
@@ -131,12 +194,13 @@ public sealed class SoundMixer
         }
     }
 
-    private int Claim(byte[] adpcm, int pitch, int volL, int volR, bool stream, bool loop = true, int group = 0) // Amedo 2026-10-06
+    private int Claim(byte[] adpcm, int pitch, int volL, int volR, bool stream, bool loop = true, int group = 0, int key = 0) // Amedo 2026-11-11
     {
-        for (int i = 0; i < VoiceCount; i++)
+        int i = Alloc_1DF7A0(key);
+        if (i >= 0)
         {
             var v = _voices[i];
-            if (v.On) continue;
+            v.Send = key != 0;
             v.Data = adpcm;
             v.Stream = stream;
             v.StreamLoop = loop; // Amedo 2026-09-28
@@ -267,6 +331,7 @@ public sealed class SoundMixer
             for (int f = 0; f < frames; f++)
             {
                 int l = 0, r = 0;
+                int wl0 = 0, wr0 = 0, wl1 = 0, wr1 = 0; // Amedo 2026-11-11
                 for (int i = 0; i < VoiceCount; i++) // Amedo 2026-10-06
                 {
                     var v = _voices[i];
@@ -279,8 +344,14 @@ public sealed class SoundMixer
                         s = s * v.Fade / FadeSamples;
                         if (--v.Fade <= 0) v.On = false;
                     }
-                    l += (s * _effL[i]) >> 14; // Amedo 2026-10-06
-                    r += (s * _effR[i]) >> 14;
+                    int vl = (s * _effL[i]) >> 14, vr = (s * _effR[i]) >> 14; // Amedo 2026-11-11
+                    l += vl;
+                    r += vr;
+                    if (v.Send)
+                    {
+                        if (i < CoreVoices) { wl0 += vl; wr0 += vr; }
+                        else { wl1 += vl; wr1 += vr; }
+                    }
                     v.Counter += v.Pitch;
                     while (v.On && 0x1000 <= v.Counter)
                     {
@@ -291,6 +362,8 @@ public sealed class SoundMixer
                         v.Cur = NextSample(v);
                     }
                 }
+                _reverb[0].Mix(wl0, wr0, ref l, ref r); // Amedo 2026-11-11
+                _reverb[1].Mix(wl1, wr1, ref l, ref r);
                 if (_pcmCount > 0) // Amedo
                 {
                     l += _pcm[2 * _pcmRead];
