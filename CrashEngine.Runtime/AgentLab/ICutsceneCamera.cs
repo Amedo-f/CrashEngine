@@ -12,5 +12,6 @@ public interface ICutsceneCamera
     void CameraNodeSetTarget_120110(AgentLabAgent target); // Amedo
     void Prepare_27DEC0(); // Amedo
     void PlayerCameraReset_15E538(); // Amedo
+    void SwitchPlayerCamera_177A90(); // Amedo 2026-11-11
     System.Numerics.Matrix4x4 Pose { get; } // Amedo
 }

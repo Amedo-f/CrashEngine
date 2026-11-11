@@ -39,6 +39,7 @@ public sealed partial class SceneSimulation
             c.ActivePlayer = true;
             World.SetPlayer_30A5A8(target, c);
             if (!ReferenceEquals(World.RootChunk, target.Chunk)) MovePlayer_1954A8(target.Chunk);
+            World.CutsceneCamera?.SwitchPlayerCamera_177A90(); // Amedo 2026-11-11
             World.CutsceneCamera?.CameraFocusObject_10F2D8(null);
         }
         World.Progression = (World.Progression & ~(0xFu << shift)) | ((uint)slot & 0xF) << shift;

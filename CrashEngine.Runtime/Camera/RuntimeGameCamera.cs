@@ -567,6 +567,15 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         FinishUpdate(Memory.U(Camera.Handle(_comp + 0x20) + 8));
     }
 
+    // Amedo 2026-11-11
+    public void SwitchPlayerCamera_177A90()
+    {
+        if (_world.PlayerCharacter is not { } c || _world.Player is not { } player || ReferenceEquals(c, _bound)) return;
+        Sync(c, player.GameMatrix);
+        _bound = c;
+        SwitchCamera_177A90(c);
+    }
+
     // Amedo 2026-10-30
     private void SwitchCamera_177A90(CharacterController c)
     {
