@@ -142,8 +142,7 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
     public void Request(SlotGroup group, uint flags, float blendSeconds, float speed, float startPhase = 0f)
     {
         int blendTicks = (flags & BlendFlag) != 0 ? GameMath.Trunc(blendSeconds * TickRate) : 0;
-        bool sameModel = CurrentGroup is null || (CurrentGroup.Ogi == group.Ogi && CurrentGroup.MeshRoot == group.MeshRoot);
-        bool blend = AllowBlend && blendTicks != 0 && sameModel;
+        bool blend = AllowBlend && blendTicks != 0; // Amedo 2026-11-11
         uint req = ((flags >> 12) & 1) | (blendTicks != 0 ? 2u : 0u) | ((flags >> 17) & 4) | ((flags >> 15) & 0x20);
         if ((flags & SyncPhaseFlag) != 0) req |= 8;
         else if ((flags & StartPhaseFlag) != 0) req |= 0x10;
