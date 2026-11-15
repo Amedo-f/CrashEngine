@@ -6,6 +6,7 @@ namespace CrashEngine.Runtime;
 
 public static class MemoryReport
 {
+    
     private static long _sampledAt;
     private static string _line = "";
 

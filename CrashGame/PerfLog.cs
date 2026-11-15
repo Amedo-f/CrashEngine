@@ -24,6 +24,8 @@ sealed class PerfLog
     public static int LastDraws { get; private set; }
     public Func<double>? GameClock { get; set; } // Amedo
     private const float SlowMs = 20f; // Amedo
+    private static float MissedMs => MathF.Min(SlowMs, PerfStats.FrameBudgetMs * 1.5f); // Amedo 2026-11-14
+    private int _missed; // Amedo 2026-11-14
     private long _jitCount = System.Runtime.JitInfo.GetCompiledMethodCount(); // Amedo
 
     public void Frame()
@@ -36,7 +38,8 @@ sealed class PerfLog
         {
             if (_started)
             {
-                if (PerfStats.LastFrameMs > SlowMs) // Amedo
+                if (PerfStats.LastFrameMs > MissedMs) _missed++; // Amedo 2026-11-14
+                if (PerfStats.LastFrameMs > MissedMs) // Amedo 2026-11-14
                 {
                     float other = PerfStats.LastFrameMs - PerfStats.LastMs(PerfSection.Update) - PerfStats.LastMs(PerfSection.Render) - PerfStats.LastMs(PerfSection.Ui) // Amedo
                         - PerfStats.LastMs(PerfSection.Present) - PerfStats.LastMs(PerfSection.FrameWait) - PerfStats.LastMs(PerfSection.WindowEvents);
@@ -88,6 +91,7 @@ sealed class PerfLog
             Stat("render", _render),
             $"draws per frame: avg {_draws.Average():0}  max {_draws.Max()}",
             $"frames over 6.94 ms (144): {_frame.Count(x => x > 1000f / 144f)}, over 16.7 ms (60): {_frame.Count(x => x > 1000f / 60f)}, over 33.3 ms (30): {_frame.Count(x => x > 1000f / 30f)}",
+            string.Create(CultureInfo.InvariantCulture, $"frames that missed the screen (over {MissedMs:0.0} ms = 1.5x the frame): {_missed}, each one is a [slow] line in CrashGame.log"), // Amedo 2026-11-14
             string.Create(CultureInfo.InvariantCulture, $"longest GC pause {(_gc.Count == 0 ? 0 : _gc.Max()):0.00} ms"),
             $"memory peak: RAM {MemoryReport.PeakPrivateBytes >> 20} MB, C# {MemoryReport.PeakManagedBytes >> 20} MB | {MemoryReport.LastCheck}",
             "sections (avg / max ms): " + string.Join("  ", Sections.Select((sec, i) =>
@@ -96,7 +100,7 @@ sealed class PerfLog
         if (monitor is not null && monitor.Averages() is { Samples: > 0 } avg)
             lines.Add(string.Create(CultureInfo.InvariantCulture,
                 $"PC usage by the game (avg of {avg.Samples} s): CPU {avg.Cpu:0.0}% ({monitor.CpuName}), GPU {(avg.Gpu < 0 ? "n/a" : $"{avg.Gpu:0.0}%")} ({gpuName}), RAM {avg.Ram / 1048576.0:0} MB"));
-        var name = $"perf_{Path.GetFileName(level)}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+        var name = $"perf_{GamePaths.FileName(level)}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
         File.WriteAllLines(Path.Combine(AppContext.BaseDirectory, name), lines);
         foreach (var l in lines) Console.WriteLine("[perf] " + l);
     }

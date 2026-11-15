@@ -352,7 +352,7 @@ sealed class PlayScene : Scene
         if (_cfg.ShotAt > 0 && !_shotTaken && EngineTime.Total >= _cfg.ShotAt)
         {
             _shotTaken = true;
-            SaveShot(Path.Combine(AppContext.BaseDirectory, $"shot_{Path.GetFileName(_cfg.Level)}_{DateTime.Now:yyyyMMdd_HHmmss}.png"));
+            SaveShot(Path.Combine(AppContext.BaseDirectory, $"shot_{GamePaths.FileName(_cfg.Level)}_{DateTime.Now:yyyyMMdd_HHmmss}.png"));
         }
         if (ShotPath is { } shot)
         {
@@ -396,7 +396,7 @@ sealed class PlayScene : Scene
             : $"VRAM game {Mb(m.VramGame)}, used {Mb(m.VramUsed)}";
         _overlay = new[]
         {
-            $"FPS {PerfStats.Fps:0}   frame {PerfStats.FrameMs:0.00} ms   worst {PerfStats.FramePeakMs:0.0} ms   {Engine.FrameModeName} (F3)",
+            $"FPS {PerfStats.Fps:0}   frame {PerfStats.FrameMs:0.00} ms   worst {PerfStats.FramePeakMs:0.0} ms   missed {PerfStats.MissedPerSecond} (10 s: {PerfStats.MissedLast10s})   {Engine.FrameModeName} (F3)", // Amedo 2026-11-14
             $"CPU  game {Pct(m?.CpuGame ?? -1)}   all apps {Pct(m?.CpuTotal ?? -1)}   {m?.CpuName}",
             $"GPU  game {Pct(m?.GpuGame ?? -1)}   all apps {Pct(m?.GpuTotal ?? -1)}   {_gpuName}",
             $"     {vram}",

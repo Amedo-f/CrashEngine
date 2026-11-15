@@ -52,6 +52,10 @@ public static class PerfStats
     private static long _secondStart = Stopwatch.GetTimestamp();
     private static int _gc0, _gc1, _gc2, _framesRun;
     private static float _frameRunPeak, _allocRun;
+    private static int _missedRun, _missedSlot; // Amedo 2026-11-14
+    private static readonly int[] _missedSeconds = new int[10];
+    public static int MissedPerSecond { get; private set; }
+    public static int MissedLast10s { get; private set; }
 
     public static float GpuMs { get; private set; }
     public static bool VSync { get; set; } = true;
@@ -102,6 +106,7 @@ public static class PerfStats
         FrameMs = FrameMs <= 0f ? frame : FrameMs + (frame - FrameMs) * Smooth;
         _frameRunPeak = MathF.Max(_frameRunPeak, frame);
         LastFrameMs = frame; // Amedo 2026-09-29
+        if (frame > FrameBudgetMs * 1.5f) _missedRun++; // Amedo 2026-11-14
         for (int i = 0; i < N; i++)
         {
             float ms = (float)(_frameTicks[i] * MsPerTick);
@@ -124,6 +129,11 @@ public static class PerfStats
         if ((now - _secondStart) * MsPerTick < 1000.0) return;
         Fps = _framesRun * 1000f / (float)((now - _secondStart) * MsPerTick);
         FramePeakMs = _frameRunPeak;
+        MissedPerSecond = _missedRun; // Amedo 2026-11-14
+        _missedSeconds[_missedSlot] = _missedRun;
+        _missedSlot = (_missedSlot + 1) % _missedSeconds.Length;
+        MissedLast10s = _missedSeconds.Sum();
+        _missedRun = 0;
         AllocKbPerFrame = _allocRun / _framesRun;
         for (int i = 0; i < N; i++) // Amedo 2026-09-29
         {
