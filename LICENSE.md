@@ -18,6 +18,12 @@ particular:
 - The **TwinTech** library and the engine foundation originate from **TT Lab**
   by Smartkin and NeoKesha, and remain under their authors' terms.
 
+The **CrashEngine.Runtime** library is also **not** licensed to you under this
+document. It is all rights reserved and has its own terms in
+[`CrashEngine.Runtime/LICENSE.md`](CrashEngine.Runtime/LICENSE.md). It may not
+be copied, redistributed, or used in other projects without written permission
+from Amedo.
+
 This repository contains **no copyrighted game data**. *Crash Bandicoot* and
 related assets are the property of their respective rights holders. This is an
 unofficial fan project and is not affiliated with or endorsed by them.

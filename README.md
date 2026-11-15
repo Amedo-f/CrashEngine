@@ -144,4 +144,10 @@ Noncommercial License 1.0.0**. See [`LICENSE.md`](LICENSE.md). Third-party
 components retain their own separate licenses, listed in
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
+**CrashEngine.Runtime is the exception.** It is all rights reserved. You may
+build and run it as part of CrashEngine and share what you make with it, but
+you may not copy it, or any part of it, into another project, or redistribute
+it, without written permission from Amedo. See
+[`CrashEngine.Runtime/LICENSE.md`](CrashEngine.Runtime/LICENSE.md).
+
 © 2026 Amedo
