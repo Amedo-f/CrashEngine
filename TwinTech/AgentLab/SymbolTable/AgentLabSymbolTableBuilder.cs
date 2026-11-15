@@ -1,7 +1,7 @@
 using System;
 using System.IO;
-using System.Reflection;
 using Twinsanity.AgentLab.AbstractSyntaxTree;
+using Twinsanity.Libraries;
 
 namespace Twinsanity.AgentLab.SymbolTable;
 
@@ -28,11 +28,7 @@ public class AgentLabSymbolTableBuilder
 
     public AgentLabSymbolTableBuilder BuildConditions()
     {
-        string codeBase = Assembly.GetExecutingAssembly().Location;
-        if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
-        UriBuilder uri = new(codeBase);
-        string path = Uri.UnescapeDataString(uri.Path);
-        using FileStream fs = new(Path.Combine(Path.GetDirectoryName(path), @"AgentLab\ConditionDefinitions.lab"), FileMode.Open, FileAccess.Read);
+        using FileStream fs = new(TwinTechFiles.PathOf("AgentLab", "ConditionDefinitions.lab"), FileMode.Open, FileAccess.Read); // Amedo 2026-11-08
         using StreamReader sr = new StreamReader(fs);
         using StringReader reader = new StringReader(sr.ReadToEnd());
         var parser = new AgentLabParser(new AgentLabLexer(reader));
@@ -45,11 +41,7 @@ public class AgentLabSymbolTableBuilder
     {
         if (actionDefinitionFile != "")
         {
-            string codeBase = Assembly.GetExecutingAssembly().Location;
-            if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
-            UriBuilder uri = new(codeBase);
-            string path = Uri.UnescapeDataString(uri.Path);
-            using FileStream fs = new(Path.Combine(Path.GetDirectoryName(path), @$"AgentLab\{actionDefinitionFile}"), FileMode.Open, FileAccess.Read);
+            using FileStream fs = new(TwinTechFiles.PathOf("AgentLab", actionDefinitionFile), FileMode.Open, FileAccess.Read); // Amedo 2026-11-08
             using StreamReader sr = new StreamReader(fs);
             using StringReader reader = new StringReader(sr.ReadToEnd());
             var parser = new AgentLabParser(new AgentLabLexer(reader));

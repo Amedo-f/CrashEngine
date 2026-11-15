@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 using Twinsanity.Libraries;
 using Twinsanity.PS2Hardware;
@@ -42,11 +41,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.Graphics
         private static void EnsureTextureDescriptorHelperLoaded()
         {
             if (TextureDescriptorHelper != null) return;
-            string codeBase = Assembly.GetExecutingAssembly().Location;
-            if (!Path.IsPathRooted(codeBase)) codeBase = new Uri(Path.Combine(AppContext.BaseDirectory, "TwinTech.dll")).AbsoluteUri; // Amedo 2026-10-26
-            UriBuilder uri = new(codeBase);
-            string path = Uri.UnescapeDataString(uri.Path);
-            using FileStream stream = new(Path.Combine(Path.GetDirectoryName(path), @"TextureDescriptionHelper.json"), FileMode.Open, FileAccess.Read);
+            using FileStream stream = new(TwinTechFiles.PathOf("TextureDescriptionHelper.json"), FileMode.Open, FileAccess.Read); // Amedo 2026-11-08
             using StreamReader reader = new(stream);
             TextureDescriptorHelper = JsonSerializer.Deserialize<Dictionary<string, TextureDescriptor>>(reader.ReadToEnd());
         }
