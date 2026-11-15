@@ -134,8 +134,7 @@ public sealed partial class GameScene : Scene
                                 .FirstOrDefault(x => x.GetID() == id);
             if (p is not null)
             {
-                var posEnt = MakePointMarker(_positionsRoot, $"Position_{p.GetID():X4}", p.Position,
-                                new Vector4(1f, 0.9f, 0.15f, 0.7f));
+                var posEnt = MakePositionMarker(_positionsRoot, $"Position_{p.GetID():X4}", p.Position); // Amedo 2026-11-15
                 posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
             }
         }
@@ -241,8 +240,7 @@ public sealed partial class GameScene : Scene
 
             foreach (var p in LayoutSectionItems<PS2AnyPosition>(layout, TwinConstants.LAYOUT_POSITIONS_SECTION))
             {
-                var posEnt = MakePointMarker(positionsRoot, $"Position_{p.GetID():X4}", p.Position,
-                                new Vector4(1f, 0.9f, 0.15f, 0.7f));
+                var posEnt = MakePositionMarker(positionsRoot, $"Position_{p.GetID():X4}", p.Position); // Amedo 2026-11-15
                 posEnt.Add(new CrashEngine.Importer.PositionMarker { Source = p });
                 positions++;
             }
@@ -317,20 +315,9 @@ public sealed partial class GameScene : Scene
 		var chainInst = _selected?.Get<InstanceData>();
 		if (chainInst is not null && chainInst.Source.Positions.Count > 0)
 		{
-			var chainChunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-			if (chainChunkRoot is not null)
-			{
-				var chainPosEnts = AllEntities(chainChunkRoot)
-					.Where(x => x.Has<CrashEngine.Importer.PositionMarker>())
-					.ToDictionary(x => x.Get<CrashEngine.Importer.PositionMarker>()!.Source.GetID(), x => x);
-
-				points.Add(_selected!.Transform.World.Translation);
-				foreach (var pid in chainInst.Source.Positions)
-				{
-					if (!chainPosEnts.TryGetValue(pid, out var posEnt)) continue;
-					points.Add(posEnt.Transform.World.Translation);
-				}
-			}
+			points.Add(_selected!.Transform.World.Translation);
+			foreach (var (_, _, marker) in PatrolPoints(chainInst.Source)) // Amedo 2026-11-15
+				if (marker is not null) points.Add(marker.Transform.World.Translation);
 		}
 	}
 

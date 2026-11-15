@@ -74,6 +74,7 @@ public sealed partial class GameScene
 	private Entity? HitTestCameraIcons(System.Numerics.Vector2 mouse, int sw, int sh)
 	{
 		if (_camerasRoot is not { Active: true } camerasRoot) return null;
+		if (_cameraIconModel is not null || _playerCameraModel is not null) return HitTestCameraIcon3D(mouse, sw, sh); // Amedo 2026-11-15
 		foreach (var child in camerasRoot.Children)
 		{
 			if (!WorldToScreen(child.Transform.World.Translation, sw, sh, out var screen)) continue;

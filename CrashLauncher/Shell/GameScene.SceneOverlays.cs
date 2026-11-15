@@ -114,11 +114,11 @@ public sealed partial class GameScene : Scene
 				}
 			}
 		}
-		if (_workspace == Workspace.Scene) UpdateAiPathLines(); // Amedo
 		if (_workspace == Workspace.Scene && !blockingUi && _camera != null)
 		{
+			DrawPlayerCameraLine(); // Amedo 2026-11-15
 			Entity camerasRoot = _camerasRoot;
-			if (camerasRoot != null && camerasRoot.Active)
+			if (camerasRoot != null && camerasRoot.Active && _cameraIconModel is null) // Amedo 2026-11-15
 			{
 				ImDrawListPtr foregroundDrawList4 = ImGui.GetBackgroundDrawList();
 				foreach (Entity child in _camerasRoot.Children)
