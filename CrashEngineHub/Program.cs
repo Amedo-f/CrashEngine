@@ -13,13 +13,8 @@ Engine.CustomFontSetup = atlas =>
 var engine = new Engine("CrashEngine Hub", 1100, 680);
 try
 {
-    var icons = new List<(int, int, byte[])>();
-    foreach (var size in new[] { 16, 32, 48 })
-    {
-        var rgba = CrashEngine.Renderer.Texture2D.LoadRgba(Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", $"hub-icon-{size}.png"), out int w, out int h);
-        if (rgba != null) icons.Add((w, h, rgba));
-    }
-    if (icons.Count > 0) engine.SetWindowIcon(icons.ToArray());
+    var icons = CrashEngine.Renderer.Texture2D.LoadWindowIcons(Path.Combine(AppContext.BaseDirectory, "Assets", "Icons"), "hub-icon"); // Amedo 2026-11-15
+    if (icons.Length > 0) engine.SetWindowIcon(icons);
 }
 catch (Exception ex)
 {

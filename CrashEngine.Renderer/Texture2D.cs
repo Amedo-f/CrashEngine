@@ -280,6 +280,15 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         catch { return null; }
     }
 
+    // Amedo 2026-11-15
+    public static (int W, int H, byte[] Rgba)[] LoadWindowIcons(string folder, string name)
+    {
+        var icons = new List<(int, int, byte[])>();
+        foreach (int size in new[] { 16, 32, 48 })
+            if (LoadRgba(Path.Combine(folder, $"{name}-{size}.png"), out int w, out int h) is { } rgba) icons.Add((w, h, rgba));
+        return icons.ToArray();
+    }
+
     // Amedo 2026-10-02
     public unsafe void UpdateHighRes(ReadOnlySpan<byte> rgba, uint uploadW, uint uploadH, uint w, uint h)
     {

@@ -48,14 +48,8 @@ var engine = new Engine("CrashEngine", 1280, 720);
 // Amedo 2026-09-22
 try
 {
-    var iconDir = Path.Combine(AppContext.BaseDirectory, "Assets", "Icons");
-    var icons = new List<(int, int, byte[])>();
-    foreach (var sz in new[] { 16, 32, 48 })
-    {
-        var rgba = CrashEngine.Renderer.Texture2D.LoadRgba(Path.Combine(iconDir, $"app-icon-{sz}.png"), out int w, out int h);
-        if (rgba != null) icons.Add((w, h, rgba));
-    }
-    if (icons.Count > 0) engine.SetWindowIcon(icons.ToArray());
+    var icons = CrashEngine.Renderer.Texture2D.LoadWindowIcons(Path.Combine(AppContext.BaseDirectory, "Assets", "Icons"), "app-icon"); // Amedo 2026-11-15
+    if (icons.Length > 0) engine.SetWindowIcon(icons);
 }
 catch { }
 

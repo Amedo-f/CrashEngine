@@ -30,5 +30,8 @@ tools/
 # local backup copies
 *.bak
 
+# the game's logo used as the player's icon (trademark, kept local)
+CrashGame/Icons/
+
 # personal notes (kept private)
 ملاحظات المستخدمين.md
