@@ -124,6 +124,13 @@ For developers who want to build it themselves:
    ```
 4. Launch **CrashEngine Hub** and create a project from your own disc image.
 
+## Support
+
+CrashEngine is free and made in my spare time. If you enjoy it and want to help
+it keep growing, you can support development at
+[**creators.sa/amedo**](https://creators.sa/amedo). Every bit is appreciated,
+and nothing in the project is locked behind support.
+
 ## Attribution
 
 CrashEngine is built on the foundation of **TT Lab** by **Smartkin** and
