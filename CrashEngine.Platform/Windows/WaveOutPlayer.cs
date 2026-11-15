@@ -5,7 +5,7 @@ namespace CrashEngine.Platform.Windows;
 
 // Amedo 2026-09-28
 [SupportedOSPlatform("windows")]
-public sealed class WaveOutPlayer : IDisposable
+public sealed class WaveOutPlayer : ISoundStream // Amedo 2026-11-15
 {
     [StructLayout(LayoutKind.Sequential, Pack = 2)]
     private struct WaveFormat

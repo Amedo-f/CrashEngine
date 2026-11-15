@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using CrashEngine.Platform.Windows;
+using CrashEngine.Platform; // Amedo 2026-11-15
 using ImGuiNET;
 using Twinsanity.Libraries;
 
@@ -193,10 +193,10 @@ public sealed partial class GameScene
         var scaled = ApplyPreviewVolume(wav, _previewVolume);
         lock (_previewSoundLock) // Amedo 2026-09-25
         {
-            WinMmSound.Stop();
+            SoundOutput.StopWav();
             if (_previewSoundPin.IsAllocated) _previewSoundPin.Free();
             _previewSoundPin = GCHandle.Alloc(scaled, GCHandleType.Pinned);
-            return WinMmSound.PlayWav(scaled);
+            return SoundOutput.PlayWav(scaled);
         }
     }
 
@@ -262,7 +262,7 @@ public sealed partial class GameScene
     {
         lock (_previewSoundLock) // Amedo 2026-09-25
         {
-            try { WinMmSound.Stop(); } catch {  }
+            try { SoundOutput.StopWav(); } catch {  }
             if (_previewSoundPin.IsAllocated) _previewSoundPin.Free();
         }
         _musicPreviewPlaying = false;

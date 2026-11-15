@@ -1,5 +1,4 @@
-using System.Runtime.Versioning;
-using CrashEngine.Platform.Windows;
+using CrashEngine.Platform;
 
 namespace CrashEngine.Runtime.Audio;
 
@@ -18,16 +17,14 @@ public static class AudioOutput
     public static IAudioOutput? Create(SoundMixer mixer)
     {
         if (Factory is { } factory) return factory(mixer);
-        return OperatingSystem.IsWindows() ? new WaveOutAudioOutput(mixer) : null;
+        return SoundOutput.OpenStream(SoundMixer.SampleRate, mixer.Render) is { } stream ? new SystemAudioOutput(stream) : null; // Amedo 2026-11-15
     }
 }
 
-[SupportedOSPlatform("windows")]
-internal sealed class WaveOutAudioOutput(SoundMixer mixer) : IAudioOutput
+// Amedo 2026-11-15
+internal sealed class SystemAudioOutput(ISoundStream stream) : IAudioOutput
 {
-    private readonly WaveOutPlayer _player = new(SoundMixer.SampleRate, mixer.Render);
-
-    public string? Error => _player.Error;
-    public int BuffersWritten => _player.BuffersWritten;
-    public void Dispose() => _player.Dispose();
+    public string? Error => stream.Error;
+    public int BuffersWritten => stream.BuffersWritten;
+    public void Dispose() => stream.Dispose();
 }
