@@ -6,8 +6,21 @@ namespace CrashLauncher;
 
 public sealed partial class GameScene : Scene
 {
+    private int _browserRevision = -1;
+
+    // Amedo 2026-11-12
+    private void SyncWithBrowser()
+    {
+        if (_browserRevision == _browser.Revision) return;
+        _browserRevision = _browser.Revision;
+        _gameProjectLoaded = false;
+        _swapLevelList = null;
+        _sceneFiles = null;
+    }
+
     private CrashProject? GetGameProject()
     {
+        SyncWithBrowser(); // Amedo 2026-11-12
         if (_gameProjectLoaded) return _gameProject;
         _gameProjectLoaded = true;
         var projectRoot = Path.GetDirectoryName(_scriptOut) ?? _extractedRoot;
@@ -24,6 +37,7 @@ public sealed partial class GameScene : Scene
 
     private List<string> GetSwapLevelList()
     {
+        SyncWithBrowser(); // Amedo 2026-11-12
         if (_swapLevelList is not null) return _swapLevelList;
         var list = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -47,7 +61,7 @@ public sealed partial class GameScene : Scene
             {
                 foreach (var file in Directory.GetFiles(savedChunksDir, "*.rm2", SearchOption.AllDirectories))
                 {
-                    var rel = Path.GetRelativePath(savedChunksDir, file);
+                    var rel = GamePaths.FromDisk(Path.GetRelativePath(savedChunksDir, file));
                     if (string.Equals(rel, _rm2, StringComparison.OrdinalIgnoreCase)) continue;
                     if (seen.Add(rel)) list.Add(rel);
                 }

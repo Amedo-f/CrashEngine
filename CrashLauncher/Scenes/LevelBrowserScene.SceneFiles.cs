@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using CrashEngine.Importer;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
 
@@ -19,24 +20,24 @@ public sealed partial class LevelBrowserScene
         if (_projectPath is null) { error = "No project loaded -- can't record a New Game claim without one."; return false; }
         if (!WriteBlankScene(templatePath, targetBasePath, blank: false, out _, out error)) return false;
 
-        var project = CrashProject.Open(_projectPath);
+        var project = ReadProject(); // Amedo 2026-11-12
         if (project is null) { error = "Scene written, but couldn't load this project's .tson to record the claim."; return false; }
         if (!project.ClaimedLevels.Contains(targetBasePath, StringComparer.OrdinalIgnoreCase))
             project.ClaimedLevels.Add(targetBasePath);
-        project.Save();
+        SaveProject(project);
         error = null;
         return true;
     }
 
     private bool TryUnclaimLevelSlot(string basePath, out string? error)
     {
-        if (_project is null) { error = "No project loaded."; return false; }
+        if (ReadProject() is not { } project) { error = "No project loaded."; return false; } // Amedo 2026-11-12
         if (!File.Exists(BackupBdPath))
         { error = "No backup archive found -- New Game's own Build ISO never actually ran yet, so there's nothing baked-in to restore from (try plain \"Delete\" instead)."; return false; }
 
         var savedChunksDir = SavedChunksDir;
-        var rm2Path = Path.Combine(savedChunksDir, basePath + ".rm2");
-        var sm2Path = Path.Combine(savedChunksDir, basePath + ".sm2");
+        var rm2Path = GamePaths.OnDisk(savedChunksDir, basePath + ".rm2");
+        var sm2Path = GamePaths.OnDisk(savedChunksDir, basePath + ".sm2");
 
         try
         {
@@ -64,10 +65,51 @@ public sealed partial class LevelBrowserScene
             return false;
         }
 
-        _project.ClaimedLevels.RemoveAll(p => p.Equals(basePath, StringComparison.OrdinalIgnoreCase));
-        _project.Save();
+        project.ClaimedLevels.RemoveAll(p => p.Equals(basePath, StringComparison.OrdinalIgnoreCase));
+        SaveProject(project);
         error = null;
         return true;
+    }
+
+    // Amedo 2026-11-12
+    public void SetNewGame(bool on)
+    {
+        if (ReadProject() is not { } project) return;
+        project.IsNewGame = on;
+        SaveProject(project);
+        if (on)
+        {
+            ScanLevels(); // Amedo 2026-09-22
+            Log("New Game mode: ON — Build ISO will now exclude every original level not claimed via \"Add Scene...\".");
+            if (project.ExcludedCutscenes.Count == 0)
+            {
+                var fmvRoot = Path.Combine(_extractedRoot, "FMV");
+                if (Directory.Exists(fmvRoot))
+                {
+                    foreach (var f in Directory.EnumerateFiles(fmvRoot, "*.pss", SearchOption.AllDirectories))
+                    {
+                        var rel = Path.GetRelativePath(fmvRoot, f);
+                        if (BuildIsoToPS2.IsStoryCutscene(Path.GetFileName(f)))
+                            project.ExcludedCutscenes.Add(rel);
+                    }
+                    SaveProject(project);
+                    Log($"New Game mode: pre-selected {project.ExcludedCutscenes.Count} story cutscene(s) to exclude — adjust per-file under UI Browser → FMV / Cutscenes.");
+                }
+            }
+        }
+        else
+        {
+            if (TryRestoreOriginalArchive(out var restoreErr))
+            {
+                Log("New Game mode: OFF — live archive restored from backup, every original level is back.");
+                ScanLevels();
+            }
+            else
+            {
+                Log($"New Game mode: OFF, but the live archive restore FAILED — {restoreErr} " +
+                     "(the browser may still only show what's currently in the live archive until this is fixed and you reopen the project).");
+            }
+        }
     }
 
     private bool WriteBlankScene(string templatePath, string destBasePath, bool blank, out string? rm2Rel, out string? error)
@@ -106,11 +148,11 @@ public sealed partial class LevelBrowserScene
             }
 
 
-            var destDir = Path.Combine(savedChunksDir, Path.GetDirectoryName(destBasePath) ?? "");
+            var destDir = GamePaths.OnDisk(savedChunksDir, GamePaths.Folder(destBasePath));
             Directory.CreateDirectory(destDir);
 
-            var rm2Path = Path.Combine(savedChunksDir, destBasePath + ".rm2");
-            var sm2Path = Path.Combine(savedChunksDir, destBasePath + ".sm2");
+            var rm2Path = GamePaths.OnDisk(savedChunksDir, destBasePath + ".rm2");
+            var sm2Path = GamePaths.OnDisk(savedChunksDir, destBasePath + ".sm2");
             WriteChunkAtomic(rm2Path, rm2.Write);
             WriteChunkAtomic(sm2Path, sm2.Write);
 
@@ -137,10 +179,10 @@ public sealed partial class LevelBrowserScene
         File.Move(tmp, path, overwrite: true);
     }
 
-    private void DeleteSavedScene(string rm2Rel)
+    public void DeleteSavedScene(string rm2Rel)
     {
         var savedChunksDir = SavedChunksDir;
-        var rm2Path = Path.Combine(savedChunksDir, rm2Rel);
+        var rm2Path = GamePaths.OnDisk(savedChunksDir, rm2Rel);
         var sm2Path = Path.ChangeExtension(rm2Path, ".sm2");
 
         bool deletedAnything = false;
@@ -150,7 +192,7 @@ public sealed partial class LevelBrowserScene
             if (File.Exists(sm2Path)) { File.Delete(sm2Path); deletedAnything = true; }
 
             var markersRel = rm2Rel.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase) ? rm2Rel[..^4] : rm2Rel;
-            var markersPath = Path.Combine(CollisionMarkersDir, markersRel + ".json");
+            var markersPath = GamePaths.OnDisk(CollisionMarkersDir, markersRel + ".json");
             if (File.Exists(markersPath)) { File.Delete(markersPath); deletedAnything = true; }
 
             var markersDir = Path.GetDirectoryName(markersPath);
@@ -180,11 +222,11 @@ public sealed partial class LevelBrowserScene
         if (newRelNoExt.Length == 0) { error = "Enter a destination path."; return false; }
 
         var savedChunksDir = SavedChunksDir;
-        var srcRm2 = Path.Combine(savedChunksDir, sourceRm2Rel);
+        var srcRm2 = GamePaths.OnDisk(savedChunksDir, sourceRm2Rel);
         var srcSm2 = Path.ChangeExtension(srcRm2, ".sm2");
 
-        var destRm2 = Path.Combine(savedChunksDir, newRelNoExt + ".rm2");
-        var destSm2 = Path.Combine(savedChunksDir, newRelNoExt + ".sm2");
+        var destRm2 = GamePaths.OnDisk(savedChunksDir, newRelNoExt + ".rm2");
+        var destSm2 = GamePaths.OnDisk(savedChunksDir, newRelNoExt + ".sm2");
         if (Path.GetFullPath(destRm2).Equals(Path.GetFullPath(srcRm2), StringComparison.OrdinalIgnoreCase))
         { error = "Source and destination are the same path."; return false; }
 
@@ -253,11 +295,11 @@ public sealed partial class LevelBrowserScene
                 File.Delete(srcRm2);
                 if (File.Exists(srcSm2)) File.Delete(srcSm2);
 
-                var srcMarkers = Path.Combine(CollisionMarkersDir,
+                var srcMarkers = GamePaths.OnDisk(CollisionMarkersDir,
                     (sourceRm2Rel.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase) ? sourceRm2Rel[..^4] : sourceRm2Rel) + ".json");
                 if (File.Exists(srcMarkers))
                 {
-                    var destMarkers = Path.Combine(CollisionMarkersDir, newRelNoExt + ".json");
+                    var destMarkers = GamePaths.OnDisk(CollisionMarkersDir, newRelNoExt + ".json");
                     Directory.CreateDirectory(Path.GetDirectoryName(destMarkers)!);
                     File.Copy(srcMarkers, destMarkers, overwrite: true);
                     File.Delete(srcMarkers);
@@ -290,8 +332,8 @@ public sealed partial class LevelBrowserScene
         var newName = SanitizeSceneName(rawNewName);
         if (newName.Length == 0) { error = "Enter a name (letters/digits/underscore)."; return false; }
 
-        var dir = Path.GetDirectoryName(sourceRm2Rel) ?? "";
-        var destRel = Path.Combine(dir, newName);
+        var dir = GamePaths.Folder(sourceRm2Rel);
+        var destRel = GamePaths.Combine(dir, newName);
         return MoveSavedScene(sourceRm2Rel, destRel, out error);
     }
 

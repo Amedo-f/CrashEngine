@@ -275,10 +275,9 @@ public sealed partial class GameScene
     }
 
     // Amedo 2026-09-28
-    private void LeaveScene(Action? leave = null)
+    private void LeaveScene(Action go) // Amedo 2026-11-12
     {
-        var go = leave ?? (() => Engine.Instance.ActiveScene = _browser); // Amedo 2026-10-02
-        leave = () => { DropPlayHost(); _releaseGpu = true; go(); };
+        Action leave = () => { DropPlayHost(); _releaseGpu = true; go(); };
         if (!Simulating) { leave(); return; }
         if (_leavePlayOpen) { _cancelLeavePlay = true; return; }
         _leaveTo = leave;

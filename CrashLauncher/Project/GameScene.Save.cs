@@ -46,6 +46,7 @@ public sealed partial class GameScene : Scene
             _browser.Log(msg);
             _saveConfirmMessage = msg;
             _openSaveConfirmPopup = confirm; // Amedo 2026-10-04
+            _sceneFiles = null; // Amedo 2026-11-12
             return true;
         }
         catch (Exception ex) { _browser.Log($"Save failed: {ex.Message}"); return false; }

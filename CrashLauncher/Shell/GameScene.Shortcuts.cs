@@ -31,7 +31,7 @@ public sealed partial class GameScene
         Row("Delete",            "Delete selected");
         Row("Ctrl+G",            "Glue mode (snap to another object)");
         Row("X / Y / Z",         "Lock glue to an axis (while gluing)");
-        Row("Esc",               "Cancel current mode / back to levels");
+        Row("Esc",               "Cancel current mode");
 
         ImGui.Spacing();
         ImGui.TextUnformatted("Selection");

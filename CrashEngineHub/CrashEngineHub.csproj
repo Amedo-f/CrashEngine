@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Amedo 2026-11-12 -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>CrashEngine Hub</AssemblyName>
+    <RootNamespace>CrashEngineHub</RootNamespace>
+    <ApplicationIcon>hub.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
+    <ProjectReference Include="..\CrashEngine.Renderer\CrashEngine.Renderer.csproj" />
+    <ProjectReference Include="..\CrashEngine.Install\CrashEngine.Install.csproj" />
+    <ProjectReference Include="..\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
+    <ProjectReference Include="..\CrashEngine.Platform\CrashEngine.Platform.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\CrashLauncher\EditorTheme.cs" Link="Shared\EditorTheme.cs" />
+    <Compile Include="..\CrashLauncher\EditorFonts.cs" Link="Shared\EditorFonts.cs" />
+    <Compile Include="..\CrashLauncher\Shell\ImGuiFileBrowser.cs" Link="Shared\ImGuiFileBrowser.cs" />
+    <None Include="Assets\Icons\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -28,6 +28,7 @@ public sealed class CrashProject
     public string?      Language          { get; set; } // Amedo 2026-10-01
     public string?      DiscLanguage      { get; set; } // Amedo 2026-11-11
     public bool         CratesReceiveShadows { get; set; } // Amedo
+    public string?      LastScene         { get; set; } // Amedo 2026-11-12
 
     [JsonIgnore]
     public string ProjectPath => System.IO.Path.Combine(Path, Name);
@@ -104,17 +105,18 @@ public sealed class CrashProject
     private static string RecentsFile =>
         System.IO.Path.Combine(AppContext.BaseDirectory, "recent_projects.txt");
 
-    public static List<string> GetRecents() =>
-        File.Exists(RecentsFile)
-            ? File.ReadAllLines(RecentsFile).Where(Directory.Exists).Distinct().Take(10).ToList()
-            : new List<string>();
+    // Amedo 2026-11-12
+    public static List<string> GetRecents()
+    {
+        CrashEngine.Install.RecentProjects.ImportLegacy(RecentsFile);
+        return CrashEngine.Install.RecentProjects.Get().Take(10).ToList();
+    }
 
+    // Amedo 2026-11-12
     public static void AddRecent(string projectPath)
     {
-        var list = GetRecents();
-        list.Remove(projectPath);
-        list.Insert(0, projectPath);
-        File.WriteAllLines(RecentsFile, list.Take(10));
+        CrashEngine.Install.RecentProjects.ImportLegacy(RecentsFile);
+        CrashEngine.Install.RecentProjects.Add(projectPath);
     }
 
 

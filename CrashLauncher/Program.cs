@@ -5,44 +5,34 @@ using System.Runtime.InteropServices;
 
 string SCRIPT_OUT = Path.Combine(AppContext.BaseDirectory, "Scripts");
 
+if (args.Length == 0 && ProjectCreator.StartHub()) return; // Amedo 2026-11-12
+
 Engine.CustomStyleSetup = EditorTheme.Apply; // Amedo
 Engine.CustomFontSetup = atlas =>
 {
     try
     {
-        var sysFontsDir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-        var sysFont = Path.Combine(sysFontsDir, "segoeui.ttf");
-        if (!File.Exists(sysFont)) sysFont = Path.Combine(sysFontsDir, "arial.ttf");
-        if (File.Exists(sysFont))
+        var sysFont = EditorFonts.AddUiFont(atlas); // Amedo 2026-11-12
+        if (sysFont is not null)
         {
             unsafe
             {
-                ushort[] rangesManaged = { 0x0020, 0x00FF, 0x0600, 0x06FF, 0x0750, 0x077F, 0x2010, 0x2027, 0x2030, 0x2044, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0 }; // Amedo 2026-10-01
-                var rangesPtr = (ushort*)Marshal.AllocHGlobal(rangesManaged.Length * sizeof(ushort));
-                for (int i = 0; i < rangesManaged.Length; i++) rangesPtr[i] = rangesManaged[i];
-                atlas.AddFontFromFileTTF(sysFont, 16f, default, (IntPtr)rangesPtr);
-                // Amedo 2026-11-04: fixed-width font for the code editor (Consolas), with the Arabic letters taken from the UI font
-                var mono = Path.Combine(sysFontsDir, "consola.ttf");
-                if (File.Exists(mono))
+                // Amedo 2026-11-04
+                if (EditorFonts.MonoFontPath() is { } mono) // Amedo 2026-11-14
                 {
-                    ushort[] latin = { 0x0020, 0x00FF, 0x2010, 0x2027, 0 };
-                    var latinPtr = (ushort*)Marshal.AllocHGlobal(latin.Length * sizeof(ushort));
-                    for (int i = 0; i < latin.Length; i++) latinPtr[i] = latin[i];
-                    var monoFont = atlas.AddFontFromFileTTF(mono, 15f, default, (IntPtr)latinPtr);
-                    ushort[] arabic = { 0x0600, 0x06FF, 0x0750, 0x077F, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0 };
-                    var arabicPtr = (ushort*)Marshal.AllocHGlobal(arabic.Length * sizeof(ushort));
-                    for (int i = 0; i < arabic.Length; i++) arabicPtr[i] = arabic[i];
+                    var monoFont = atlas.AddFontFromFileTTF(mono, 15f, default, EditorFonts.Ranges([0x0020, 0x00FF, 0x2010, 0x2027, 0]));
                     var merge = ImGuiNET.ImGuiNative.ImFontConfig_ImFontConfig();
                     merge->MergeMode = 1;
-                    atlas.AddFontFromFileTTF(sysFont, 15f, merge, (IntPtr)arabicPtr);
+                    atlas.AddFontFromFileTTF(sysFont, 15f, merge, EditorFonts.Ranges([0x0600, 0x06FF, 0x0750, 0x077F, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0]));
                     CrashLauncher.CodeEditor.CodeEditor.MonoFont = monoFont;
                 }
             }
+            SplashScene.AddFonts(atlas, sysFont); // Amedo 2026-11-12
             Console.WriteLine($"Font setup: loaded {Path.GetFileName(sysFont)} with extended glyph range (em-dash etc. now render correctly).");
         }
         else
         {
-            Console.WriteLine("Font setup: no system TTF found (segoeui.ttf/arial.ttf) — falling back to ImGui's ASCII-only default font (em-dashes etc. will show as '?').");
+            Console.WriteLine("Font setup: no system TTF found (segoeui/arial/DejaVuSans/NotoSans) — falling back to ImGui's ASCII-only default font (em-dashes etc. will show as '?').");
         }
     }
     catch (Exception ex)
@@ -72,5 +62,23 @@ catch { }
 JitWarmup.Start(typeof(CrashEngine.Runtime.SceneSimulation).Assembly, typeof(MeshDecoder).Assembly, // Amedo 2026-10-01
     typeof(CrashEngine.Renderer.RenderPipeline).Assembly, typeof(Engine).Assembly, typeof(Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2).Assembly); // Amedo
 
-engine.ActiveScene = new ProjectSetupScene(SCRIPT_OUT);
+int openArg = Array.FindIndex(args, a => a.Equals("--open", StringComparison.OrdinalIgnoreCase)); // Amedo 2026-11-12
+int createArg = Array.FindIndex(args, a => a.Equals("--create", StringComparison.OrdinalIgnoreCase)); // Amedo 2026-11-12
+string? openError = openArg >= 0 && openArg + 1 < args.Length ? ProjectCreator.Open(args[openArg + 1]) : "";
+if (createArg >= 0 && createArg + 3 < args.Length) // Amedo 2026-11-12
+{
+    openError = ProjectCreator.Validate(args[createArg + 3], args[createArg + 2], args[createArg + 1], out var created);
+    if (openError is null) engine.ActiveScene = new SplashScene(created, SCRIPT_OUT);
+}
+int resumeArg = Array.FindIndex(args, a => a.Equals("--resume", StringComparison.OrdinalIgnoreCase)); // Amedo 2026-11-12
+if (resumeArg >= 0 && resumeArg + 1 < args.Length)
+{
+    if (CrashProject.Open(args[resumeArg + 1]) is { } unfinished) { engine.ActiveScene = new SplashScene(unfinished, SCRIPT_OUT); openError = null; }
+    else openError = $"Not a project: {args[resumeArg + 1]}";
+}
+if (openError is not null)
+{
+    if (openError.Length > 0) Console.WriteLine($"--open: {openError}");
+    engine.ActiveScene = new ProjectSetupScene(SCRIPT_OUT);
+}
 engine.Run();

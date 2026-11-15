@@ -51,6 +51,15 @@ public sealed partial class GameScene
         }
         if (ImGui.MenuItem("Export Collision to OBJ...")) ExportCollisionToObj();
         if (ImGui.MenuItem("Import Collision from OBJ...")) ImportCollisionFromObj();
+        ImGui.Separator();
+        ImGui.BeginDisabled(_building); // Amedo 2026-11-12
+        if (_browser.HasProject)
+        {
+            if (ImGui.MenuItem("New Game Mode", null, _browser.IsNewGame)) ToggleNewGame();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip(LevelBrowserScene.NewGameHelp);
+        }
+        if (ImGui.MenuItem("Close Project")) LeaveScene(() => ProjectCreator.Close(_scriptOut));
+        ImGui.EndDisabled();
     }
 
     // Amedo

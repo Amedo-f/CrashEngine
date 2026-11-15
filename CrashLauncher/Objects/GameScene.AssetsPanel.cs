@@ -14,13 +14,14 @@ public sealed partial class GameScene
     private string _assetsCategory = "";
     private string _assetsFilter   = "";
 
-    private List<string>? _assetsLevelList;
+    private enum AssetsView { Home, Scenes, MyAssets } // Amedo 2026-11-12
+    private AssetsView _assetsView = AssetsView.Home;
+
     private readonly Dictionary<string, PS2AnyTwinsanitySM2?> _assetsSm2Cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<uint, Texture2D>> _assetsTexCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string Level, int Tile), Texture2D?> _assetsThumbCache = new();
     private PreviewFbo? _assetsThumbFbo;
 
-    private bool   _assetsMyAssets = true;
     private string _assetsMyAssetsFolder = "";
     private readonly Dictionary<(string Folder, string FileName), Texture2D?> _assetsCustomThumbCache = new();
     private bool   _assetRenameOpen;
@@ -41,12 +42,9 @@ public sealed partial class GameScene
         ImGui.SetNextWindowSizeConstraints(new Vector2(240f, 120f), new Vector2(float.MaxValue, float.MaxValue));
         if (!_windowChrome.Begin("Project##panel", ref _showProject)) return; // Amedo
 
-        if (ImGui.SmallButton("Assets"))
-        {
-            _assetsLevel = ""; _assetsCategory = ""; _assetsFilter = "";
-            _assetsMyAssets = true; _assetsMyAssetsFolder = "";
-        }
-        if (_assetsMyAssets)
+        if (ImGui.SmallButton("Assets")) GoToAssets(AssetsView.Home);
+        if (_assetsView == AssetsView.Scenes) DrawScenesBreadcrumb(); // Amedo 2026-11-12
+        if (_assetsView == AssetsView.MyAssets)
         {
             ImGui.SameLine(); ImGui.TextDisabled(">");
             ImGui.SameLine();
@@ -63,29 +61,18 @@ public sealed partial class GameScene
                 }
             }
         }
-        if (_assetsLevel.Length > 0)
-        {
-            ImGui.SameLine(); ImGui.TextDisabled(">");
-            ImGui.SameLine();
-            var levelName = System.IO.Path.GetFileName(_assetsLevel);
-            if (ImGui.SmallButton(levelName)) { _assetsCategory = ""; _assetsFilter = ""; }
-        }
-        if (_assetsCategory.Length > 0)
-        {
-            ImGui.SameLine(); ImGui.TextDisabled(">");
-            ImGui.SameLine();
-            ImGui.TextUnformatted(_assetsCategory);
-        }
         ImGui.Separator();
 
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##assetsFilter", "Search...", ref _assetsFilter, 128);
 
         ImGui.BeginChild("##assetsBody", Vector2.Zero, ImGuiChildFlags.Border);
-        if (_assetsMyAssets)
+        if (_assetsView == AssetsView.Home)
+            DrawAssetsHome();
+        else if (_assetsView == AssetsView.MyAssets)
             DrawMyAssetsUnified();
         else if (_assetsLevel.Length == 0)
-            DrawAssetsLevelList();
+            DrawScenesFolder();
         else if (_assetsCategory.Length == 0)
             DrawAssetsCategoryList();
         else
@@ -93,65 +80,34 @@ public sealed partial class GameScene
         ImGui.EndChild();
 
         DrawAssetRenamePopup();
+        _browser.DrawScenePopups(); // Amedo 2026-11-12
+        if (_browser.TakePendingOpen() is { } created) _pendingOpenLevelPath = created;
 
         ImGui.End();
     }
 
-    private List<string> GetAssetsLevelList()
+    // Amedo 2026-11-12
+    private void GoToAssets(AssetsView view)
     {
-        if (_assetsLevelList is not null) return _assetsLevelList;
-        var list = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            using var pkg = PackageReader.Open(ResolvePristinePackageSource());
-            foreach (var rec in pkg.GetByExtension(".rm2"))
-            {
-                var rel = rec.Path.Replace('/', '\\');
-                if (rel.EndsWith(@"Startup\Default.rm2", StringComparison.OrdinalIgnoreCase)) continue;
-                if (seen.Add(rel)) list.Add(rel);
-            }
-        }
-        catch (Exception ex) { _browser.Log($"Assets: level scan failed: {ex.Message}"); }
-
-        try
-        {
-            var savedChunksDir = SavedChunksDir;
-            if (Directory.Exists(savedChunksDir))
-                foreach (var f in Directory.GetFiles(savedChunksDir, "*.rm2", SearchOption.AllDirectories))
-                {
-                    var rel = Path.GetRelativePath(savedChunksDir, f);
-                    if (seen.Add(rel)) list.Add(rel);
-                }
-        }
-        catch (Exception ex) { _browser.Log($"Assets: SavedChunks scan failed: {ex.Message}"); }
-
-        list.Sort(StringComparer.OrdinalIgnoreCase);
-        _assetsLevelList = list;
-        return list;
+        _assetsView = view;
+        _assetsLevel = ""; _assetsCategory = ""; _assetsFilter = "";
+        _assetsMyAssetsFolder = ""; _assetsScenesFolder = "";
     }
 
-    private void DrawAssetsLevelList()
+    private void DrawAssetsHome()
     {
-        if (ImGui.Selectable("  ⭐ My Assets"))
+        const float cell = 84f;
+        foreach (var (name, view) in new[] { ("Scenes", AssetsView.Scenes), ("My Assets", AssetsView.MyAssets) })
         {
-            _assetsMyAssets = true;
-            _assetsMyAssetsFolder = "";
-            _assetsFilter = "";
+            ImGui.PushID(name);
+            ImGui.BeginGroup();
+            if (DrawFolderTile("##home", cell)) GoToAssets(view);
+            ImGui.TextUnformatted(name);
+            ImGui.EndGroup();
+            ImGui.PopID();
+            ImGui.SameLine();
         }
-        ImGui.Separator();
-        foreach (var lvl in GetAssetsLevelList())
-        {
-            if (!string.IsNullOrWhiteSpace(_assetsFilter) &&
-                !lvl.Contains(_assetsFilter, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (ImGui.Selectable($"  {lvl}"))
-            {
-                _assetsLevel = lvl.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase) ? lvl[..^4] : lvl;
-                _assetsCategory = "";
-                _assetsFilter = "";
-            }
-        }
+        ImGui.NewLine();
     }
 
     private void DrawAssetsCategoryList()

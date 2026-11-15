@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 using CrashEngine.Importer;
+using CrashEngine.Install;
+using CrashEngine.Platform;
 
 namespace CrashLauncher;
 
@@ -39,17 +41,6 @@ public sealed partial class GameScene
             });
     }
 
-    // Amedo 2026-09-30
-    private static string? FindCrashGameProject()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "CrashGame", "CrashGame.csproj");
-            if (File.Exists(candidate)) return candidate;
-        }
-        return null;
-    }
-
     // Amedo
     private string ProjectRoot() => Path.GetDirectoryName(_scriptOut) ?? _extractedRoot;
 
@@ -59,7 +50,7 @@ public sealed partial class GameScene
         if (_playerProcess is { HasExited: false }) { _browser.Log("Launch Player: already running."); return; }
         if (_buildingPc) { _browser.Log("Launch Player: a build is running, wait for it to finish."); return; }
         var outDir = Path.Combine(ProjectRoot(), "LaunchPlayer");
-        if (!File.Exists(Path.Combine(outDir, "CrashGame.exe")) || PlayerIsStale(outDir))
+        if (!File.Exists(Path.Combine(outDir, PlatformInfo.ExeFile(PlayerPackage.PlayerExe))) || PlayerIsStale(outDir))
         {
             _browser.Log($"Launch Player: preparing the test copy of the game in {outDir} (the Build to PC folder is not touched)...");
             BuildGameInto(outDir, "Launch Player", StartLaunchedGame);
@@ -80,10 +71,10 @@ public sealed partial class GameScene
     {
         static bool Newer(string source, string built) =>
             !File.Exists(built) || File.GetLastWriteTimeUtc(source) > File.GetLastWriteTimeUtc(built);
-        var csproj = FindCrashGameProject();
+        var csproj = PlayerPackage.FindCrashGameProject(); // Amedo 2026-11-12
         if (csproj is null)
         {
-            var player = Path.Combine(AppContext.BaseDirectory, "Player");
+            var player = PlayerPackage.ShippedFolder; // Amedo 2026-11-12
             return Directory.Exists(player) && Directory.GetFiles(player, "*.dll")
                 .Any(f => Newer(f, Path.Combine(outDir, Path.GetFileName(f))));
         }
@@ -103,7 +94,7 @@ public sealed partial class GameScene
 
     private Process? StartGame(string outDir, string exeName, string label)
     {
-        var exe = Path.Combine(outDir, exeName + ".exe");
+        var exe = Path.Combine(outDir, PlatformInfo.ExeFile(exeName));
         try
         {
             var process = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = outDir, UseShellExecute = false });
@@ -142,11 +133,11 @@ public sealed partial class GameScene
         }
         var projectRoot = ProjectRoot();
         var level = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2Path;
-        var csproj = FindCrashGameProject();
+        var csproj = PlayerPackage.FindCrashGameProject(); // Amedo 2026-11-12
         if (csproj is null) // Amedo
         {
-            var player = Path.Combine(AppContext.BaseDirectory, "Player");
-            if (!File.Exists(Path.Combine(player, "CrashGame.exe")))
+            var player = PlayerPackage.ShippedFolder; // Amedo 2026-11-12
+            if (!PlayerPackage.HasShipped) // Amedo 2026-11-12
             {
                 _browser.Log($"{label}: no game player was found (expected a Player folder next to CrashLauncher.exe, or the CrashGame project inside CrashEngine).");
                 return;
@@ -157,9 +148,9 @@ public sealed partial class GameScene
             {
                 try
                 {
-                    CopyPlayer(player, outDir);
+                    PlayerPackage.Copy(player, outDir); // Amedo 2026-11-12
                     WriteGameConfig(outDir, projectRoot, level);
-                    NameGameExe(outDir, exeName);
+                    PlayerPackage.NameExe(outDir, exeName); // Amedo 2026-11-12
                     LogBuilt(label, outDir, level, exeName); // Amedo
                     then?.Invoke(outDir); // Amedo
                 }
@@ -180,25 +171,14 @@ public sealed partial class GameScene
         {
             try
             {
-                var psi = new ProcessStartInfo("dotnet",
-                    $"publish \"{csproj}\" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o \"{outDir}\"")
+                var (exit, errors) = PlayerPackage.Publish(csproj, outDir); // Amedo 2026-11-12
+                if (exit != 0)
                 {
-                    RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
-                };
-                var errors = new List<string>();
-                using var process = Process.Start(psi)!;
-                process.OutputDataReceived += (_, e) => { if (e.Data is { } line && line.Contains("error", StringComparison.OrdinalIgnoreCase)) lock (errors) errors.Add(line.Trim()); };
-                process.ErrorDataReceived += (_, e) => { if (e.Data is { Length: > 0 } line) lock (errors) errors.Add(line.Trim()); };
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
-                if (process.ExitCode != 0)
-                {
-                    lock (errors) _browser.Log($"{label} failed (exit {process.ExitCode}): {string.Join(" | ", errors.Distinct().Take(3))}");
+                    _browser.Log($"{label} failed (exit {exit}): {string.Join(" | ", errors.Take(3))}");
                     return;
                 }
                 WriteGameConfig(outDir, projectRoot, level); // Amedo
-                NameGameExe(outDir, exeName);
+                PlayerPackage.NameExe(outDir, exeName); // Amedo 2026-11-12
                 LogBuilt(label, outDir, level, exeName); // Amedo
                 then?.Invoke(outDir); // Amedo
             }
@@ -216,7 +196,7 @@ public sealed partial class GameScene
     // Amedo
     private void WriteGameConfig(string outDir, string projectRoot, string? level)
     {
-        var config = new Dictionary<string, object> { ["project"] = projectRoot, ["windowed"] = false, ["volume"] = 1.0 };
+        var config = new Dictionary<string, object> { ["project"] = Path.GetFullPath(projectRoot), ["windowed"] = false, ["volume"] = 1.0 };
         if (!string.IsNullOrEmpty(level)) config["level"] = Path.ChangeExtension(level, null);
         File.WriteAllText(Path.Combine(outDir, "game.json"), JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
         string projectGraphics = Path.Combine(projectRoot, "graphics.json"), builtGraphics = Path.Combine(outDir, "graphics.json"); // Amedo
@@ -233,27 +213,7 @@ public sealed partial class GameScene
     // Amedo
     private void LogBuilt(string label, string outDir, string? level, string exeName)
     {
-        _browser.Log($"{label}: done -> {Path.Combine(outDir, exeName + ".exe")} (starts in {level ?? "the default level"}; Esc quits, F1 stats, F3 frame rate)");
-    }
-
-    private static void NameGameExe(string outDir, string exeName)
-    {
-        if (exeName == "CrashGame") return;
-        File.Move(Path.Combine(outDir, "CrashGame.exe"), Path.Combine(outDir, exeName + ".exe"), overwrite: true);
-    }
-
-    // Amedo
-    private static void CopyPlayer(string from, string to)
-    {
-        foreach (var dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
-            Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
-        Directory.CreateDirectory(to);
-        foreach (var file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
-        {
-            var rel = Path.GetRelativePath(from, file);
-            if (rel.Equals("game.json", StringComparison.OrdinalIgnoreCase)) continue;
-            File.Copy(file, Path.Combine(to, rel), overwrite: true);
-        }
+        _browser.Log($"{label}: done -> {Path.Combine(outDir, PlatformInfo.ExeFile(exeName))} (starts in {level ?? "the default level"}; Esc quits, F1 stats, F3 frame rate)");
     }
 
 	private void StopPlayer()

@@ -20,6 +20,7 @@
     <ProjectReference Include="..\CrashEngine.Stealth\CrashEngine.Stealth.csproj" />
     <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
     <ProjectReference Include="..\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
+    <ProjectReference Include="..\CrashEngine.Install\CrashEngine.Install.csproj" />
   </ItemGroup>
 
   <!-- 2026-08-22 — MP3 import support: NLayer is a fully-managed C# MP3 decoder (no native code,
@@ -30,6 +31,10 @@
   <ItemGroup>
     <PackageReference Include="NLayer" Version="1.16.0" />
   </ItemGroup>
+  <!-- Amedo 2026-11-14 -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.1" />
+  </ItemGroup>
 
   <!-- 2026-09-04: editor-only UI assets (not real game data), e.g. the Camera layout marker's
        billboard icon (Assets\Icons\camera_marker.png), copied next to the built exe so
@@ -37,6 +42,7 @@
        working directory. -->
   <ItemGroup>
     <None Include="Assets\Icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\Splash\*.png" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Assets\Models\**\*.glb" CopyToOutputDirectory="PreserveNewest" />
     <!-- Amedo 2026-10-26 -->
     <None Include="Assets\Input\**\*" CopyToOutputDirectory="PreserveNewest" />

@@ -1,4 +1,5 @@
 using CrashEngine.Importer;
+using CrashEngine.Platform;
 using ImGuiNET;
 using System.Numerics;
 
@@ -6,7 +7,10 @@ namespace CrashLauncher;
 
 public sealed partial class GameScene
 {
-    private enum BuildTarget { WindowsPc, Ps2Iso }
+    private enum BuildTarget { Pc, Ps2Iso }
+
+    private static readonly string PcTargetName = OperatingSystem.IsWindows() ? "PC (Windows)" : "PC (Linux)";
+    private static readonly string OtherPcTargetName = OperatingSystem.IsWindows() ? "PC (Linux) - soon" : "PC (Windows) - soon";
 
     private bool _showBuildWindow;
     private BuildTarget _buildTarget;
@@ -20,9 +24,9 @@ public sealed partial class GameScene
         if (!_windowChrome.Begin("Build##buildwindow", ref _showBuildWindow)) return;
 
         ImGui.BeginChild("##buildtargets", new Vector2(170f, -1f), ImGuiChildFlags.Border);
-        if (ImGui.Selectable("PC (Windows)", _buildTarget == BuildTarget.WindowsPc)) _buildTarget = BuildTarget.WindowsPc;
+        if (ImGui.Selectable(PcTargetName, _buildTarget == BuildTarget.Pc)) _buildTarget = BuildTarget.Pc;
         ImGui.BeginDisabled();
-        ImGui.Selectable("PC (Linux) - soon");
+        ImGui.Selectable(OtherPcTargetName);
         ImGui.EndDisabled();
         if (ImGui.Selectable("PS2 (ISO)", _buildTarget == BuildTarget.Ps2Iso)) _buildTarget = BuildTarget.Ps2Iso;
         ImGui.EndChild();
@@ -37,7 +41,7 @@ public sealed partial class GameScene
 
     private void DrawPcBuildTarget()
     {
-        ImGui.TextUnformatted("PC (Windows)");
+        ImGui.TextUnformatted(PcTargetName);
         ImGui.Separator();
         ImGui.TextUnformatted("Output folder:");
         ImGui.SetNextItemWidth(-40f);
@@ -45,7 +49,7 @@ public sealed partial class GameScene
         ImGui.SameLine();
         if (ImGui.Button("...##buildPcBrowse")) ChoosePcOutputPath(null);
         if (!string.IsNullOrWhiteSpace(_pcOutputPath))
-            ImGui.TextDisabled("-> " + Path.Combine(_pcOutputPath.Trim(), BuiltGameName, BuiltGameName + ".exe"));
+            ImGui.TextDisabled("-> " + Path.Combine(_pcOutputPath.Trim(), BuiltGameName, PlatformInfo.ExeFile(BuiltGameName)));
         DrawBuildStartLevel();
         var (build, run) = DrawBuildButtons(withRun: true);
         if (build || run) BuildPc(run);

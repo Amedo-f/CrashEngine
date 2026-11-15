@@ -59,8 +59,7 @@ public sealed class ProjectSetupScene : Scene
             var proj = _pendingProjectPath;
             _pendingDiscPath = null;
             _pendingProjectPath = null;
-            var scriptOut = proj is not null ? Path.Combine(proj, "Scripts") : _scriptOut;
-            Engine.Instance.ActiveScene = new LevelBrowserScene(disc, scriptOut, proj);
+            ProjectCreator.ShowEditor(disc, proj, _scriptOut); // Amedo 2026-11-12
             return;
         }
 
@@ -238,32 +237,10 @@ public sealed class ProjectSetupScene : Scene
         ImGui.End();
     }
 
+    // Amedo 2026-11-12
     private void CreateProject()
     {
-        if (_name.Trim().Length == 0 || _projPath.Trim().Length == 0)
-        { _status = "ERROR: Project name and path are required!"; return; }
-
-        // Amedo 2026-09-21
-        bool isIso = File.Exists(_discPath) && _discPath.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
-                     && Ps2IsoReader.IsIso(_discPath);
-        if (!isIso && !CrashProject.ValidateDiscPS2(_discPath))
-        { _status = "ERROR: Select a PS2 .iso file, or an extracted disc folder that has SYSTEM.CNF."; return; }
-
-        var project = new CrashProject
-        {
-            Name = _name.Trim(),
-            Path = _projPath.Trim(),
-            DiscContentPathPS2 = _discPath.Trim(),
-        };
-
-        if (Directory.Exists(project.ProjectPath) &&
-            Directory.GetFiles(project.ProjectPath, "*.tson").Length > 0)
-        {
-            _status = $"ERROR: A project already exists at \"{project.ProjectPath}\" — " +
-                      "pick a different project name or path, or use \"Open existing project\" below.";
-            return;
-        }
-
+        if (ProjectCreator.Validate(_name, _projPath, _discPath, out var project) is { } error) { _status = error; return; }
         RunCreateOrResume(project);
     }
 
@@ -288,57 +265,7 @@ public sealed class ProjectSetupScene : Scene
         {
             try
             {
-                project.CreateProjectStructure();
-
-                project.Save();
-
-                // Amedo 2026-09-21
-                var discSource = project.DiscContentPathPS2 ?? "";
-                if (File.Exists(discSource) && discSource.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
-                {
-                    var target = Path.Combine(project.ProjectPath, "disc", "ps2");
-                    Directory.CreateDirectory(target);
-                    WLog("Extracting the disc image into the project (this can take a minute)...");
-                    int n = Ps2IsoReader.Extract(discSource, target, (file, p) => _progress = p * 0.5f);
-                    WLog($"Extracted {n} file(s) from the ISO.");
-                    project.DiscContentPathPS2 = target;
-                }
-                else
-                {
-                    WLog("Copying disc contents to project...");
-                    project.CopyDiscContents(p => _progress = p * 0.5f, ct, gate);
-                }
-
-                WLog("Reading game archives...");
-                using (var pkg = PackageReader.Open(project.DiscContentPathPS2!))
-                {
-                    if (pkg.Records.Count == 0)
-                    { _status = "ERROR: No game archives found in Crash6/!"; return; }
-                    WLog($"{pkg.Records.Count} records in archive");
-
-                    var manifestPath = Path.Combine(project.ProjectPath, ".unpack_manifest.txt");
-                    var doneSet = File.Exists(manifestPath)
-                        ? new HashSet<string>(File.ReadAllLines(manifestPath))
-                        : new HashSet<string>();
-                    var manifestLock = new object();
-                    void OnRecordDone(string path) { lock (manifestLock) File.AppendAllText(manifestPath, path + "\n"); }
-
-                    WLog("Unpacking PS2 assets...");
-                    var result = AssetUnpacker.Unpack(pkg, project.ProjectPath, WLog,
-                        p => _progress = 0.5f + p * 0.5f, doneSet, OnRecordDone, ct, gate);
-                    WLog($"Unpacked {result.Files} files, {result.Chunks} chunks, " +
-                         $"{result.Assets} assets, {result.Textures} textures " +
-                         $"({result.Skipped} already done, {result.Errors} warnings)");
-
-                    try { File.Delete(manifestPath); } catch {  }
-                }
-
-                ct.ThrowIfCancellationRequested(); // Amedo 2026-09-22
-
-                WLog("Serializing project...");
-                project.Completed = true;
-                project.Save();
-                CrashProject.AddRecent(project.ProjectPath);
+                ProjectCreator.Build(project, WLog, p => _progress = p, ct, gate); // Amedo 2026-11-12
                 WLog($"Project created in {DateTime.Now - started:mm\\:ss}");
 
                 _status = $"Project created in {DateTime.Now - started:mm\\:ss}";
@@ -373,19 +300,10 @@ public sealed class ProjectSetupScene : Scene
         });
     }
 
+    // Amedo 2026-11-12
     private void OpenProject(string folderOrTson)
     {
-        var project = CrashProject.Open(folderOrTson);
-        if (project is null || string.IsNullOrEmpty(project.DiscContentPathPS2))
-        { _status = "ERROR: Not a valid project (missing .tson or disc path)"; return; }
-
-        if (!Directory.Exists(project.DiscContentPathPS2))
-        { _status = $"ERROR: Disc content path no longer exists: {project.DiscContentPathPS2}"; return; }
-
-        CrashProject.AddRecent(project.ProjectPath);
-        var scriptOut = Path.Combine(project.ProjectPath, "Scripts");
-        Engine.Instance.ActiveScene =
-            new LevelBrowserScene(project.DiscContentPathPS2, scriptOut, project.ProjectPath);
+        if (ProjectCreator.Open(folderOrTson) is { } error) _status = error;
     }
 
     private void ShowOpenFileDialog(string title, string filter, Action<string?> callback) =>

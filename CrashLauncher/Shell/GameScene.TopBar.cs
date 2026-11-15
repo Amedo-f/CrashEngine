@@ -58,11 +58,11 @@ public sealed partial class GameScene : Scene
 		string camSpeedText = (_camera != null) ? $"Cam speed: {_camera.Speed:F1}  |  " : "";
 		if (drawCallsThisFrame == 0)
 		{
-			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.3f, 0.3f, 1f), $"{camSpeedText}draws: {drawCallsThisFrame}  FPS {value:F0}  ESC=back");
+			ImGui.TextColored(new System.Numerics.Vector4(1f, 0.3f, 0.3f, 1f), $"{camSpeedText}draws: {drawCallsThisFrame}  FPS {value:F0}");
 		}
 		else
 		{
-			ImGui.TextDisabled($"{camSpeedText}draws: {drawCallsThisFrame}  FPS {value:F0}  ESC=back");
+			ImGui.TextDisabled($"{camSpeedText}draws: {drawCallsThisFrame}  FPS {value:F0}");
 		}
 		ImGui.EndMainMenuBar(); // Amedo
 		}
