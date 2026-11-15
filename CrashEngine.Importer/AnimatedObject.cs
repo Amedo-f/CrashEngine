@@ -147,6 +147,11 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
         if ((flags & SyncPhaseFlag) != 0) req |= 8;
         else if ((flags & StartPhaseFlag) != 0) req |= 0x10;
         int duration = DurationTicks(group, speed);
+        if ((ModelGroup ?? CurrentGroup ?? DefaultGroup)?.Ogi is { } shownOgi && group.Ogi is { } nextOgi && shownOgi.GetID() != nextOgi.GetID()) // Amedo 2026-11-12
+        {
+            _body.Clear();
+            _face.Clear();
+        }
         var body = Insert(_body, group, req, duration, blendTicks, startPhase, blend);
         var face = Insert(_face, group, req, duration, blendTicks, startPhase, blend);
         if (body is not null && face is not null)
@@ -236,7 +241,7 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
 
     public override void OnUpdate()
     {
-        if (_body.Count == 0 && _face.Count == 0) return; // Amedo 2026-09-27
+        if (_body.Count == 0 && _face.Count == 0 && (!_logicDriven || _version == _shownVersion)) return; // Amedo 2026-11-13
         if (_logicDriven) // Amedo 2026-10-01
         {
             ShowLogicPose();

@@ -101,6 +101,7 @@ public sealed partial class AgentLabAgent
             if (_wobble is not null) LetGoOfTrajectory_240220();
             _wobble = null;
             _contactResponse = null;
+            _springRest_88 = false; // Amedo 2026-11-13
         }
         AgentFlags &= ~0x8000u;
     }

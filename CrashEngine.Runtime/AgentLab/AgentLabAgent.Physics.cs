@@ -638,9 +638,7 @@ public sealed partial class AgentLabAgent
         if (F(2) != 0f)
         {
             ctrl.SetB8(F(2));
-            float m = 0f < F(24) ? F(24) : mass;
-            if (body.IsBox) { var size = BoxExtent * F(2); body.SetBoxInertia(m, size.X, size.Y, size.Z); }
-            else body.SetBoxInertia(m, F(2), F(2), F(2));
+            SetMassAndSize_2462F8(ctrl, body, F(2)); // Amedo 2026-11-13
         }
         if (F(4) != 0f) { ctrl.SetGrip(F(4)); body.Grip = F(4); }
         if (F(6) != 0f) { ctrl.SetB4(F(6)); body.Bounce = F(6); }
