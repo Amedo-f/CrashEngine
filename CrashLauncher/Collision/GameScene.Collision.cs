@@ -21,18 +21,34 @@ public sealed partial class GameScene : Scene
                 if (e.Has<CollisionMesh>()) e.Active = visible;
     }
 
-    private void BuildCollisionTileMap(Entity chunkRoot)
+    private void BuildCollisionTileMap(Entity chunkRoot) => ApplyCollisionTileMatch(MatchCollisionTiles(chunkRoot));
+
+    // Amedo 2026-11-12: the matching reads only the level's own entities, so it can run off the main thread while a level loads
+    private sealed record CollisionTileMatch(List<Entity?> Map, int Matched);
+
+    private void ApplyCollisionTileMatch(CollisionTileMatch? match)
     {
         _collisionTileMap = null;
         _collisionTileBaselinePos.Clear();
+        if (match is null) return;
+        var map = match.Map;
+        _collisionTileMap = map;
+        foreach (var owner in map.Where(o => o is not null).Distinct())
+            _collisionTileBaselinePos[owner!] = owner!.Transform.World;
 
+        _browser.Log($"Collision baseline: {match.Matched}/{map.Count} triangles matched to a scenery tile " +
+                      "(rest are open ground/unmatched — Regenerate Collision never touches those).");
+    }
+
+    private static CollisionTileMatch? MatchCollisionTiles(Entity chunkRoot)
+    {
         var rm2  = chunkRoot.Get<ChunkSource>()?.Rm2;
         var coll = rm2?.GetItem<PS2AnyCollisionData>((uint)TwinConstants.LEVEL_COLLISION_ITEM);
-        if (coll is null || coll.Triangles.Count == 0 || coll.Vectors.Count == 0) return;
+        if (coll is null || coll.Triangles.Count == 0 || coll.Vectors.Count == 0) return null;
 
         var collRoot  = AllEntities(chunkRoot).FirstOrDefault(e => e.Has<CollisionMesh>());
         var collChild = collRoot?.Children.FirstOrDefault();
-        if (collChild is null) return;
+        if (collChild is null) return null;
         var world = collChild.Transform.World;
 
         var tiles = new List<(Entity Ent, Vector3 Min, Vector3 Max, Vector3[] Verts)>();
@@ -59,7 +75,7 @@ public sealed partial class GameScene : Scene
             foreach (var c in e.Children) CollectTiles(c);
         }
         CollectTiles(chunkRoot);
-        if (tiles.Count == 0) return;
+        if (tiles.Count == 0) return null;
 
         const float matchTolerance   = 20f;
         const float matchToleranceSq = matchTolerance * matchTolerance;
@@ -102,12 +118,7 @@ public sealed partial class GameScene : Scene
             if (owner is not null) matched++;
             map.Add(owner);
         }
-        _collisionTileMap = map;
-        foreach (var owner in map.Where(o => o is not null).Distinct())
-            _collisionTileBaselinePos[owner!] = owner!.Transform.World;
-
-        _browser.Log($"Collision baseline: {matched}/{map.Count} triangles matched to a scenery tile " +
-                      "(rest are open ground/unmatched — Regenerate Collision never touches those).");
+        return new CollisionTileMatch(map, matched);
     }
 
     private readonly Dictionary<Entity, Matrix4x4> _collisionTileBaselinePos = new();
