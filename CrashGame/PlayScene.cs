@@ -107,7 +107,7 @@ sealed class PlayScene : Scene
         OnLevelGpu(() => AddParticles(gl, chunk, src));
 
         var shared = src;
-        var host = _host = _preloaded?.Host ?? MakeHost(gl, shared); // Amedo 2026-11-09
+        var host = _host = _preloaded?.Host ?? MakeHost(gl, shared, _cfg); // Amedo 2026-11-15
         var play = PlaySettings.Resolve(ProjectPlayValues.FromTson(_cfg.Tson), _cfg.Disc, _cfg.ProjectFolder, src?.GlobalRm2, Path.Combine(AppContext.BaseDirectory, "Saves")); // Amedo
         _sim = SceneSimulation.Start(chunk, Console.WriteLine, play,
             spawnHost: (parent, inst, section) => OnLevelGpu(() =>
@@ -142,9 +142,9 @@ sealed class PlayScene : Scene
     }
 
     // Amedo 2026-11-09
-    private CrashEngine.Runtime.Streaming.ChunkHost MakeHost(Silk.NET.OpenGL.GL gl, ChunkSource? shared) => new()
+    private static CrashEngine.Runtime.Streaming.ChunkHost MakeHost(Silk.NET.OpenGL.GL gl, ChunkSource? shared, GameConfig cfg) => new() // Amedo 2026-11-15
     {
-        Parse = ParseStreamed,
+        Parse = name => ParseStreamed(cfg, name),
         Build = (name, parsed) => ChunkImporter.BuildChunk(gl, null, (ChunkImporter.ParsedChunk)parsed, out _,
             applyGlobalEffects: false, linkedScenery: false, shared: shared, editorExtras: false),
         BuildInBackground = true,
@@ -198,7 +198,7 @@ sealed class PlayScene : Scene
         if (_preloadMain.Result is not { } main) return true;
         if (_preloadHost is null)
         {
-            _preloadHost = MakeHost(gl, main.Root.Get<ChunkSource>());
+            _preloadHost = MakeHost(gl, main.Root.Get<ChunkSource>(), _cfg.ForLevel(next)); // Amedo 2026-11-15
             if (StartupChunksByLevel.TryGetValue(_cfg.ForLevel(next).Level, out var names) && names.Count > 0)
                 SceneSimulation.PrepareBeforePlay(_preloadHost, names, Console.WriteLine);
             Console.WriteLine($"[CrashGame] {next} built in the background in {_preloadClock!.ElapsedMilliseconds} ms (process memory {System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64 / 1048576} MB, GPU {(GpuStats.TextureBytes + GpuStats.MeshBytes) / 1048576} MB); linked scenes to prepare: {(names is { Count: > 0 } ? string.Join(",", names) : "none known yet")}");
@@ -210,10 +210,10 @@ sealed class PlayScene : Scene
         return true;
     }
 
-    private object? ParseStreamed(string name)
+    private static object? ParseStreamed(GameConfig cfg, string name) // Amedo 2026-11-15
     {
-        using var pkg = PackageReader.Open(_cfg.Disc);
-        pkg.ShadowDir = _cfg.SavedChunks;
+        using var pkg = PackageReader.Open(cfg.Disc);
+        pkg.ShadowDir = cfg.SavedChunks;
         return pkg.OpenByPath(name + ".rm2") is null ? null : ChunkImporter.ParseChunk(pkg, name + ".rm2", name + ".sm2");
     }
 
