@@ -1354,6 +1354,7 @@ public sealed partial class CharacterController
         GroundPoint = Vector3.Transform(GroundPoint, obj);
         FallStart = Vector3.Transform(FallStart, obj);
         GroundNormal = Vector3.TransformNormal(GroundNormal, obj);
+        PrevCenter_280 = Vector3.Transform(PrevCenter_280, obj); // Amedo 2026-11-14
         if (Link is { IsLeader: false } own) // Amedo 2026-10-05
         {
             own.Target1F0 = Vector3.Transform(own.Target1F0, obj);

@@ -75,14 +75,34 @@ public sealed partial class SceneSimulation
         }
     }
 
-    private void FreeBuilt(string name, (Entity Root, Renderer.GpuUploadQueue? Uploads) freed)
+    private readonly Queue<(string Name, (Entity Root, Renderer.GpuUploadQueue? Uploads) Built)> _freeLater = new(); // Amedo 2026-11-14
+    private readonly Renderer.GpuUploadQueue _disposeLater = new();
+    private const double DisposeBudgetMs = 0.5;
+
+    private void FreeBuilt(string name, (Entity Root, Renderer.GpuUploadQueue? Uploads) freed) => _freeLater.Enqueue((name, freed)); // Amedo 2026-11-14
+
+    // Amedo 2026-11-14
+    private void FreeBuiltNow(string name, (Entity Root, Renderer.GpuUploadQueue? Uploads) freed)
     {
         if (freed.Uploads is { } uploads)
         {
-            int count = uploads.Count, done = uploads.DisposeUnused(UsedGpuResources(), _stillUsed);
-            _log?.Invoke($"[stream] freed the built {name} ({done} of {count} GPU resources, the rest still used) to keep {KeepBuiltScenes} left scene(s)");
+            long walk = System.Diagnostics.Stopwatch.GetTimestamp();
+            int count = uploads.Count, done = uploads.MoveUnused(UsedGpuResources(), _stillUsed, _disposeLater);
+            _log?.Invoke($"[stream] freed the built {name} ({done} of {count} GPU resources, the rest still used) to keep {KeepBuiltScenes} left scene(s): used-walk {System.Diagnostics.Stopwatch.GetElapsedTime(walk).TotalMilliseconds:0.0} ms, {_disposeLater.Count} waiting to be deleted");
         }
         CutTree(freed.Root);
+    }
+
+    // Amedo 2026-11-14
+    private void FreeLaterStep()
+    {
+        if (_freeLater.Count > 0)
+        {
+            var (name, built) = _freeLater.Dequeue();
+            FreeBuiltNow(name, built);
+            return;
+        }
+        if (_disposeLater.Count > 0) _disposeLater.DisposeSome(DisposeBudgetMs);
     }
 
     private static void CutTree(Entity root)
@@ -287,7 +307,6 @@ public sealed partial class SceneSimulation
     {
         if (InstancesOf(target) is not { } home) return;
         Transfer_197650(player, obj, target, home, moving);
-        SnapDisplay(); // Amedo 2026-09-30
         World.SetRoot(target);
         _crossedThisTick = true; // Amedo 2026-09-29
         if (target.Collision is { } collision) character.CollisionWorld = collision;
@@ -321,7 +340,7 @@ public sealed partial class SceneSimulation
         e.Parent?.RemoveChild(e);
         home.AddChild(e);
         agent.GameMatrix = m;
-        SnapDisplay(e); // Amedo 2026-09-30
+        CarryDisplay(e, obj); // Amedo 2026-11-14
         agent.CanChangeChunk_23D060(target); // Amedo
         agent.Projectile?.CanChangeChunk_11EFB8(obj); // Amedo
         agent.Chunk = target;
@@ -374,7 +393,6 @@ public sealed partial class SceneSimulation
                 chunk.ToAnchor = toAnchor;
                 if (bank >= 0) World.Particles?.MoveBank(bank, was, toAnchor);
             }
-            SnapDisplay();
             _log?.Invoke($"[stream] {t.Name} placed by the link of {root.Name}: {was.Translation} -> {toAnchor.Translation}");
         }
         World.SetRoot(root);
@@ -432,6 +450,7 @@ public sealed partial class SceneSimulation
     private void StepStreaming(bool block = false)
     {
         if (Streamer is not { Root: { } root } streamer || World.Player is not { } player) return;
+        FreeLaterStep(); // Amedo 2026-11-14
         streamer.Viewer = player.GamePosition;
         streamer.Update_2AA8D0();
         if (_dropped.Count > 0) KeepDropped(); // Amedo
@@ -486,7 +505,7 @@ public sealed partial class SceneSimulation
         }
         if (block) Task.WaitAll(_parsing.Values.ToArray());
         var budget = System.Diagnostics.Stopwatch.StartNew(); // Amedo 2026-09-29
-        double budgetMs = block ? double.PositiveInfinity : _chunkHost?.UploadBudgetMs ?? 3.0;
+        double budgetMs = block ? double.PositiveInfinity : Math.Min(_chunkHost?.UploadBudgetMs ?? 3.0, CrashEngine.Core.PerfStats.FrameBudgetMs * 0.25); // Amedo 2026-11-14
         _stepResources.Clear(); // Amedo
         _stepResources.AddRange(streamer.Resources);
         if (!block && !_tapeLoadsFree && InputTape.Current is { Replaying: true } tape) // Amedo
@@ -873,6 +892,7 @@ public sealed partial class SceneSimulation
             r.ObjectsLoaded = false;
             return;
         }
+        long unloadStart = System.Diagnostics.Stopwatch.GetTimestamp(); // Amedo 2026-11-14
         foreach (var agent in World.Agents.Where(a => ReferenceEquals(a.Chunk, s.Chunk)).ToList()) // Amedo 2026-09-29
             if (!ReleaseOnUnload_197570(agent, s.Chunk)) ReleaseAgent(agent); // Amedo
         World.ReleaseSpawnedUnder(s.Entity); // Amedo 2026-09-29
@@ -907,7 +927,7 @@ public sealed partial class SceneSimulation
         ReleaseChunkData(s.Chunk);
         r.SceneryLoaded = false;
         r.Links = null;
-        _log?.Invoke($"[stream] unloaded {r.Name} (kept built for the rest of this Play)");
+        _log?.Invoke($"[stream] unloaded {r.Name} (kept built for the rest of this Play) in {System.Diagnostics.Stopwatch.GetElapsedTime(unloadStart).TotalMilliseconds:0.0} ms"); // Amedo 2026-11-14
     }
 
     // Amedo 2026-09-29
@@ -1167,6 +1187,12 @@ public sealed partial class SceneSimulation
         if (_built.Count > 0) _log?.Invoke($"[stream] freed {freed} GPU resources of {_built.Count} streamed scene(s)");
         _built.Clear();
         _builtOrder.Clear();
+        while (_freeLater.TryDequeue(out var pending)) // Amedo 2026-11-14
+        {
+            pending.Built.Uploads?.DisposeAll();
+            CutTree(pending.Built.Root);
+        }
+        _disposeLater.DisposeAll();
         _stillUsed.DisposeAll();
         Streamer = null;
     }

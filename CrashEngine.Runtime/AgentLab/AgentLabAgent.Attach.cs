@@ -828,7 +828,7 @@ public sealed partial class AgentLabAgent
         while (i < _links.Count)
         {
             var link = _links[i].Agent;
-            if (link._spawnedBy is null)
+            if (link is null || link._spawnedBy is null) // Amedo 2026-11-14
             {
                 i++;
                 continue;

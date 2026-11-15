@@ -104,21 +104,37 @@ public sealed class GpuUploadQueue
         _next = 0;
     }
 
-    public int DisposeUnused(HashSet<object> used, GpuUploadQueue keep)
+    // Amedo 2026-11-14
+    public int MoveUnused(HashSet<object> used, GpuUploadQueue keep, GpuUploadQueue unused)
     {
-        int freed = 0;
+        int moved = 0;
         foreach (var r in _resources)
         {
             if (used.Contains(r)) keep._resources.Add(r);
             else
             {
-                r.Dispose();
-                freed++;
+                unused._resources.Add(r);
+                moved++;
             }
         }
         _resources.Clear();
         _next = 0;
-        return freed;
+        return moved;
+    }
+
+    // Amedo 2026-11-14
+    public bool DisposeSome(double budgetMs)
+    {
+        long start = Stopwatch.GetTimestamp();
+        long budget = (long)(budgetMs * Stopwatch.Frequency / 1000.0);
+        while (_resources.Count > 0)
+        {
+            int last = _resources.Count - 1;
+            _resources[last].Dispose();
+            _resources.RemoveAt(last);
+            if (budget < Stopwatch.GetTimestamp() - start) break;
+        }
+        return _resources.Count == 0;
     }
 
     internal static void RequireMainThread(string what)

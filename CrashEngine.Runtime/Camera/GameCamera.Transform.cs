@@ -57,6 +57,7 @@ public sealed partial class GameCamera
 
     public void EyeTransform_273FC8(uint y, Matrix4x4 m)
     {
+        int keptPitch = M.I(y + 0x68), keptYaw = M.I(y + 0x108); // Amedo 2026-11-14
         TransformPoint_1E9A60(m, y + 0x1A0, true);
         TransformQuat_1EFA40(m, y + 0x10);
         TransformPoint_1E9A60(m, y + 0x20, true);
@@ -66,6 +67,11 @@ public sealed partial class GameCamera
         var flat = GameMath.Rotate3_18E4B8(GameMath.RotY_18BBC0(-yaw), v);
         M.I(y + 0x68, GameMath.Wrap16(GameMath.Pitch_18C898(flat)));
         M.I(y + 0x108, GameMath.Wrap16(yaw));
+        if (MathF.Abs(m.M22 - 1f) < 1e-4f) // Amedo 2026-11-14
+        {
+            M.I(y + 0x68, keptPitch);
+            M.I(y + 0x108, GameMath.Wrap16(keptYaw + GameMath.Yaw_18C830(new Vector4(m.M31, m.M32, m.M33, 1f))));
+        }
     }
 
     public void TransformPoint_1E9A60(Matrix4x4 m, uint v, bool translate)

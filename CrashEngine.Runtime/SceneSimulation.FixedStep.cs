@@ -180,4 +180,13 @@ public sealed partial class SceneSimulation
     {
         if (_smooth.TryGetValue(e, out var s)) s.Fresh = true;
     }
+
+    // Amedo 2026-11-14
+    internal void CarryDisplay(Entity e, Matrix4x4 obj)
+    {
+        if (!_smooth.TryGetValue(e, out var s)) return;
+        s.Prev *= obj;
+        s.Cur *= obj;
+        s.Shown *= obj;
+    }
 }

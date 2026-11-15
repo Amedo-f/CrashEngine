@@ -95,7 +95,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     // Amedo 2026-09-30
     private Matrix4x4 _prevPose = Matrix4x4.Identity;
     private float _prevFov = 45f;
-    private bool _havePose, _snap;
+    private bool _havePose;
 
     // Amedo 2026-09-30
     public void Step(CharacterPad pad, uint dtTicks)
@@ -103,12 +103,11 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         var pose = _pose;
         float fov = FovDegrees;
         Update(pad, dtTicks);
-        if (!_havePose || _snap)
+        if (!_havePose)
         {
             _prevPose = _pose;
             _prevFov = FovDegrees;
             _havePose = true;
-            _snap = false;
         }
         else
         {
@@ -638,8 +637,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
     {
         Camera.CameraTransform_27B760(_c9, transform);
         _pose *= transform; // Amedo 2026-10-02
-        _prevPose = _pose;
-        _snap = true; // Amedo 2026-09-30
+        _prevPose *= transform; // Amedo 2026-11-14
     }
 
     // Amedo 2026-09-29
