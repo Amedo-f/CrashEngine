@@ -6,6 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <!-- Amedo 2026-11-16 -->
+  <PropertyGroup>
+    <Product>CrashEngine</Product>
+    <Company>Amedo</Company>
+    <Authors>Amedo</Authors>
+    <Copyright>Copyright © 2026 Amedo. All rights reserved.</Copyright>
+    <AssemblyTitle>CrashEngine.Runtime</AssemblyTitle>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CrashEngine.Core\CrashEngine.Core.csproj" />
     <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
