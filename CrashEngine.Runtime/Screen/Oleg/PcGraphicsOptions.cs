@@ -27,26 +27,28 @@ public sealed class PcGraphicsOptions
     {
         if (GraphicsSettings.DisplayModeAvailable) _display = Choice("DISPLAY", DisplayItem, DisplayNames);
         if (GraphicsSettings.QualityPresets is { Length: > 0 } presets) _quality = Choice("QUALITY", QualityItem, presets.Select(p => p.Name).ToArray()); // Amedo 2026-10-27
-        _vsync = new ToggleItem(0, VSyncItem, 0, 1, true, 0, 1) { Name_00 = "VSYNC" };
+        _vsync = new ToggleItem(0, VSyncItem, 0, 1, true, 0, 1) { Name_00 = Shown("VSYNC") };
         _frameLimit = Choice("FRAME LIMIT", FrameLimitItem, GraphicsSettings.FrameLimits.Select(f => f > 0 ? f.ToString() : "UNLIMITED").ToArray());
         _resolution = Choice("RESOLUTION", ResolutionItem, new[] { "" });
         _msaa = Choice("ANTI-ALIASING", MsaaItem, GraphicsSettings.MsaaSamples.Select(s => s > 1 ? $"MSAA {s}X" : "OFF").ToArray());
         _filtering = Choice("FILTERING", FilteringItem, FilteringNames);
         _brightness = new ValueItem(0, BrightnessItem, GraphicsSettings.BrightnessMin, GraphicsSettings.BrightnessMax, false, GraphicsSettings.BrightnessDefault, 1)
         {
-            Name_00 = "BRIGHTNESS",
+            Name_00 = Shown("BRIGHTNESS"),
         };
         _shadows = Choice("SHADOWS", ShadowsItem, ShadowNames); // Amedo
         _sharpness = new ValueItem(0, SharpnessItem, GraphicsSettings.SharpnessMin, GraphicsSettings.SharpnessMax, false, GraphicsSettings.SharpnessDefault, 1) // Amedo
         {
-            Name_00 = "SHARPNESS",
+            Name_00 = Shown("SHARPNESS"),
         };
     }
 
+    private static string Shown(string text) => text.ToLowerInvariant(); // Amedo 2026-11-14
+
     private static ChoiceItem Choice(string name, int id, string[] values) => new(0, id, values.Length, false, 0, 1)
     {
-        Name_00 = name,
-        Strings_40 = values,
+        Name_00 = Shown(name),
+        Strings_40 = values.Select(Shown).ToArray(),
         UseStrings_44 = true,
         Cycles_3D = true,
     };
@@ -80,7 +82,7 @@ public sealed class PcGraphicsOptions
         _heights = GraphicsSettings.HeightsFor(h);
         var names = new string[_heights.Length];
         for (int i = 0; i < names.Length; i++) names[i] = GraphicsSettings.ResolutionName(_heights[i], w, h);
-        _resolution.Strings_40 = names;
+        _resolution.Strings_40 = names.Select(Shown).ToArray();
         _resolution.Min_34 = 0;
         _resolution.Max_38 = names.Length - 1;
         _version = -1;
