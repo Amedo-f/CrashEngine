@@ -130,7 +130,7 @@ public sealed partial class GameScene : Scene
                     light.UnkVec3 = new TwinVec4(-dir.X, dir.Y, dir.Z, 0f);
                 }
 
-                var destPath = Path.Combine(outDir, link.Path.Replace('/', '\\') + ".sm2");
+                var destPath = GamePaths.OnDisk(outDir, link.Path.Replace('/', '\\') + ".sm2");
                 Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
                 var tempPath = destPath + ".tmp";
                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))

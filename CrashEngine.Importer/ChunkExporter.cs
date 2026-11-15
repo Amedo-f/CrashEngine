@@ -56,14 +56,14 @@ public static class ChunkExporter
 
         var (instSynced, tileSynced) = SyncEntityGraph(chunkRoot);
 
-        var rm2Out = Path.Combine(outDir, source.Rm2Path);
+        var rm2Out = GamePaths.OnDisk(outDir, source.Rm2Path);
         Directory.CreateDirectory(Path.GetDirectoryName(rm2Out)!);
         WriteItem(source.Rm2, rm2Out);
 
         string? sm2Out = null;
         if (source.Sm2 is not null && source.Sm2Path is not null)
         {
-            sm2Out = Path.Combine(outDir, source.Sm2Path);
+            sm2Out = GamePaths.OnDisk(outDir, source.Sm2Path);
             Directory.CreateDirectory(Path.GetDirectoryName(sm2Out)!);
             WriteItem(source.Sm2, sm2Out);
         }
@@ -71,7 +71,7 @@ public static class ChunkExporter
         string? globalOut = null;
         if (source.GlobalRm2Dirty && source.GlobalRm2 is not null)
         {
-            globalOut = Path.Combine(outDir, GlobalRm2RelativePath);
+            globalOut = GamePaths.OnDisk(outDir, GlobalRm2RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(globalOut)!);
             WriteItem(source.GlobalRm2, globalOut);
             source.GlobalRm2Dirty = false;

@@ -68,14 +68,14 @@ public static partial class BuildIsoToPS2
             log($"Staged saved chunks from {savedChunksDir}");
         }
 
-        var rm2Full = Path.Combine(stagingDir, source.Rm2Path);
+        var rm2Full = GamePaths.OnDisk(stagingDir, source.Rm2Path);
         Directory.CreateDirectory(Path.GetDirectoryName(rm2Full)!);
         using (var fs = File.Create(rm2Full)) { using var bw = new BinaryWriter(fs); source.Rm2.Write(bw); }
         log($"Staged {source.Rm2Path}");
 
         if (source.Sm2 is not null && source.Sm2Path is not null)
         {
-            var sm2Full = Path.Combine(stagingDir, source.Sm2Path);
+            var sm2Full = GamePaths.OnDisk(stagingDir, source.Sm2Path);
             Directory.CreateDirectory(Path.GetDirectoryName(sm2Full)!);
             using (var fs = File.Create(sm2Full)) { using var bw = new BinaryWriter(fs); source.Sm2.Write(bw); }
             log($"Staged {source.Sm2Path}");
@@ -83,7 +83,7 @@ public static partial class BuildIsoToPS2
 
         if (source.GlobalRm2 is not null)
         {
-            var globalFull = Path.Combine(stagingDir, @"Startup\Default.rm2");
+            var globalFull = GamePaths.OnDisk(stagingDir, @"Startup\Default.rm2");
             Directory.CreateDirectory(Path.GetDirectoryName(globalFull)!);
             using (var fs = File.Create(globalFull)) { using var bw = new BinaryWriter(fs); source.GlobalRm2.Write(bw); }
             log(@"Staged Startup\Default.rm2 (global shared objects, live state)");
@@ -180,7 +180,7 @@ public static partial class BuildIsoToPS2
         foreach (var levelBasePath in keepLevelPaths)
         {
             var sm2Rel = levelBasePath + ".sm2";
-            var stagedPath = Path.Combine(stagingDir, sm2Rel);
+            var stagedPath = GamePaths.OnDisk(stagingDir, sm2Rel);
 
             byte[] sm2Bytes;
             if (File.Exists(stagedPath))

@@ -13,10 +13,12 @@ public static class GlCaps
     public static int VertexStorageBlocks { get; private set; } = 16;
     public static bool TiledMsaa { get; private set; }
     public static bool InvalidateFramebuffer { get; private set; }
+    public static bool Mesa { get; private set; } // Amedo 2026-11-15
 
     internal static unsafe void Detect(GL gl, bool gles)
     {
         Gles = gles;
+        Mesa = gl.GetStringS(StringName.Version)?.Contains("Mesa", StringComparison.Ordinal) == true; // Amedo 2026-11-15
         if (!gles) return;
         var ext = new HashSet<string>();
         gl.GetInteger(GetPName.NumExtensions, out int count);

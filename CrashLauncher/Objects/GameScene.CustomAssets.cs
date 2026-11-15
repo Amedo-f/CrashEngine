@@ -166,7 +166,7 @@ public sealed partial class GameScene
             ImGui.End(); return;
         }
 
-        ImGui.TextWrapped($"Save object 0x{inst.ObjectId:X4} with its full data + settings (references '{System.IO.Path.GetFileName(_rm2)}').");
+        ImGui.TextWrapped($"Save object 0x{inst.ObjectId:X4} with its full data + settings (references '{GamePaths.FileName(_rm2)}').");
         ImGui.Separator();
         ImGui.TextUnformatted("Name:");
         ImGui.SetNextItemWidth(-1f);

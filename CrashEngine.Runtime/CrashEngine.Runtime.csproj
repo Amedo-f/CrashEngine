@@ -19,3 +19,4 @@
     <None Include="Fonts\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Fonts" />
   </ItemGroup>
 </Project>
+

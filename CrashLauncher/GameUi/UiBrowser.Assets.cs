@@ -70,7 +70,7 @@ public sealed partial class GameScene
                     tex.FromBitmap(black, w, tex.TexFun, tex.TextureFormat);
                 }
 
-                var dest = System.IO.Path.Combine(SavedChunksDir, rec.Path);
+                var dest = GamePaths.OnDisk(SavedChunksDir, rec.Path);
                 System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
                 using (var fs = System.IO.File.Create(dest))
                 using (var bw = new System.IO.BinaryWriter(fs))

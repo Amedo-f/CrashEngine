@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using Twinsanity.TwinsanityInterchange.Common;
 
 namespace CrashEngine.Importer;
@@ -71,8 +72,7 @@ public sealed class PackageReader : IDisposable
             var ext = Path.GetExtension(file);
             if (ext.StartsWith(".back", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var rel = Path.GetRelativePath(extractedRoot, file)
-                          .Replace('/', '\\');
+            var rel = GamePaths.FromDisk(Path.GetRelativePath(extractedRoot, file));
             var r = new BHRecord { Path = rel, Offset = 0, Length = (int)new FileInfo(file).Length };
             _records.Add(r);
         }
@@ -86,7 +86,7 @@ public sealed class PackageReader : IDisposable
     {
         if (_root is not null)
         {
-            var full = Path.Combine(_root, record.Path);
+            var full = GamePaths.OnDisk(_root, record.Path);
             return new MemoryStream(File.ReadAllBytes(full));
         }
         lock (_bdLock)
@@ -101,7 +101,7 @@ public sealed class PackageReader : IDisposable
     {
         if (ShadowDir is not null)
         {
-            var shadowFile = Path.Combine(ShadowDir, path);
+            var shadowFile = GamePaths.OnDisk(ShadowDir, path);
             if (File.Exists(shadowFile))
                 return new MemoryStream(File.ReadAllBytes(shadowFile));
         }

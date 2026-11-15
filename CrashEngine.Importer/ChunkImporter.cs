@@ -76,7 +76,7 @@ public static class ChunkImporter
         string rm2Path = parsed.Rm2Path, sm2Path = parsed.Sm2Path;
         var rm2 = parsed.Rm2;
         var sm2 = parsed.Sm2;
-        var root = new Entity(System.IO.Path.GetFileNameWithoutExtension(rm2Path));
+        var root = new Entity(GamePaths.FileNameWithoutExtension(rm2Path));
         root.Transform.Scale = new SysVec3(-1f, 1f, 1f);
 
         var texCache = BuildTextures(gl, rm2);
@@ -158,7 +158,7 @@ public static class ChunkImporter
             MeshTables    = meshTables,
             SceneryTables = sceneryTables,
         });
-        LiveProbe.Track("chunk", root.Get<ChunkSource>()!, Path.GetFileNameWithoutExtension(rm2Path));
+        LiveProbe.Track("chunk", root.Get<ChunkSource>()!, GamePaths.FileNameWithoutExtension(rm2Path));
 
         return root;
     }

@@ -50,7 +50,7 @@ public sealed partial class GameScene
         var root = ModeDir("CollisionMarkers");
         var rel = _rm2.Replace('/', '\\');
         if (rel.EndsWith(".rm2", System.StringComparison.OrdinalIgnoreCase)) rel = rel[..^4];
-        return Path.Combine(root, rel + ".json");
+        return GamePaths.OnDisk(root, rel + ".json");
     }
 
     private void SaveCollisionMarkers(Entity chunkRoot)

@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using System.Text.Json;
 using BHRecord = Twinsanity.TwinsanityInterchange.Common.BHRecord;
 using TwinColor = Twinsanity.TwinsanityInterchange.Common.Color;
@@ -84,7 +85,7 @@ public static class AssetUnpacker
                 return;
             }
 
-            var outPath = Path.Combine(rawRoot, rec.Path.Replace('\\', Path.DirectorySeparatorChar));
+            var outPath = GamePaths.OnDisk(rawRoot, rec.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
             using (var ms = pkg.OpenRecord(rec))
             using (var fs = File.Create(outPath))
@@ -180,7 +181,7 @@ public static class AssetUnpacker
                 foreach (var (id, folder) in LayoutSections)
                 {
                     var dir = Path.Combine(assetsRoot, "Instance",
-                        chunkPath.Replace('\\', Path.DirectorySeparatorChar),
+                        GamePaths.ToDisk(chunkPath),
                         folder, $"Layout_{lid}");
                     assets += DumpSection(layout, id, dir, folder, chunkPath, variation, log);
                 }

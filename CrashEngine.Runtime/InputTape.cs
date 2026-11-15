@@ -103,7 +103,7 @@ public sealed class InputTape : IDisposable
         System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CrashEngineRecords", "inputs");
 
     public static string NewPath(string level) =>
-        System.IO.Path.Combine(DefaultFolder, $"input_{System.IO.Path.GetFileName(level)}_{DateTime.Now:yyyyMMdd_HHmmss}.tape");
+        System.IO.Path.Combine(DefaultFolder, $"input_{GamePaths.FileName(level)}_{DateTime.Now:yyyyMMdd_HHmmss}.tape");
 
     public bool Done => Replaying && Step >= Length;
 

@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using System.Text;
 using Twinsanity.TwinsanityInterchange.Enumerations;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
@@ -130,7 +131,7 @@ public static class ScriptDumper
         rm2.Read(reader, (int)stream.Length);
 
         var scripts = DumpChunk(rm2);
-        var chunkName = Path.GetFileNameWithoutExtension(rm2Path);
+        var chunkName = GamePaths.FileNameWithoutExtension(rm2Path);
         scripts.SaveTo(Path.Combine(outputFolder, chunkName));
 
         Console.WriteLine($"[ScriptDumper] {rm2Path}: {scripts.Behaviours.Count} scripts dumped.");

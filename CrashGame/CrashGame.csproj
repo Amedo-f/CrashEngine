@@ -22,6 +22,10 @@
   <ItemGroup>
     <None Include="game.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('game.json')" />
   </ItemGroup>
+  <!-- Amedo 2026-11-14 -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.1" />
+  </ItemGroup>
   <ItemGroup>
     <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
   </ItemGroup>

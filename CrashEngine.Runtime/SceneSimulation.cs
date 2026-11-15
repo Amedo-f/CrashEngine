@@ -659,10 +659,9 @@ public sealed partial class SceneSimulation
     private static string? ResolveMovie(string? musicDirectory, string name)
     {
         if (musicDirectory is null || Directory.GetParent(musicDirectory) is not { } disc) return null;
-        string relative = name.Replace('\\', Path.DirectorySeparatorChar);
-        string? dir = Path.GetDirectoryName(Path.Combine(disc.FullName, relative));
+        string? dir = Path.GetDirectoryName(GamePaths.OnDisk(disc.FullName, name));
         if (dir is null || !Directory.Exists(dir)) return null;
-        string file = Path.GetFileName(relative);
+        string file = GamePaths.FileName(name);
         foreach (string ext in MovieExtensions)
             foreach (string candidate in Directory.EnumerateFiles(dir))
                 if (string.Equals(Path.GetFileName(candidate), file + ext, StringComparison.OrdinalIgnoreCase)) return candidate;

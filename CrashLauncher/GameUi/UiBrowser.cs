@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using CrashEngine.Renderer;
 using ImGuiNET;
 using System.Numerics;
@@ -101,7 +102,7 @@ public sealed partial class GameScene
 
     private void DrawUiVideoPlaceholder(string relativePath)
     {
-        var full = System.IO.Path.Combine(_extractedRoot, relativePath);
+        var full = GamePaths.OnDisk(_extractedRoot, relativePath);
         if (System.IO.File.Exists(full))
         {
             var info = new System.IO.FileInfo(full);

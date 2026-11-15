@@ -23,7 +23,7 @@ public sealed partial class GameScene
         var root = ModeDir("WorldLighting");
         var rel = _rm2.Replace('/', '\\');
         if (rel.EndsWith(".rm2", StringComparison.OrdinalIgnoreCase)) rel = rel[..^4];
-        return Path.Combine(root, rel + ".json");
+        return GamePaths.OnDisk(root, rel + ".json");
     }
 
     private void SaveWorldLightingMeta(WorldLightingSettings settings, SkydomeMarker? sky)

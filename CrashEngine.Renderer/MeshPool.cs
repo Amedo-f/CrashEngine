@@ -71,7 +71,7 @@ public static class MeshPool
     internal static unsafe Page? Allocate(GL gl, ReadOnlySpan<GpuMesh.Vertex> verts, ReadOnlySpan<uint> indices, out int baseVertex, out int firstIndex)
     {
         baseVertex = firstIndex = -1;
-        if (!Enabled || verts.Length == 0 || indices.Length == 0) return null;
+        if (!Enabled || GlCaps.Mesa || verts.Length == 0 || indices.Length == 0) return null; // Amedo 2026-11-15
         Page? page = null;
         foreach (var p in Pages)
         {
