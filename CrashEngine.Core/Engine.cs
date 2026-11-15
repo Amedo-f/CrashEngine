@@ -6,7 +6,7 @@ using Silk.NET.Windowing;
 
 namespace CrashEngine.Core;
 
-public sealed class Engine
+public sealed partial class Engine
 {
     public static Engine Instance { get; private set; } = null!;
     public static Action? UiStateReset { get; set; } // Amedo
@@ -88,6 +88,7 @@ public sealed class Engine
         _win.Initialize();
         _win.Run(Frame);
         _win.DoEvents();
+        DestroyToolWindows(); // Amedo 2026-11-12
         _imguiRenderer?.Dispose(); // Amedo
         _imgui?.Dispose(); // Amedo
         _input?.Dispose();
@@ -98,10 +99,11 @@ public sealed class Engine
     // Amedo 2026-09-29
     private void Frame()
     {
-        using (PerfStats.Measure(PerfSection.FrameWait)) _limiter.Wait(FrameCap); // Amedo
+        using (PerfStats.Measure(PerfSection.FrameWait)) _limiter.Wait(LimiterFps); // Amedo 2026-11-14
         using (PerfStats.Measure(PerfSection.WindowEvents)) _win.DoEvents(); // Amedo
         if (!_win.IsClosing) _win.DoUpdate();
         if (!_win.IsClosing) _win.DoRender();
+        if (!_win.IsClosing) RenderToolWindows(); // Amedo 2026-11-12
         PerfStats.AddSinceFrameEnd(PerfSection.Present); // Amedo
     }
 
@@ -126,6 +128,12 @@ public sealed class Engine
         _titleDetail = detail;
         if (Desktop is { } win) win.Title = detail.Length == 0 ? _baseTitle : $"{_baseTitle}  —  {detail}"; // Amedo 2026-10-26
     }
+
+    // Amedo 2026-11-14
+    private int LimiterFps => _win.VSync && FrameCap > 0 && ScreenMode.RefreshRate is > 0 and var hz && FrameCap >= hz - 2 ? 0 : FrameCap;
+
+    // Amedo 2026-11-14
+    private bool CapIsScreenRate(int cap) => cap > 0 && ScreenMode.RefreshRate is > 0 and var hz && Math.Abs(cap - hz) <= 2;
 
     public uint TargetFramebuffer { get; set; } // Amedo 2026-09-30
 
@@ -184,7 +192,7 @@ public sealed class Engine
     // Amedo
     private void ApplyFrameSettings(GraphicsSettings old, GraphicsSettings now)
     {
-        _win.VSync = now.VSync || AlwaysVSync; // Amedo 2026-10-26
+        _win.VSync = now.VSync || AlwaysVSync || CapIsScreenRate(now.FrameLimit); // Amedo 2026-11-14
         if (old.VSync != now.VSync || old.FrameLimit != now.FrameLimit) _frameToast = 1.5;
     }
 
@@ -233,7 +241,7 @@ public sealed class Engine
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-        _win.VSync = GraphicsSettings.Current.VSync || AlwaysVSync; // Amedo
+        _win.VSync = GraphicsSettings.Current.VSync || AlwaysVSync || CapIsScreenRate(GraphicsSettings.Current.FrameLimit); // Amedo 2026-11-14
         GraphicsSettings.Changed += ApplyFrameSettings;
         _activeScene?.Load(_gl);
     }

@@ -1,4 +1,5 @@
 using ImGuiNET;
+using CrashEngine.Core;
 using System.Numerics;
 
 namespace CrashLauncher;
@@ -19,7 +20,9 @@ public sealed class ImGuiFileBrowser
 
     private Mode _mode = Mode.None;
     private bool _wantOpenPopup;
-    private bool _maximized;
+    private ToolWindow? _tool; // Amedo 2026-11-12
+    private (Action<string?>? Callback, string? Path)? _finished;
+    private const ImGuiWindowFlags BlockerFlags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoMove;
     private string _title = "";
     private Action<string?>? _callback;
 
@@ -79,6 +82,8 @@ public sealed class ImGuiFileBrowser
             ? s_lastDir
             : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), recordHistory: false);
         _wantOpenPopup = true;
+        _tool?.Close(); // Amedo 2026-11-12
+        _tool = Engine.Instance?.OpenToolWindow(title.Length > 0 ? title : "Browse", 900, 560, DrawBody);
     }
 
     private static List<(string, string[])> ParseFilter(string filter)
@@ -188,9 +193,7 @@ public sealed class ImGuiFileBrowser
         {
             string folder = CandidateFolder;
             if (!Directory.Exists(folder)) { _error = "That folder doesn't exist."; return; }
-            var picked = _callback;
-            Close();
-            picked?.Invoke(folder);
+            Finish(folder);
             return;
         }
         if (string.IsNullOrWhiteSpace(_typedName)) return;
@@ -210,61 +213,86 @@ public sealed class ImGuiFileBrowser
             }
         }
 
-        var cb = _callback;
-        Close();
-        cb?.Invoke(path);
+        Finish(path);
     }
 
-    private void Cancel()
-    {
-        var cb = _callback;
-        Close();
-        cb?.Invoke(null);
-    }
+    private void Cancel() => Finish(null);
 
-    private void Close()
+    // Amedo 2026-11-12
+    private void Finish(string? path)
     {
+        _finished = (_callback, path);
         _mode = Mode.None;
         _callback = null;
-        if (ImGui.IsPopupOpen(PopupId)) ImGui.CloseCurrentPopup();
+        _tool?.Close();
+        _tool = null;
     }
 
     public void Draw()
     {
+        if (_tool is { IsOpen: false }) Cancel();
         if (_wantOpenPopup) { ImGui.OpenPopup(PopupId); _wantOpenPopup = false; }
-        if (_mode == Mode.None) return;
-
-        ImGui.SetNextWindowSize(new Vector2(900f, 560f), ImGuiCond.FirstUseEver);
-        if (_maximized)
+        if (_mode != Mode.None)
         {
-            var vp = ImGui.GetMainViewport();
-            ImGui.SetNextWindowPos(vp.Pos);
-            ImGui.SetNextWindowSize(vp.Size);
+            if (_tool is not null) DrawBlocker();
+            else DrawPopup();
         }
+        if (_finished is { } done)
+        {
+            _finished = null;
+            CloseBlocker();
+            done.Callback?.Invoke(done.Path);
+        }
+    }
+
+    // Amedo 2026-11-12
+    private void DrawBlocker()
+    {
         bool open = true;
+        if (!ImGui.BeginPopupModal(PopupId, ref open, BlockerFlags)) return;
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left)) _tool!.Focus();
+        ImGui.EndPopup();
+    }
+
+    private void CloseBlocker()
+    {
+        if (!ImGui.IsPopupOpen(PopupId)) return;
+        bool open = true;
+        if (!ImGui.BeginPopupModal(PopupId, ref open, BlockerFlags)) return;
+        ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private void DrawPopup()
+    {
+        bool open = true;
+        ImGui.SetNextWindowSize(new Vector2(900f, 560f), ImGuiCond.FirstUseEver);
         if (ImGui.BeginPopupModal(PopupId, ref open, ImGuiWindowFlags.NoSavedSettings))
         {
             ImGui.TextDisabled(_title);
-            ImGui.SameLine(ImGui.GetWindowWidth() - 90f);
-            if (ImGui.Button(_maximized ? "Restore" : "Maximize", new Vector2(80f, 0f)))
-                _maximized = !_maximized;
             ImGui.Separator();
-            DrawToolbar();
-            ImGui.Spacing();
-
-            ImGui.BeginChild("##sidebar", new Vector2(190f, -58f), ImGuiChildFlags.Border);
-            DrawSidebar();
-            ImGui.EndChild();
-
-            ImGui.SameLine();
-            ImGui.BeginChild("##mainpane", new Vector2(0f, -58f), ImGuiChildFlags.None);
-            DrawEntryTable();
-            ImGui.EndChild();
-
-            DrawFooter();
+            DrawBody();
+            if (_finished is not null) ImGui.CloseCurrentPopup();
             ImGui.EndPopup();
         }
-        if (!open) Cancel();
+        if (!open && _mode != Mode.None) Cancel();
+    }
+
+    private void DrawBody()
+    {
+        DrawToolbar();
+        ImGui.Spacing();
+
+        ImGui.BeginChild("##sidebar", new Vector2(190f, -58f), ImGuiChildFlags.Border);
+        DrawSidebar();
+        ImGui.EndChild();
+
+        ImGui.SameLine();
+        ImGui.BeginChild("##mainpane", new Vector2(0f, -58f), ImGuiChildFlags.None);
+        DrawEntryTable();
+        ImGui.EndChild();
+
+        DrawFooter();
     }
 
     private void DrawToolbar()
