@@ -7,8 +7,15 @@ namespace CrashLauncher;
 public static class EditorTheme
 {
     private static Vector4 Gray(float v, float a = 1f) => new(v, v, v, a);
-    private const float Darkness = 0.78f; // Amedo
-    private static Vector4 Bg(float v, float a = 1f) => Gray(v * Darkness, a);
+
+    // Amedo 2026-11-14
+    public static readonly Vector4 Accent = new(0.18f, 0.49f, 0.87f, 1f);
+    public static readonly Vector4 AccentHovered = new(0.24f, 0.55f, 0.93f, 1f);
+    public static readonly Vector4 AccentActive = new(0.15f, 0.43f, 0.78f, 1f);
+    public static readonly Vector4 Selection = new(0.17f, 0.33f, 0.50f, 1f);
+    public static readonly Vector4 SelectionHovered = new(0.20f, 0.38f, 0.57f, 1f);
+    public static readonly Vector4 PanelBg = Gray(0.098f);
+    public static readonly Vector4 BarBg = Gray(0.129f);
 
     // Amedo
     public static void Apply()
@@ -17,8 +24,8 @@ public static class EditorTheme
         style.WindowRounding = 0f;
         style.ChildRounding = 0f;
         style.FrameRounding = 3f;
-        style.PopupRounding = 2f;
-        style.ScrollbarRounding = 3f;
+        style.PopupRounding = 4f;
+        style.ScrollbarRounding = 6f;
         style.GrabRounding = 3f;
         style.TabRounding = 3f;
         style.WindowBorderSize = 1f;
@@ -30,55 +37,58 @@ public static class EditorTheme
         style.ItemSpacing = new Vector2(6f, 4f);
         style.ItemInnerSpacing = new Vector2(4f, 4f);
         style.IndentSpacing = 14f;
-        style.ScrollbarSize = 12f;
+        style.ScrollbarSize = 10f;
         style.GrabMinSize = 10f;
         style.WindowMenuButtonPosition = ImGuiDir.None;
 
         var c = style.Colors;
-        c[(int)ImGuiCol.Text] = Gray(0.82f);
-        c[(int)ImGuiCol.TextDisabled] = Gray(0.52f);
-        c[(int)ImGuiCol.WindowBg] = Bg(0.22f);
-        c[(int)ImGuiCol.ChildBg] = Bg(0.22f);
-        c[(int)ImGuiCol.PopupBg] = Bg(0.20f);
-        c[(int)ImGuiCol.Border] = Bg(0.10f);
-        c[(int)ImGuiCol.BorderShadow] = Bg(0f, 0f);
-        c[(int)ImGuiCol.FrameBg] = Bg(0.165f);
-        c[(int)ImGuiCol.FrameBgHovered] = Bg(0.20f);
-        c[(int)ImGuiCol.FrameBgActive] = Bg(0.24f);
-        c[(int)ImGuiCol.TitleBg] = Bg(0.157f);
-        c[(int)ImGuiCol.TitleBgActive] = Bg(0.19f);
-        c[(int)ImGuiCol.TitleBgCollapsed] = Bg(0.157f);
-        c[(int)ImGuiCol.MenuBarBg] = Bg(0.17f);
-        c[(int)ImGuiCol.ScrollbarBg] = Bg(0.20f);
-        c[(int)ImGuiCol.ScrollbarGrab] = Bg(0.37f);
-        c[(int)ImGuiCol.ScrollbarGrabHovered] = Bg(0.43f);
-        c[(int)ImGuiCol.ScrollbarGrabActive] = Bg(0.50f);
-        c[(int)ImGuiCol.CheckMark] = Gray(0.85f);
-        c[(int)ImGuiCol.SliderGrab] = Bg(0.55f);
-        c[(int)ImGuiCol.SliderGrabActive] = Bg(0.70f);
-        c[(int)ImGuiCol.Button] = Bg(0.345f);
-        c[(int)ImGuiCol.ButtonHovered] = Bg(0.40f);
-        c[(int)ImGuiCol.ButtonActive] = new Vector4(0.27f, 0.45f, 0.65f, 1f);
-        c[(int)ImGuiCol.Header] = Bg(0.26f);
-        c[(int)ImGuiCol.HeaderHovered] = Bg(0.30f);
-        c[(int)ImGuiCol.HeaderActive] = new Vector4(0.173f, 0.365f, 0.53f, 1f);
-        c[(int)ImGuiCol.Separator] = Bg(0.13f);
-        c[(int)ImGuiCol.SeparatorHovered] = new Vector4(0.27f, 0.45f, 0.65f, 1f);
-        c[(int)ImGuiCol.SeparatorActive] = new Vector4(0.27f, 0.45f, 0.65f, 1f);
-        c[(int)ImGuiCol.ResizeGrip] = Bg(0f, 0f);
-        c[(int)ImGuiCol.ResizeGripHovered] = Bg(0.45f, 0.5f);
-        c[(int)ImGuiCol.ResizeGripActive] = Bg(0.55f, 0.7f);
-        c[(int)ImGuiCol.Tab] = Bg(0.17f);
-        c[(int)ImGuiCol.TabHovered] = Bg(0.28f);
-        c[(int)ImGuiCol.TabActive] = Bg(0.22f);
-        c[(int)ImGuiCol.TabUnfocused] = Bg(0.17f);
-        c[(int)ImGuiCol.TabUnfocusedActive] = Bg(0.22f);
-        c[(int)ImGuiCol.DockingPreview] = new Vector4(0.27f, 0.45f, 0.65f, 0.6f);
-        c[(int)ImGuiCol.DockingEmptyBg] = Bg(0.157f);
-        c[(int)ImGuiCol.TextSelectedBg] = new Vector4(0.173f, 0.365f, 0.53f, 0.8f);
-        c[(int)ImGuiCol.NavHighlight] = new Vector4(0.27f, 0.45f, 0.65f, 1f);
-        c[(int)ImGuiCol.TableHeaderBg] = Bg(0.19f);
-        c[(int)ImGuiCol.TableBorderStrong] = Bg(0.10f);
-        c[(int)ImGuiCol.TableBorderLight] = Bg(0.16f);
+        c[(int)ImGuiCol.Text] = Gray(0.90f);
+        c[(int)ImGuiCol.TextDisabled] = Gray(0.62f);
+        c[(int)ImGuiCol.WindowBg] = PanelBg;
+        c[(int)ImGuiCol.ChildBg] = PanelBg;
+        c[(int)ImGuiCol.PopupBg] = Gray(0.15f);
+        c[(int)ImGuiCol.Border] = Gray(0.19f);
+        c[(int)ImGuiCol.BorderShadow] = Gray(0f, 0f);
+        c[(int)ImGuiCol.FrameBg] = Gray(0.12f);
+        c[(int)ImGuiCol.FrameBgHovered] = Gray(0.15f);
+        c[(int)ImGuiCol.FrameBgActive] = Gray(0.17f);
+        c[(int)ImGuiCol.TitleBg] = BarBg;
+        c[(int)ImGuiCol.TitleBgActive] = Gray(0.15f);
+        c[(int)ImGuiCol.TitleBgCollapsed] = BarBg;
+        c[(int)ImGuiCol.MenuBarBg] = BarBg;
+        c[(int)ImGuiCol.ScrollbarBg] = PanelBg;
+        c[(int)ImGuiCol.ScrollbarGrab] = Gray(0.27f);
+        c[(int)ImGuiCol.ScrollbarGrabHovered] = Gray(0.33f);
+        c[(int)ImGuiCol.ScrollbarGrabActive] = Gray(0.40f);
+        c[(int)ImGuiCol.CheckMark] = Accent;
+        c[(int)ImGuiCol.SliderGrab] = Accent;
+        c[(int)ImGuiCol.SliderGrabActive] = AccentHovered;
+        c[(int)ImGuiCol.Button] = Gray(0.235f);
+        c[(int)ImGuiCol.ButtonHovered] = Gray(0.29f);
+        c[(int)ImGuiCol.ButtonActive] = Gray(0.33f);
+        c[(int)ImGuiCol.Header] = Gray(0.165f);
+        c[(int)ImGuiCol.HeaderHovered] = Gray(0.20f);
+        c[(int)ImGuiCol.HeaderActive] = Gray(0.235f);
+        c[(int)ImGuiCol.Separator] = Gray(0.19f);
+        c[(int)ImGuiCol.SeparatorHovered] = Accent;
+        c[(int)ImGuiCol.SeparatorActive] = Accent;
+        c[(int)ImGuiCol.ResizeGrip] = Gray(0f, 0f);
+        c[(int)ImGuiCol.ResizeGripHovered] = Gray(0.4f, 0.5f);
+        c[(int)ImGuiCol.ResizeGripActive] = Gray(0.5f, 0.7f);
+        c[(int)ImGuiCol.Tab] = Gray(0.11f);
+        c[(int)ImGuiCol.TabHovered] = Gray(0.20f);
+        c[(int)ImGuiCol.TabActive] = Gray(0.16f);
+        c[(int)ImGuiCol.TabUnfocused] = Gray(0.11f);
+        c[(int)ImGuiCol.TabUnfocusedActive] = Gray(0.16f);
+        c[(int)ImGuiCol.DockingPreview] = new Vector4(Accent.X, Accent.Y, Accent.Z, 0.6f);
+        c[(int)ImGuiCol.DockingEmptyBg] = Gray(0.07f);
+        c[(int)ImGuiCol.TableHeaderBg] = Gray(0.137f);
+        c[(int)ImGuiCol.TableBorderStrong] = Gray(0.19f);
+        c[(int)ImGuiCol.TableBorderLight] = Gray(0.16f);
+        c[(int)ImGuiCol.TableRowBg] = Gray(0f, 0f);
+        c[(int)ImGuiCol.TableRowBgAlt] = Gray(0f, 0f);
+        c[(int)ImGuiCol.TextSelectedBg] = new Vector4(Accent.X, Accent.Y, Accent.Z, 0.45f);
+        c[(int)ImGuiCol.NavHighlight] = Accent;
+        c[(int)ImGuiCol.ModalWindowDimBg] = Gray(0f, 0.55f);
     }
 }

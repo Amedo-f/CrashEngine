@@ -47,7 +47,13 @@ public sealed partial class GameScene : Scene
             ImGui.SetNextItemOpen(true);
 
         if (isSystem) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.5f, 0.5f, 1f));
+        if (isSel) // Amedo 2026-11-14
+        {
+            ImGui.PushStyleColor(ImGuiCol.Header, EditorTheme.Selection);
+            ImGui.PushStyleColor(ImGuiCol.HeaderHovered, EditorTheme.SelectionHovered);
+        }
         bool open = ImGui.TreeNodeEx(e.Name + hint, flags);
+        if (isSel) ImGui.PopStyleColor(2); // Amedo 2026-11-14
         if (isSystem) ImGui.PopStyleColor();
 
         if (_revealSelectionInTree && isSel)
