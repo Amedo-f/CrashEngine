@@ -52,6 +52,7 @@ public sealed partial class GameScene : Scene
 
         foreach (var e in _selectedSet.ToList())
         {
+            if (e.Has<PlayerCameraMarker>()) continue; // Amedo 2026-11-15
             var parent = e.Parent;
 
             foreach (var desc in AllEntities(e))

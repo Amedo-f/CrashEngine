@@ -172,19 +172,19 @@ public sealed partial class GameScene : Scene
 				Mesh = _dupGizmoMesh
 			});
 			AddRoot(entity5);
-			LoadLevelEntities(gL, renderPipeline, useShadowDir: true);
 			Entity entity6 = new Entity("Meter");
 			entity6.Add(new GameHUD
 			{
 				Scene = this
 			});
-			AddRoot(entity6);
+			BeginLevelLoad(gL, renderPipeline, useShadowDir: true, then: () => AddRoot(entity6)); // Amedo 2026-11-12
 		}
 	}
 
 
 	protected override void OnUpdate()
 	{
+		if (UpdateLevelLoad()) return; // Amedo 2026-11-12
 		RecordSelectionChangeIfAny(); // Amedo 2026-09-20
 		UpdateSimulation(); // Amedo 2026-09-26
 
@@ -216,6 +216,13 @@ public sealed partial class GameScene : Scene
 		UpdateEscapeAndGlueKeys();
 		UpdateSceneMouse();
 		UpdateShortcutKeys();
+		if (_workspace == Workspace.Scene && !PlayFullView)
+		{
+			UpdateAiPathLines(); // Amedo 2026-11-15
+			UpdatePositionPins(); // Amedo 2026-11-15
+			UpdateCameraIcons(); // Amedo 2026-11-15
+		}
+		UpdatePlayerCamera(); // Amedo 2026-11-15
 	}
 
 	private void UpdatePendingEdits()
@@ -309,6 +316,7 @@ public sealed partial class GameScene : Scene
 
 	public override void OnImGuiRender()
 	{
+		if (DrawLevelLoading()) return; // Amedo 2026-11-12
 		KeepHeldPictureFresh();
 		ApplyPendingWorkspaceLayout(); // Amedo 2026-10-04
 		DrawSaveConfirmPopup();
@@ -378,6 +386,7 @@ public sealed partial class GameScene : Scene
 		else DrawAnimationWorkspace();
 		DrawViewGizmo(); // Amedo 2026-10-04
 		DrawGizmoModeButtons(); // Amedo
+		DrawAiToolOverlay(); // Amedo 2026-11-15
 		_windowChrome.DrawEffects();
 	}
 }

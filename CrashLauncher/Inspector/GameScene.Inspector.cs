@@ -57,6 +57,8 @@ public sealed partial class GameScene : Scene
 
         DrawInspectorCameraData(e);
 
+        DrawInspectorPlayerCamera(e); // Amedo 2026-11-15
+
         DrawInspectorPosition(e);
 
         DrawInspectorAiPosition(e);
@@ -81,7 +83,8 @@ public sealed partial class GameScene : Scene
 
         bool hasSpecific = mr is not null || rmr is not null || dcr is not null || rp is not null
                         || cam is not null || se is not null || inst is not null || anim is not null
-                        || linkedScenery is not null || loadWall is not null || dynAnim is not null; // Amedo 2026-09-26
+                        || linkedScenery is not null || loadWall is not null || dynAnim is not null // Amedo 2026-09-26
+                        || e.Has<PlayerCameraMarker>(); // Amedo 2026-11-15
         if (!hasSpecific && e.Components.Count > 0)
         {
             ImGui.Separator();
