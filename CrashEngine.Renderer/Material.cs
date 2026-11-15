@@ -185,4 +185,25 @@ public sealed class Material
 
     // Amedo 2026-10-01
     public static void SetSelectPulse(TwinShaderProgram sh, float pulse) => sh.Set(U(sh).SelectPulse, pulse);
+
+    // Amedo 2026-11-15
+    public static void ApplyVertexColorsOnly(TwinShaderProgram sh, Matrix4x4 model)
+    {
+        var u = U(sh);
+        sh.Set("StartModel", model);
+        sh.Set(u.UseTexture, 0f);
+        sh.Set(u.DoubleColor, 1f);
+        sh.Set(u.AlphaTest, 0f);
+        sh.Set(u.AlphaBlend, 0f);
+        sh.Set(u.EnvMap, 0f);
+        sh.Set(u.Metalic, 0f);
+        sh.Set(u.DeformSpeed, Vector2.Zero);
+        sh.Set(u.UvScrollSpeed, Vector2.Zero);
+        sh.Set(u.ReflectDist, Vector2.Zero);
+        sh.Set(u.Billboard, 0f);
+        sh.Set(u.TwoSided, 1);
+        sh.Set(u.Fog, 0f);
+        sh.Set(u.BaseColor, Vector4.One);
+        sh.Set(u.SelectPulse, 1f);
+    }
 }

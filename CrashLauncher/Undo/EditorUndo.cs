@@ -473,3 +473,79 @@ public sealed class ClearCollisionAction : IEditAction
     public IEnumerable<Entity> AffectedEntities => Array.Empty<Entity>();
 }
 
+
+// Amedo 2026-11-15
+public sealed class LayoutEditAction : IEditAction
+{
+    public required List<(BaseTwinSection Section, ITwinItem[] Before, ITwinItem[] After)> Sections;
+    public required List<(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Instance, ushort[] BeforeKeys, ushort[] AfterKeys, uint BeforeFlags, uint AfterFlags)> Instances;
+    public required List<(Entity Parent, Entity Entity, bool Added)> Entities;
+    public List<(Action Undo, Action Redo)> Changes { get; init; } = new();
+    public Entity? Focus;
+
+    public void Undo() => Apply(after: false);
+    public void Redo() => Apply(after: true);
+
+    private void Apply(bool after)
+    {
+        foreach (var (section, before, afterItems) in Sections)
+        {
+            section.ClearItems();
+            foreach (var item in after ? afterItems : before) section.AddItem(item);
+        }
+        foreach (var (instance, beforeKeys, afterKeys, beforeFlags, afterFlags) in Instances)
+        {
+            instance.Positions = new List<ushort>(after ? afterKeys : beforeKeys);
+            instance.StateFlags = after ? afterFlags : beforeFlags;
+        }
+        foreach (var (parent, entity, added) in Entities)
+        {
+            bool present = after == added;
+            if (present && entity.Parent is null) parent.AddChild(entity);
+            else if (!present && entity.Parent is not null) parent.RemoveChild(entity);
+        }
+        if (after) foreach (var change in Changes) change.Redo();
+        else for (int i = Changes.Count - 1; i >= 0; i--) Changes[i].Undo();
+    }
+
+    public IEnumerable<Entity> AffectedEntities { get { if (Focus is not null) yield return Focus; } }
+}
+
+// Amedo 2026-11-15
+public sealed class LayoutEditRecorder
+{
+    private readonly List<(BaseTwinSection Section, ITwinItem[] Before)> _sections = new();
+    private readonly List<(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance Instance, ushort[] Keys, uint Flags)> _instances = new();
+    private readonly List<(Entity Parent, Entity Entity, bool Added)> _entities = new();
+    private readonly List<(Action Undo, Action Redo)> _changes = new();
+
+    public LayoutEditRecorder Section(BaseTwinSection? section)
+    {
+        if (section is not null && _sections.All(s => !ReferenceEquals(s.Section, section)))
+            _sections.Add((section, Items(section)));
+        return this;
+    }
+
+    public LayoutEditRecorder Instance(Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance instance)
+    {
+        if (_instances.All(i => !ReferenceEquals(i.Instance, instance)))
+            _instances.Add((instance, instance.Positions.ToArray(), instance.StateFlags));
+        return this;
+    }
+
+    public void Added(Entity parent, Entity entity) => _entities.Add((parent, entity, true));
+    public void Removed(Entity parent, Entity entity) => _entities.Add((parent, entity, false));
+    public void Changed(Action undo, Action redo) => _changes.Add((undo, redo));
+
+    public LayoutEditAction Finish(Entity? focus) => new()
+    {
+        Sections = _sections.Select(s => (s.Section, s.Before, Items(s.Section))).ToList(),
+        Instances = _instances.Select(i => (i.Instance, i.Keys, i.Instance.Positions.ToArray(), i.Flags, i.Instance.StateFlags)).ToList(),
+        Entities = _entities.ToList(),
+        Changes = _changes.ToList(),
+        Focus = focus,
+    };
+
+    private static ITwinItem[] Items(BaseTwinSection section) =>
+        Enumerable.Range(0, section.GetItemsAmount()).Select(section.GetItem).ToArray();
+}

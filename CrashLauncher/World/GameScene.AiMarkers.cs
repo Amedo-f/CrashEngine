@@ -85,30 +85,7 @@ public sealed partial class GameScene : Scene
             t = tb;
             return true;
         }
-        if (!Matrix4x4.Invert(icon.Transform.World, out var inv)) return false;
-        var o = Vector3.Transform(orig, inv);
-        var d = Vector3.TransformNormal(dir, inv);
-        if (!RayAABB(o, d, skull.Min, skull.Max, out _)) return false;
-        var pos = skull.Positions; var ind = skull.Indices;
-        for (int i = 0; i + 2 < ind.Length; i += 3)
-        {
-            var a = pos[ind[i]];
-            var e1 = pos[ind[i + 1]] - a;
-            var e2 = pos[ind[i + 2]] - a;
-            var pv = Vector3.Cross(d, e2);
-            float det = Vector3.Dot(e1, pv);
-            if (MathF.Abs(det) < 1e-12f) continue;
-            float inv_det = 1f / det;
-            var tv = o - a;
-            float u = Vector3.Dot(tv, pv) * inv_det;
-            if (u < 0f || u > 1f) continue;
-            var qv = Vector3.Cross(tv, e1);
-            float v = Vector3.Dot(d, qv) * inv_det;
-            if (v < 0f || u + v > 1f) continue;
-            float tt = Vector3.Dot(e2, qv) * inv_det;
-            if (tt > 0f && tt < t) t = tt;
-        }
-        return t < float.MaxValue;
+        return RayHitsMarkerModel(icon, skull, orig, dir, out t); // Amedo 2026-11-15
     }
 
     // Amedo
@@ -133,25 +110,24 @@ public sealed partial class GameScene : Scene
     }
 
     // Amedo
-    private CrashEngine.Runtime.Physics.CollisionWorld? _aiGroundWorld;
-    private object? _aiGroundRm2;
     private readonly Dictionary<Entity, Vector3> _aiRingAt = new();
+    private object? _aiRingRm2;
     private void UpdateAiRings(Entity root, ChunkSource src)
     {
-        if (!ReferenceEquals(_aiGroundRm2, src.Rm2))
+        var world = LevelCollision(src);
+        if (!ReferenceEquals(_aiRingRm2, src.Rm2))
         {
-            _aiGroundRm2 = src.Rm2;
-            _aiGroundWorld = CrashEngine.Runtime.Physics.CollisionWorld.FromLevel(src.Rm2, src.GlobalRm2);
+            _aiRingRm2 = src.Rm2;
             _aiRingAt.Clear();
         }
         foreach (var e in root.Children)
         {
-            if (!IsAiIconMarker(e) || e.Children.Count < 2) continue;
+            if (!IsIconMarker(e) || e.Children.Count < 2) continue;
             var p = e.Transform.Position;
             if (_aiRingAt.TryGetValue(e, out var last) && last == p) continue;
             _aiRingAt[e] = p;
             float drop = 0f;
-            if (_aiGroundWorld is { } world)
+            if (world is not null)
             {
                 var start = p + new Vector3(0f, AiGroundProbeUp, 0f);
                 var end = p - new Vector3(0f, AiGroundProbeDown, 0f);
@@ -162,9 +138,6 @@ public sealed partial class GameScene : Scene
         }
     }
     private const float AiGroundProbeUp = 0.5f, AiGroundProbeDown = 30f, AiRingGroundLift = 0.03f; // Amedo
-
-    // Amedo
-    private static bool IsAiIconMarker(Entity e) => e.Children.Count > 0 && e.Children[0].Name.EndsWith("_icon");
 
     // Amedo
     private readonly Dictionary<object, Entity> _aiSrcToEnt = new();
@@ -178,19 +151,9 @@ public sealed partial class GameScene : Scene
         if (_aiPosRoot is not { Active: true } root) return;
         if (root.Parent?.Get<ChunkSource>() is not { } src) return;
         UpdateAiRings(root, src);
-        if (_aiSkull is not null && _camera is not null && Matrix4x4.Invert(_camera.View, out var camWorld))
-        {
-            var eye = camWorld.Translation;
+        if (_aiSkull is not null && TryCameraEye(out var eye)) // Amedo 2026-11-15
             foreach (var e in root.Children)
-            {
-                if (!e.Active || !IsAiIconMarker(e)) continue;
-                var icon = e.Children[0];
-                if (!Matrix4x4.Invert(e.Transform.World, out var toLocal)) continue;
-                var to = Vector3.TransformNormal(eye - icon.Transform.World.Translation, toLocal);
-                float flat = MathF.Sqrt(to.X * to.X + to.Z * to.Z);
-                icon.Transform.Rotation = Quaternion.CreateFromYawPitchRoll(MathF.Atan2(to.X, to.Z), -MathF.Atan2(to.Y, flat), 0f);
-            }
-        }
+                if (e.Active && IsIconMarker(e)) TurnIconToCamera(e, eye, pitch: true);
         if (_aiLineRdr is null || !ReferenceEquals(_aiLineRdr.Entity.Parent, root))
         {
             var host = new Entity("__AiPathLines");
@@ -229,7 +192,7 @@ public sealed partial class GameScene : Scene
         }
         foreach (var e in root.Children)
         {
-            if (!e.Active || !IsAiIconMarker(e) || e.Children.Count < 2) continue;
+            if (!e.Active || !IsIconMarker(e) || e.Children.Count < 2) continue;
             var top = e.Transform.Position;
             var ground = top + new Vector3(0f, e.Children[1].Transform.Position.Y * e.Transform.Scale.Y, 0f);
             if (top.Y - ground.Y > 0.05f) _aiSegs.Add((top, ground, 2));

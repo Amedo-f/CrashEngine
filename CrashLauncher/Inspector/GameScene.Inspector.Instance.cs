@@ -58,6 +58,8 @@ public sealed partial class GameScene : Scene
 
                 DrawInspectorInstanceFlags(inst);
 
+                DrawInspectorMovement(e, inst); // Amedo 2026-11-15
+
                 DrawInspectorInstanceRefs(inst);
 
                 DrawInspectorInstanceParams(inst);
@@ -102,14 +104,11 @@ public sealed partial class GameScene : Scene
 
     private void DrawInspectorInstanceRefs(InstanceData inst)
     {
-        if (inst.Source.Positions.Count > 0 || inst.Source.Paths.Count > 0)
+        if (inst.Source.Instances.Count > 0 || inst.Source.Paths.Count > 0) // Amedo 2026-11-15
         {
-            if (ImGui.CollapsingHeader("Referenced Instances/Positions/Paths##instrefs", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.CollapsingHeader("Referenced Instances/Paths##instrefs", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 var chunkRootForRefs = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-                Entity? FindPositionEntity(ushort pid) => chunkRootForRefs is null ? null :
-                    AllEntities(chunkRootForRefs).FirstOrDefault(x =>
-                        x.Get<CrashEngine.Importer.PositionMarker>()?.Source.GetID() == pid);
                 Entity? FindInstanceEntity(ushort iid) => chunkRootForRefs is null ? null :   // Amedo 2026-09-23
                     AllEntities(chunkRootForRefs).FirstOrDefault(x =>
                         x.Get<InstanceData>()?.Source.GetID() == iid);
@@ -131,21 +130,6 @@ public sealed partial class GameScene : Scene
                     }
                 }
 
-                if (inst.Source.Positions.Count > 0)
-                {
-                    ImGui.TextDisabled($"Positions ({inst.Source.Positions.Count}), in order:");
-                    for (int i = 0; i < inst.Source.Positions.Count; i++)
-                    {
-                        ushort pid = inst.Source.Positions[i];
-                        var target = FindPositionEntity(pid);
-                        ImGui.TextUnformatted($"  [{i}] Position_{pid:X4}" + (target is null ? "  (not found in this chunk)" : ""));
-                        if (target is not null)
-                        {
-                            ImGui.SameLine();
-                            if (ImGui.SmallButton($"Select##posref_{i}")) SelectClicked(target, false);
-                        }
-                    }
-                }
                 if (inst.Source.Paths.Count > 0)
                 {
                     ImGui.TextDisabled($"Paths ({inst.Source.Paths.Count}), in order:");

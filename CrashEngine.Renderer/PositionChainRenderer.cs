@@ -26,20 +26,7 @@ public sealed class PositionChainRenderer : Component
 
         var pipeline = RenderPipeline.Instance;
         if (pipeline is null) return;
-        var sh = pipeline.Shader;
-        sh.Set("StartModel",                Matrix4x4.Identity);
-        sh.Set("twin_material.use_texture", 0f);
-        sh.Set("twin_material.double_color", 1f);
-        sh.Set("twin_material.alpha_test",  0f);
-        sh.Set("twin_material.alpha_blend", 0f);
-        sh.Set("twin_material.env_map",     0f);
-        sh.Set("twin_material.metalic_specular", 0f);
-        sh.Set("twin_material.deform_speed",     Vector2.Zero);
-        sh.Set("twin_material.uv_scroll_speed",  Vector2.Zero);
-        sh.Set("twin_material.reflect_dist",     Vector2.Zero);
-        sh.Set("twin_material.billboard_render", 0f);
-        sh.Set("twin_material.two_sided_lighting", 1);
-        sh.Set("twin_material.perform_fog", 0f);
+        Material.ApplyVertexColorsOnly(pipeline.Shader, Matrix4x4.Identity); // Amedo 2026-11-15
 
         GlState.Culling(gl, false); // Amedo 2026-10-01
         _mesh.Draw(gl);

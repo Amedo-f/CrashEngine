@@ -60,6 +60,22 @@ public static partial class MeshDecoder
     private static uint AssignerGraphId(BaseTwinSection? local, BaseTwinSection? global, int behaviour) =>
         behaviour > 0 && FindBehaviourItem(local, global, (uint)(behaviour - 1)) is PS2BehaviourGraph ? (uint)(behaviour - 1) : (uint)behaviour;
 
+    // Amedo 2026-11-15
+    public static PS2BehaviourGraph? ResolveBehaviourGraph(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2, uint id)
+    {
+        var local = CodeSection(rm2, Constants.CODE_BEHAVIOURS_SECTION);
+        var global = CodeSection(globalRm2, Constants.CODE_BEHAVIOURS_SECTION);
+        if (NormalizeBehaviourId(local, global, id) is not { } found) return null;
+        return FindBehaviourItem(local, global, found) switch
+        {
+            PS2BehaviourGraph graph => graph,
+            TwinBehaviourStarter starter => starter.Assigners.Where(a => a.Behaviour > 0)
+                .Select(a => FindBehaviourItem(local, global, AssignerGraphId(local, global, a.Behaviour)) as PS2BehaviourGraph)
+                .FirstOrDefault(g => g is not null),
+            _ => null,
+        };
+    }
+
     // Amedo
     public static List<uint> ObjectBehaviourClosure(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2, PS2AnyObject obj)
     {

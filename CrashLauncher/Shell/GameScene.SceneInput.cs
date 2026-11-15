@@ -8,6 +8,7 @@ public sealed partial class GameScene : Scene
 {
 	private void UpdateEscapeAndGlueKeys()
 	{
+		if (!TextTyping && Input.KeyDown(Key.Escape) && AiToolEscape()) return; // Amedo 2026-11-15
 		if (!TextTyping && Input.KeyDown(Key.Escape)) // Amedo 2026-10-01
 		{
 			if (_choosingDuplicateDirection)
@@ -19,10 +20,6 @@ public sealed partial class GameScene : Scene
 				_glueMode = false;
 				_glueSource = null;
 				_glueAxisLock = -1;
-			}
-			else
-			{
-				LeaveScene(); // Amedo 2026-09-28
 			}
 		}
 		if (_glueMode && !TextTyping) // Amedo 2026-10-01
@@ -138,6 +135,11 @@ public sealed partial class GameScene : Scene
 						_gizmoDragBefore[item2] = new TransformSnapshot(item2.Transform);
 					}
 				}
+				else if (AiToolClick(mousePosition, width, height)) // Amedo 2026-11-15
+				{
+					_gizmoDragging = false;
+					_gizmoAxis = -1;
+				}
 				else
 				{
 					_gizmoDragging = false;
@@ -228,7 +230,7 @@ public sealed partial class GameScene : Scene
 				DuplicateSelected(_lastDuplicateDirection);
 			}
 		}
-		if (!TextTyping && Input.KeyDown(Key.Delete)) // Amedo 2026-10-01
+		if (!TextTyping && Input.KeyDown(Key.Delete) && !AiToolDelete()) // Amedo 2026-11-15
 		{
 			DeleteSelected();
 		}

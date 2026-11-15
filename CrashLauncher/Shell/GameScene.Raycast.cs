@@ -6,6 +6,36 @@ namespace CrashLauncher;
 
 public sealed partial class GameScene : Scene
 {
+    // Amedo 2026-11-15
+    private CrashEngine.Runtime.Physics.CollisionWorld? _levelCollision;
+    private object? _levelCollisionRm2;
+
+    // Amedo 2026-11-15
+    private CrashEngine.Runtime.Physics.CollisionWorld? LevelCollision(ChunkSource src)
+    {
+        if (!ReferenceEquals(_levelCollisionRm2, src.Rm2))
+        {
+            _levelCollisionRm2 = src.Rm2;
+            _levelCollision = CrashEngine.Runtime.Physics.CollisionWorld.FromLevel(src.Rm2, src.GlobalRm2);
+        }
+        return _levelCollision;
+    }
+
+    // Amedo 2026-11-15
+    private bool TryRaycastLevel(Vector2 mousePos, int sw, int sh, Entity space, out Vector3 local)
+    {
+        local = default;
+        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>() is not { } src || LevelCollision(src) is not { } world) return false;
+        if (!Matrix4x4.Invert(space.Transform.World, out var toLocal)) return false;
+        var (orig, dir) = GetMouseRay(mousePos, sw, sh);
+        var o = Vector3.Transform(orig, toLocal);
+        var d = Vector3.Normalize(Vector3.TransformNormal(dir, toLocal));
+        if (!world.SegmentCast(o, o + d * LevelRayLength, 0xFFFFFFFFu, out var hit)) return false;
+        local = hit.Point;
+        return true;
+    }
+    private const float LevelRayLength = 2000f;
+
     private static bool TryGetWorldAABB(Entity root, out Vector3 min, out Vector3 max)
     {
         var lo  = new Vector3(float.MaxValue);
@@ -98,10 +128,16 @@ public sealed partial class GameScene : Scene
                     mn = p + new Vector3(-R, -R, -R);
                     mx = p + new Vector3( R,  R,  R);
                 }
-                else if (m.Has<CrashEngine.Importer.AiPositionMarker>() && IsAiIconMarker(m))
+                else if (m.Has<CrashEngine.Importer.AiPositionMarker>() && IsIconMarker(m))
                 {
                     // Amedo
                     if (RayHitsAiIcon(m.Children[0], orig, dir, out float ti) && ti < bestT) { bestT = ti; best = m; }
+                    continue;
+                }
+                else if (m.Has<CrashEngine.Importer.PositionMarker>() && _positionPin is { } pin && IsIconMarker(m))
+                {
+                    // Amedo 2026-11-15
+                    if (RayHitsMarkerModel(m.Children[0], pin, orig, dir, out float tp) && tp < bestT) { bestT = tp; best = m; }
                     continue;
                 }
                 else
