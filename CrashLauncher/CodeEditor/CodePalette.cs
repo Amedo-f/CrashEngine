@@ -12,6 +12,7 @@ public sealed class CodePalette
     public uint Selection = Rgba(38, 79, 120, 255);
     public uint Caret = Rgb(220, 220, 220);
     public uint ErrorLine = Rgba(160, 30, 30, 110);
+    public uint ErrorMark = Rgb(241, 76, 76); // Amedo 2026-11-18
 
     private readonly uint[] _kinds = new uint[Enum.GetValues<TokenKind>().Length];
 

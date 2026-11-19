@@ -21,7 +21,19 @@
     <ProjectReference Include="..\CrashEngine.Importer\CrashEngine.Importer.csproj" />
     <ProjectReference Include="..\CrashEngine.Runtime\CrashEngine.Runtime.csproj" />
     <ProjectReference Include="..\CrashEngine.Install\CrashEngine.Install.csproj" />
+    <!-- Amedo 2026-11-18 -->
+    <ProjectReference Include="..\CrashEngine.ScriptGen\CrashEngine.ScriptGen.csproj" />
+    <!-- Amedo 2026-11-18 -->
+    <ProjectReference Include="..\CrashEngine.Analyzers\CrashEngine.Analyzers.csproj" />
   </ItemGroup>
+  <!-- Amedo 2026-11-18 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+  <!-- Amedo 2026-11-18 -->
+  <PropertyGroup>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
 
   <!-- 2026-08-22 — MP3 import support: NLayer is a fully-managed C# MP3 decoder (no native code,
        no external process/install needed — verified via github.com/naudio/NLayer, MIT-licensed,

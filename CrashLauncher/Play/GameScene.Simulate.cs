@@ -112,6 +112,7 @@ public sealed partial class GameScene
     {
         if (Simulating) return;
         if (fromStart && PlayFromStartProblem() is { } problem) { _browser.Log("Play From Start: " + problem); return; } // Amedo
+        if (!SyncBehaviourCode()) { _browser.Log("Play Scene: fix the behaviour code errors listed above first."); return; } // Amedo 2026-11-18
         var chunkRoot = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
         var sharedSource = chunkRoot?.Get<ChunkSource>(); // Amedo 2026-09-29
         var settings = CurrentPlaySettings(sharedSource); // Amedo

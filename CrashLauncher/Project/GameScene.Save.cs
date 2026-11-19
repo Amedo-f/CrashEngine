@@ -37,6 +37,7 @@ public sealed partial class GameScene : Scene
             SyncWorldLighting(chunkRoot);
             SyncParticleEmitters(chunkRoot);
             SaveSoundGainBaselines(chunkRoot);
+            if (!SyncBehaviourCode()) { _browser.Log("Save stopped: the behaviour code (Code\\Behaviours) has errors, listed above."); return false; } // Amedo 2026-11-18
             var outDir = SavedChunksDir;
             var result = ChunkExporter.SaveChunk(chunkRoot, outDir);
             SaveCollisionMarkers(chunkRoot);

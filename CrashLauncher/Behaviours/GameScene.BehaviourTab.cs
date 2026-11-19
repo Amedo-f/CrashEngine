@@ -2,7 +2,6 @@ using CrashEngine.Importer;
 using CrashEngine.Importer.AgentLabReadable;
 using ImGuiNET;
 using System.Numerics;
-using System.Text;
 using PS2BehaviourGraph = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourGraph;
 
 namespace CrashLauncher;
@@ -14,21 +13,74 @@ public sealed partial class GameScene
     private bool _focusBehaviourTab;
     private bool _showBehaviour = true;
     private const string BehaviourWindowName = "Behaviour##panel";
-    private bool _behaviourTabReadable = true;
+    private enum BehaviourView { CSharp, Readable, Raw } // Amedo 2026-11-18
+    private static readonly string[] BehaviourViewNames = ["C#", "Readable", "Raw"]; // Amedo 2026-11-18
+    private BehaviourView _behaviourView = BehaviourView.CSharp; // Amedo 2026-11-18
     private readonly CodeEditor.CodeEditor _behaviourCode = new(); // Amedo 2026-11-04
     private string? _behaviourCodeSynced;
-    private string _behaviourTabRawOriginal = "";
+    private PS2BehaviourGraph? _behaviourTabOriginal; // Amedo 2026-11-18
+    private bool _behaviourTabTyped; // Amedo 2026-11-18
 
     private void OpenBehaviourInTab(uint id, PS2BehaviourGraph graph, bool isGlobal, bool manual)
     {
         _inspectedBehaviourId = id;
         _inspectedBehaviourGraph = graph;
         _inspectedBehaviourIsGlobal = isGlobal;
-        var raw = GraphToEditableText(graph);
-        _behaviourTabRawOriginal = GetPristineBehaviourGraphText(isGlobal, id) ?? raw;
-        _inspectedBehaviourText = _behaviourTabReadable ? ReadableScript.ToReadable(raw) : raw;
-        _inspectedBehaviourApplyMsg = "";
+        _behaviourTabOriginal = GetPristineBehaviourGraph(isGlobal, id) ?? BehaviourGraphs.Clone(graph); // Amedo 2026-11-18
+        SetBehaviourStatus(OutputKind.Info, ""); // Amedo 2026-11-18
+        LoadBehaviourTabText(graph); // Amedo 2026-11-18
         _focusBehaviourTab = true;
+    }
+
+    // Amedo 2026-11-18
+    private string ViewText(PS2BehaviourGraph graph, BehaviourView view) => view switch
+    {
+        BehaviourView.CSharp => GeneratedBehaviourCode(_inspectedBehaviourId ?? 0, graph, _inspectedBehaviourIsGlobal),
+        BehaviourView.Readable => ReadableScript.ToReadable(BehaviourGraphs.ToText(graph)),
+        _ => BehaviourGraphs.ToText(graph),
+    };
+
+    // Amedo 2026-11-18
+    private void LoadBehaviourTabText(PS2BehaviourGraph graph)
+    {
+        _inspectedBehaviourText = TabText(graph);
+        _behaviourTabTyped = false;
+    }
+
+    // Amedo 2026-11-18
+    private void ReloadBehaviourTabText()
+    {
+        if (_behaviourTabTyped || _inspectedBehaviourGraph is null) return;
+        string text = TabText(_inspectedBehaviourGraph);
+        if (text != _inspectedBehaviourText) _inspectedBehaviourText = text;
+    }
+
+    // Amedo 2026-11-18
+    private string TabText(PS2BehaviourGraph graph)
+    {
+        if (_behaviourView == BehaviourView.CSharp && ReferenceEquals(graph, _inspectedBehaviourGraph) && _inspectedBehaviourId is uint id
+            && ReadBehaviourCode(id, _inspectedBehaviourIsGlobal) is { } file) return file;
+        try { return ViewText(graph, _behaviourView); }
+        catch (Exception ex) when (_behaviourView == BehaviourView.CSharp)
+        {
+            _behaviourView = BehaviourView.Readable;
+            SetBehaviourStatus(OutputKind.Error, "Can't show as C#", ErrorRows(ex));
+            return ViewText(graph, _behaviourView);
+        }
+    }
+
+    // Amedo 2026-11-18
+    private PS2BehaviourGraph? TabGraph(uint bid, List<OutputRow> errors)
+    {
+        if (_inspectedBehaviourText == ViewText(_inspectedBehaviourGraph!, _behaviourView)) return _inspectedBehaviourGraph;
+        if (_behaviourView == BehaviourView.CSharp)
+        {
+            var compileErrors = new List<BehaviourCompiler.CompileError>();
+            var compiled = BehaviourCompiler.ToGraph(_inspectedBehaviourText, bid, compileErrors);
+            errors.AddRange(ErrorRows(compileErrors));
+            return compiled;
+        }
+        return BehaviourGraphs.FromText(_behaviourView == BehaviourView.Readable ? ReadableScript.FromReadable(_inspectedBehaviourText) : _inspectedBehaviourText, bid);
     }
 
     private void DrawBehaviourTab()
@@ -65,30 +117,52 @@ public sealed partial class GameScene
         ImGui.SameLine();
         if (ImGui.Button("Revert to Original##behtabrevert")) RevertBehaviourTabText();
         ImGui.SameLine();
-        bool readable = _behaviourTabReadable;
-        if (ImGui.Checkbox("Readable##behtabreadable", ref readable)) SetBehaviourTabReadable(readable);
+        int view = (int)_behaviourView; // Amedo 2026-11-18
+        ImGui.SetNextItemWidth(ImGui.CalcTextSize("Readable").X + ImGui.GetFrameHeight() * 2f);
+        if (ImGui.Combo("View##behtabview", ref view, BehaviourViewNames, BehaviourViewNames.Length)) SetBehaviourView((BehaviourView)view);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("C#: the script as a C# class (Apply turns it into the game's data, same bytes when nothing changed).\nReadable / Raw: the old text forms.");
         ImGui.SameLine();
+        if (ImGui.Button("Export Level Code##behtabexport")) // Amedo 2026-11-18
+        {
+            int written = ExportBehaviourCode(_inspectedBehaviourIsGlobal);
+            SetBehaviourStatus(OutputKind.Info, $"Wrote {written} new script file(s) to Code\\Behaviours\\{BehaviourCodeLevel(_inspectedBehaviourIsGlobal)} (files already there are kept).");
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Write every script of this level as a C# file in the project's Code\\Behaviours folder,\nso you can edit them here or in VS Code. Existing files are not overwritten.");
+        ImGui.SameLine();
+        if (ImGui.Button("Open Code Folder##behtabfolder")) // Amedo 2026-11-18
+        {
+            Directory.CreateDirectory(BehaviourCodeDir(_inspectedBehaviourIsGlobal));
+            ShowInFileBrowser(BehaviourCodeDir(_inspectedBehaviourIsGlobal));
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Open in Visual Studio##behtabide")) OpenBehaviourInIde(bid, graph, _inspectedBehaviourIsGlobal); // Amedo 2026-11-18
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Edit this script in Visual Studio: it knows the engine (autocomplete, errors as you type)\nand CrashEngine's rules. Saving there updates the level here.");
         // Amedo 2026-11-04: our coloured code editor (CodeEditor/) instead of the plain text box; the text it gives back is
         // exactly the text it got until the user types, so Apply / Revert / Readable work the same
-        _behaviourCode.Language ??= CodeEditor.AgentLabLanguage.Instance;
+        _behaviourCode.Language = _behaviourView == BehaviourView.CSharp ? CodeEditor.CSharpLanguage.Instance : CodeEditor.AgentLabLanguage.Instance; // Amedo 2026-11-18
         if (!ReferenceEquals(_behaviourCodeSynced, _inspectedBehaviourText))
         {
             _behaviourCode.SetText(_inspectedBehaviourText);
             _behaviourCodeSynced = _inspectedBehaviourText;
+            ShowBehaviourSquiggles(); // Amedo 2026-11-18
         }
         ImGui.TextDisabled($"Ln {_behaviourCode.CaretLine + 1}, Col {_behaviourCode.CaretColumn + 1}  |  {_behaviourCode.LineCount} lines");
-        if (!string.IsNullOrEmpty(_inspectedBehaviourApplyMsg))
-        {
-            ImGui.SameLine();
-            ImGui.TextDisabled($"|  {_inspectedBehaviourApplyMsg}");
-        }
 
-        _behaviourCode.Render($"##behtabtext{bid}", ImGui.GetContentRegionAvail());
+        var avail = ImGui.GetContentRegionAvail(); // Amedo 2026-11-18
+        const float splitH = 5f;
+        _behaviourOutputHeight = Math.Clamp(_behaviourOutputHeight, 60f, Math.Max(60f, avail.Y - 120f));
+        float codeH = Math.Max(40f, avail.Y - _behaviourOutputHeight - splitH - ImGui.GetStyle().ItemSpacing.Y * 2f);
+        _behaviourCode.Render($"##behtabtext{bid}", new Vector2(avail.X, codeH)); // Amedo 2026-11-18
         if (_behaviourCode.Changed)
         {
             _inspectedBehaviourText = _behaviourCode.Text;
             _behaviourCodeSynced = _inspectedBehaviourText;
+            _behaviourTabTyped = true; // Amedo 2026-11-18
         }
+        ImGui.InvisibleButton("##behoutsplit", new Vector2(avail.X, splitH)); // Amedo 2026-11-18
+        if (ImGui.IsItemActive()) _behaviourOutputHeight -= ImGui.GetIO().MouseDelta.Y;
+        if (ImGui.IsItemHovered() || ImGui.IsItemActive()) ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
+        DrawBehaviourOutput(new Vector2(avail.X, _behaviourOutputHeight));
         ImGui.End();
     }
 
@@ -97,20 +171,23 @@ public sealed partial class GameScene
         if (_inspectedBehaviourId is not uint bid || _inspectedBehaviourGraph is null) return;
         try
         {
-            var rawText = _behaviourTabReadable ? ReadableScript.FromReadable(_inspectedBehaviourText) : _inspectedBehaviourText;
-            using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(rawText));
-            using var sr = new StreamReader(ms);
-            _inspectedBehaviourGraph.ReadText(sr);
+            var errors = new List<OutputRow>(); // Amedo 2026-11-18
+            var edited = TabGraph(bid, errors);
+            if (edited is null) { SetBehaviourStatus(OutputKind.Error, $"NOT applied: {ErrorCount(errors.Count)}", errors); return; }
+            if (!ReferenceEquals(edited, _inspectedBehaviourGraph)) BehaviourGraphs.CopyInto(edited, _inspectedBehaviourGraph);
+            if (_behaviourView == BehaviourView.CSharp) SaveBehaviourCode(bid, _inspectedBehaviourGraph, _inspectedBehaviourIsGlobal, _inspectedBehaviourText); // Amedo 2026-11-18
+            else if (ReadBehaviourCode(bid, _inspectedBehaviourIsGlobal) is not null) // Amedo 2026-11-18
+                SaveBehaviourCode(bid, _inspectedBehaviourGraph, _inspectedBehaviourIsGlobal, GeneratedBehaviourCode(bid, _inspectedBehaviourGraph, _inspectedBehaviourIsGlobal));
             CrashEngine.Runtime.AgentLab.Compiled.CompiledBehaviours.Forget(_inspectedBehaviourGraph); // Amedo 2026-11-04: an edited script runs on the interpreter
             _scriptTextCache.Remove(bid);
             var src = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
             if (_inspectedBehaviourIsGlobal && src is not null) src.GlobalRm2Dirty = true;
-            _inspectedBehaviourApplyMsg = "Applied (in-memory)" + (_inspectedBehaviourIsGlobal ? ", GLOBAL script" : "") +
-                ". Build ISO to test; Save Chunk to keep it.";
+            _behaviourTabTyped = false; // Amedo 2026-11-18
+            SetBehaviourStatus(OutputKind.Success, "No issues found"); // Amedo 2026-11-18
         }
         catch (Exception ex)
         {
-            _inspectedBehaviourApplyMsg = $"Parse failed, NOT applied: {ex.Message}";
+            SetBehaviourStatus(OutputKind.Error, "NOT applied: 1 error", ErrorRows(ex)); // Amedo 2026-11-18
         }
     }
 
@@ -119,46 +196,36 @@ public sealed partial class GameScene
         if (_inspectedBehaviourId is not uint bid || _inspectedBehaviourGraph is null) return;
         try
         {
-            using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_behaviourTabRawOriginal));
-            using var sr = new StreamReader(ms);
-            _inspectedBehaviourGraph.ReadText(sr);
+            if (_behaviourTabOriginal is not null) BehaviourGraphs.CopyInto(_behaviourTabOriginal, _inspectedBehaviourGraph); // Amedo 2026-11-18
+            if (ReadBehaviourCode(bid, _inspectedBehaviourIsGlobal) is not null) // Amedo 2026-11-18
+                SaveBehaviourCode(bid, _inspectedBehaviourGraph, _inspectedBehaviourIsGlobal, GeneratedBehaviourCode(bid, _inspectedBehaviourGraph, _inspectedBehaviourIsGlobal));
             CrashEngine.Runtime.AgentLab.Compiled.CompiledBehaviours.Forget(_inspectedBehaviourGraph); // Amedo 2026-11-04
-            _inspectedBehaviourText = _behaviourTabReadable ? ReadableScript.ToReadable(_behaviourTabRawOriginal) : _behaviourTabRawOriginal;
+            LoadBehaviourTabText(_inspectedBehaviourGraph); // Amedo 2026-11-18
             _scriptTextCache.Remove(bid);
-            _inspectedBehaviourApplyMsg = "Reverted to the original (disc) script, in-memory. Save Chunk to persist.";
+            SetBehaviourStatus(OutputKind.Success, "Reverted to the original (disc) script, in-memory. Save Chunk to persist."); // Amedo 2026-11-18
         }
         catch (Exception ex)
         {
-            _inspectedBehaviourApplyMsg = $"Revert failed: {ex.Message}";
+            SetBehaviourStatus(OutputKind.Error, "Revert failed", ErrorRows(ex)); // Amedo 2026-11-18
         }
     }
 
-    private void SetBehaviourTabReadable(bool readable)
+    // Amedo 2026-11-18
+    private void SetBehaviourView(BehaviourView view)
     {
-        if (readable == _behaviourTabReadable) return;
+        if (view == _behaviourView || _inspectedBehaviourId is not uint bid || _inspectedBehaviourGraph is null) return;
         try
         {
-            _inspectedBehaviourText = readable
-                ? ReadableScript.ToReadable(_inspectedBehaviourText)
-                : ReadableScript.FromReadable(_inspectedBehaviourText);
-            _behaviourTabReadable = readable;
-            _inspectedBehaviourApplyMsg = "";
+            var errors = new List<OutputRow>();
+            var graph = TabGraph(bid, errors);
+            if (graph is null) { SetBehaviourStatus(OutputKind.Error, $"Can't switch view: {ErrorCount(errors.Count)}", errors); return; }
+            _behaviourView = view;
+            SetBehaviourStatus(OutputKind.Info, "");
+            LoadBehaviourTabText(graph);
         }
         catch (Exception ex)
         {
-            _inspectedBehaviourApplyMsg = $"Can't switch to raw: {ex.Message}";
+            SetBehaviourStatus(OutputKind.Error, "Can't switch view", ErrorRows(ex));
         }
     }
-
-	private static string GraphToEditableText(PS2BehaviourGraph g)
-	{
-		using MemoryStream memoryStream = new MemoryStream();
-		using (StreamWriter writer = new StreamWriter(memoryStream, Encoding.UTF8, 4096, leaveOpen: true))
-		{
-			g.WriteText(writer);
-		}
-		memoryStream.Position = 0L;
-		using StreamReader streamReader = new StreamReader(memoryStream);
-		return streamReader.ReadToEnd();
-	}
 }

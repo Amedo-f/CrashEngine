@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using CrashEngine.Runtime.Screen;
 using ImGuiNET;
 
@@ -55,7 +54,7 @@ public sealed partial class GameScene
         if (LanguageDirectory(proj.Language) is { } current)
         {
             ImGui.SameLine();
-            if (ImGui.Button("Open folder##langopen")) Process.Start(new ProcessStartInfo("explorer.exe", $"\"{current}\"") { UseShellExecute = true });
+            if (ImGui.Button("Open folder##langopen")) ShowInFileBrowser(current); // Amedo 2026-11-18
             var font = GameScreen.FallbackFontPath(current);
             ImGui.TextDisabled($"Font for missing letters: {(font is null ? "none" : Path.GetFileName(font))}");
         }

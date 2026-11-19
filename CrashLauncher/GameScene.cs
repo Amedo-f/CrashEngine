@@ -187,6 +187,7 @@ public sealed partial class GameScene : Scene
 		if (UpdateLevelLoad()) return; // Amedo 2026-11-12
 		RecordSelectionChangeIfAny(); // Amedo 2026-09-20
 		UpdateSimulation(); // Amedo 2026-09-26
+		UpdateBehaviourWatch(); // Amedo 2026-11-18
 
 		if (_pendingOpenLevelPath is not null)
 		{

@@ -212,7 +212,7 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.Ag
         {
             AgentLabDefs defs = PS2BehaviourGraph.GetAgentLabDefs();
             Arguments.Clear();
-            Debug.Assert(line.StartsWith($"@{Version}"), "Trying to parse PS2 command as a different version");
+            if (!line.StartsWith($"@{Version}")) throw new FormatException($"not a command line: '{line}'"); // Amedo 2026-11-18
             if (line.StartsWith($"@{Version} ById_"))
             {
                 CommandIndex = ushort.Parse(StringUtils.GetStringInBetween(line, "ById_", "("));
@@ -220,7 +220,9 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.Ag
             else
             {
                 String cmd_Name = StringUtils.GetStringAfter(StringUtils.GetStringBefore(line, "("), $"@{Version}").Trim();
-                CommandIndex = ushort.Parse(defs.CommandMap.FirstOrDefault(x => x.Value.Name == cmd_Name).Key);
+                var key = defs.CommandMap.FirstOrDefault(x => x.Value.Name == cmd_Name).Key; // Amedo 2026-11-18
+                if (key is null) throw new FormatException($"unknown command '{cmd_Name}'"); // Amedo 2026-11-18
+                CommandIndex = ushort.Parse(key);
             }
             String[] args = StringUtils.GetStringInBetween(line, "(", ")").Split(',');
             for (Int32 i = 0; i < args.Length; ++i)

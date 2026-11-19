@@ -6,7 +6,7 @@ using Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentL
 namespace CrashEngine.Importer.AgentLabReadable;
 
 // Amedo 2026-09-25
-public enum FieldKind { UInt, Hex, Bool, NotBool, Enum, Variant, Float, SlotList }
+public enum FieldKind { UInt, Hex, Bool, NotBool, Enum, Variant, Float, SlotList, Int } // Amedo 2026-11-18
 
 public sealed class FieldSpec
 {
@@ -18,6 +18,7 @@ public sealed class FieldSpec
     public uint Default;
     public bool HasDefault;
     public Dictionary<uint, string>? Names;
+    public string? EnumType; // Amedo 2026-11-18
     public int CountWord, CountShift, CountBits;
 
     public uint Mask => Bits >= 32 ? 0xFFFFFFFFu : ((1u << Bits) - 1u) << Shift;
@@ -31,9 +32,9 @@ public sealed class CommandSpec
     public uint[] PadDefault = Array.Empty<uint>();
     public List<FieldSpec> Fields = new();
 
-    public CommandSpec F(string name, FieldKind kind, int word, int shift = 0, int bits = 32, uint? def = null, Dictionary<uint, string>? names = null)
+    public CommandSpec F(string name, FieldKind kind, int word, int shift = 0, int bits = 32, uint? def = null, Dictionary<uint, string>? names = null, string? enumType = null)
     {
-        Fields.Add(new FieldSpec { Name = name, Kind = kind, Word = word, Shift = shift, Bits = bits, Default = def ?? 0, HasDefault = def.HasValue, Names = names });
+        Fields.Add(new FieldSpec { Name = name, Kind = kind, Word = word, Shift = shift, Bits = bits, Default = def ?? 0, HasDefault = def.HasValue, Names = names, EnumType = enumType }); // Amedo 2026-11-18
         return this;
     }
 
@@ -63,40 +64,53 @@ public static class ReadableScript
 {
     private static readonly Regex RawLine = new(@"^(\s*)@PS2 (\w+)\((.*)\);\s*$", RegexOptions.Compiled);
     private static readonly Regex ReadLine = new(@"^(\s*)([A-Za-z_]\w*)\((.*)\);\s*$", RegexOptions.Compiled);
+    private static readonly Regex NoSemicolonLine = new(@"^\s*([A-Za-z_]\w*)\(.*\)\s*$", RegexOptions.Compiled); // Amedo 2026-11-18
     public static IReadOnlyDictionary<ushort, CommandSpec> ByOp => _byOp;
     private static readonly Dictionary<string, CommandSpec> _byName = new();
+    private static readonly Dictionary<string, CommandSpec> _byRawName = new(); // Amedo 2026-11-18
     private static readonly Dictionary<ushort, CommandSpec> _byOp = new();
 
     static ReadableScript()
     {
-        foreach (var s in ReadableCommands.All()) { _byName[s.Name] = s; _byOp[s.Op] = s; }
+        foreach (var s in ReadableCommands.All()) { _byName[s.Name] = s; _byRawName[RawName(s)] = s; _byOp[s.Op] = s; } // Amedo 2026-11-18
     }
 
-    public static string? Decode(CommandSpec spec, uint[] args)
+    // Amedo 2026-11-18
+    public static string RawName(CommandSpec spec) =>
+        PS2BehaviourGraph.GetAgentLabDefs().CommandMap.TryGetValue(spec.Op.ToString(CultureInfo.InvariantCulture), out var d) ? d.Name : $"ById_{spec.Op}";
+
+    // Amedo 2026-11-18
+    public readonly record struct DecodedPart(string Name, FieldSpec? Field, string Text);
+
+    public static string? Decode(CommandSpec spec, uint[] args) => DecodeParts(spec, args) is { } parts ? Join(parts) : null; // Amedo 2026-11-18
+
+    // Amedo 2026-11-18
+    public static List<DecodedPart>? DecodeParts(CommandSpec spec, uint[] args)
     {
         if (args.Length != spec.ArgCount) return null;
-        var parts = new List<string>();
+        var parts = new List<DecodedPart>();
         foreach (var f in spec.Fields)
         {
             string? v = DecodeField(f, args);
             if (v is null) return null;
-            if (v.Length > 0) parts.Add($"{f.Name}: {v}");
+            if (v.Length > 0) parts.Add(new(f.Name, f, v));
         }
         for (int w = 0; w < spec.ArgCount; w++)
         {
             uint rest = args[w] & ~spec.CoveredMask(w);
             uint def = (w < spec.PadDefault.Length ? spec.PadDefault[w] : 0) & ~spec.CoveredMask(w);
-            if (rest != def) parts.Add($"pad{w}: 0x{rest:X8}");
+            if (rest != def) parts.Add(new($"pad{w}", null, $"0x{rest:X8}"));
         }
-        string text = string.Join(", ", parts);
         try
         {
-            var back = Encode(spec, ParseFields(text));
+            var back = Encode(spec, ParseFields(Join(parts)));
             if (!back.SequenceEqual(args)) return null;
         }
         catch { return null; }
-        return text;
+        return parts;
     }
+
+    private static string Join(List<DecodedPart> parts) => string.Join(", ", parts.Select(p => $"{p.Name}: {p.Text}")); // Amedo 2026-11-18
 
     private static string? DecodeField(FieldSpec f, uint[] a)
     {
@@ -132,6 +146,7 @@ public static class ReadableScript
         return f.Kind switch
         {
             FieldKind.UInt => val.ToString(CultureInfo.InvariantCulture),
+            FieldKind.Int => ((int)val).ToString(CultureInfo.InvariantCulture), // Amedo 2026-11-18
             FieldKind.Hex => $"0x{val:X}",
             FieldKind.Bool => val != 0 ? "true" : "false",
             FieldKind.NotBool => val == 0 ? "true" : "false",
@@ -167,7 +182,15 @@ public static class ReadableScript
             string s = fl.ToString("G" + digits, CultureInfo.InvariantCulture);
             if (float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var p) &&
                 (BitConverter.SingleToUInt32Bits(p) & mask) == (bits & mask))
+            {
+                if (s.Contains('E')) // Amedo 2026-11-18
+                {
+                    string plain = double.Parse(s, CultureInfo.InvariantCulture).ToString("0.##########", CultureInfo.InvariantCulture);
+                    if (plain.Length <= 10 && float.TryParse(plain, NumberStyles.Float, CultureInfo.InvariantCulture, out var q) &&
+                        (BitConverter.SingleToUInt32Bits(q) & mask) == (bits & mask)) s = plain;
+                }
                 return s.Contains('.') || s.Contains('E') ? s : s + ".0";
+            }
         }
         return fl.ToString("R", CultureInfo.InvariantCulture);
     }
@@ -200,8 +223,6 @@ public static class ReadableScript
 
     public static uint[] Encode(CommandSpec spec, List<(string key, string val)> fields)
     {
-        var words = new uint[spec.ArgCount];
-        for (int w = 0; w < spec.ArgCount; w++) words[w] = w < spec.PadDefault.Length ? spec.PadDefault[w] : 0;
         var given = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (k, v) in fields)
         {
@@ -212,53 +233,77 @@ public static class ReadableScript
             if (k.StartsWith("pad") && int.TryParse(k[3..], out int pw) && pw >= 0 && pw < spec.ArgCount) continue;
             if (!spec.Fields.Any(f => f.Name == k)) throw new FormatException($"{spec.Name} has no field '{k}'");
         }
+        var pads = new uint?[spec.ArgCount]; // Amedo 2026-11-18
+        for (int w = 0; w < spec.ArgCount; w++)
+            if (given.TryGetValue($"pad{w}", out var pv)) pads[w] = ParseUInt(pv);
+        var values = new object?[spec.Fields.Count];
+        for (int i = 0; i < spec.Fields.Count; i++)
+            if (given.TryGetValue(spec.Fields[i].Name, out var v)) values[i] = ParseValue(spec.Fields[i], v);
+        return EncodeValues(spec, values, pads);
+    }
+
+    // Amedo 2026-11-18
+    public static uint[] EncodeValues(CommandSpec spec, IReadOnlyList<object?> values, IReadOnlyList<uint?> pads)
+    {
+        var words = new uint[spec.ArgCount];
+        for (int w = 0; w < spec.ArgCount; w++) words[w] = w < spec.PadDefault.Length ? spec.PadDefault[w] : 0;
         for (int w = 0; w < spec.ArgCount; w++)
         {
             uint cov = spec.CoveredMask(w);
-            if (given.TryGetValue($"pad{w}", out var pv)) words[w] = (words[w] & cov) | (ParseUInt(pv) & ~cov);
+            if (pads[w] is uint p) words[w] = (words[w] & cov) | (p & ~cov);
         }
-        foreach (var f in spec.Fields)
-        {
-            given.TryGetValue(f.Name, out var v);
-            EncodeField(spec, f, v, words);
-        }
+        for (int i = 0; i < spec.Fields.Count; i++) EncodeField(spec, spec.Fields[i], values[i], words);
         return words;
     }
 
-    private static void EncodeField(CommandSpec spec, FieldSpec f, string? v, uint[] words)
+    // Amedo 2026-11-18
+    private static object ParseValue(FieldSpec f, string v)
     {
         switch (f.Kind)
         {
             case FieldKind.SlotList:
             {
-                var items = v is null ? new List<string>() : v.Trim().TrimStart('[').TrimEnd(']').Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                var items = v.Trim().TrimStart('[').TrimEnd(']').Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
                 if (items.Count > 4) throw new FormatException($"{f.Name}: at most 4 slots");
-                uint w = 0xFFFFFFFF;
+                var slots = new byte[items.Count];
                 for (int i = 0; i < items.Count; i++)
                 {
                     uint b = ParseUInt(items[i]);
                     if (b > 0xFF) throw new FormatException($"{f.Name}: slot {b} out of range");
-                    w = (w & ~(0xFFu << (8 * i))) | (b << (8 * i));
+                    slots[i] = (byte)b;
                 }
+                return slots;
+            }
+            case FieldKind.Variant: return ParseVariant(v);
+            case FieldKind.Float: return ParseFloatWord(v);
+            case FieldKind.Bool: return ParseBool(v) ? 1u : 0u;
+            case FieldKind.NotBool: return ParseBool(v) ? 0u : 1u;
+            case FieldKind.Enum: return f.Names?.FirstOrDefault(kv => kv.Value == v).Value is not null ? f.Names!.First(kv => kv.Value == v).Key : ParseUInt(v);
+            default: return ParseUInt(v);
+        }
+    }
+
+    private static void EncodeField(CommandSpec spec, FieldSpec f, object? v, uint[] words) // Amedo 2026-11-18
+    {
+        switch (f.Kind)
+        {
+            case FieldKind.SlotList:
+            {
+                var items = v as IReadOnlyList<byte> ?? Array.Empty<byte>();
+                if (items.Count > 4) throw new FormatException($"{f.Name}: at most 4 slots");
+                uint w = 0xFFFFFFFF;
+                for (int i = 0; i < items.Count; i++) w = (w & ~(0xFFu << (8 * i))) | ((uint)items[i] << (8 * i));
                 words[f.Word] = w;
                 uint cm = ((1u << f.CountBits) - 1u) << f.CountShift;
                 words[f.CountWord] = (words[f.CountWord] & ~cm) | (((uint)items.Count << f.CountShift) & cm);
                 return;
             }
             case FieldKind.Variant:
-                words[f.Word] = v is null ? RequireDefault(spec, f) : ParseVariant(v);
-                return;
             case FieldKind.Float:
-                words[f.Word] = v is null ? RequireDefault(spec, f) : ParseFloatWord(v);
+                words[f.Word] = v is null ? RequireDefault(spec, f) : (uint)v;
                 return;
         }
-        uint val = v is null ? RequireDefault(spec, f) : f.Kind switch
-        {
-            FieldKind.Bool => ParseBool(v) ? 1u : 0u,
-            FieldKind.NotBool => ParseBool(v) ? 0u : 1u,
-            FieldKind.Enum => f.Names?.FirstOrDefault(kv => kv.Value == v).Value is not null ? f.Names!.First(kv => kv.Value == v).Key : ParseUInt(v),
-            _ => ParseUInt(v),
-        };
+        uint val = v is null ? RequireDefault(spec, f) : (uint)v;
         if (f.Bits < 32 && val > ((1u << f.Bits) - 1u)) throw new FormatException($"{f.Name}: {val} does not fit in {f.Bits} bits");
         words[f.Word] = f.Bits >= 32 ? val : (words[f.Word] & ~f.Mask) | (val << f.Shift);
     }
@@ -348,9 +393,9 @@ public static class ReadableScript
         foreach (var line in SplitLines(rawText))
         {
             var m = RawLine.Match(line);
-            if (m.Success && _byName.TryGetValue(m.Groups[2].Value, out var spec))
+            if (m.Success && _byRawName.TryGetValue(m.Groups[2].Value, out var spec)) // Amedo 2026-11-18
             {
-                var args = ParseRawArgs(spec.Name, m.Groups[3].Value, typeOf);
+                var args = ParseRawArgs(m.Groups[2].Value, m.Groups[3].Value, typeOf);
                 string? r = args is null ? null : Decode(spec, args);
                 if (r is not null) { sb.Append(m.Groups[1].Value).Append(spec.Name).Append('(').Append(r).Append(");\n"); converted++; continue; }
                 kept++;
@@ -372,11 +417,13 @@ public static class ReadableScript
             {
                 uint[] words;
                 try { words = Encode(spec, ParseFields(m.Groups[3].Value)); }
-                catch (Exception ex) { throw new FormatException($"line {lineNo}: {ex.Message}"); }
-                sb.Append(m.Groups[1].Value).Append("@PS2 ").Append(spec.Name).Append('(')
+                catch (Exception ex) { throw new ScriptTextException(lineNo, ex.Message, m.Groups[3].Index + 1); } // Amedo 2026-11-18
+                sb.Append(m.Groups[1].Value).Append("@PS2 ").Append(RawName(spec)).Append('(') // Amedo 2026-11-18
                   .Append(string.Join(", ", words.Select(x => $"0x{x:X8}"))).Append(");\n");
                 continue;
             }
+            if (NoSemicolonLine.Match(line) is { Success: true } bare && _byName.ContainsKey(bare.Groups[1].Value)) // Amedo 2026-11-18
+                throw new ScriptTextException(lineNo, $"{bare.Groups[1].Value}(...) is missing the ';' at its end", line.TrimEnd().Length + 1);
             sb.Append(line).Append('\n');
         }
         return sb.ToString();

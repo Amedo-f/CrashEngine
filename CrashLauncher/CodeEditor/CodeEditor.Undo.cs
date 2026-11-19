@@ -54,7 +54,7 @@ public sealed partial class CodeEditor
     {
         _textCache = null;
         Changed = true;
-        ErrorLine = -1;
+        Errors.Clear(); // Amedo 2026-11-18
     }
 
     // ---- recorded changes ----

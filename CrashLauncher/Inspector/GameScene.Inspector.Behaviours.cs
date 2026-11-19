@@ -58,7 +58,7 @@ public sealed partial class GameScene : Scene
         }
     }
 
-    private string? GetPristineBehaviourGraphText(bool isGlobal, uint bid)
+    private PS2BehaviourGraph? GetPristineBehaviourGraph(bool isGlobal, uint bid) // Amedo 2026-11-18
     {
         try
         {
@@ -66,8 +66,7 @@ public sealed partial class GameScene : Scene
             if (freshRm2 is null) return null;
 
             var freshBehSec = MeshDecoder.CodeSection(freshRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
-            var freshGraph = freshBehSec?.GetItem<PS2BehaviourGraph>(bid);
-            return freshGraph is null ? null : GraphToEditableText(freshGraph);
+            return freshBehSec?.GetItem<PS2BehaviourGraph>(bid); // Amedo 2026-11-18
         }
         catch { return null; }
     }

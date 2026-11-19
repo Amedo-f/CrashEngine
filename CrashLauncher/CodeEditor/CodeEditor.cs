@@ -7,6 +7,8 @@ namespace CrashLauncher.CodeEditor;
 // Amedo 2026-11-04: our own code text box: coloured lines (ICodeLanguage), line numbers, caret and selection, typing,
 // clipboard, undo/redo. Only the visible lines are drawn, so long scripts stay fast. The text comes back exactly as it
 // went in (same line endings) until the user changes it.
+public readonly record struct CodeError(int Line, int Column, string Text); // Amedo 2026-11-18
+
 public sealed partial class CodeEditor
 {
     public static ImFontPtr MonoFont;                 // set at font setup (Consolas); the editor falls back to the current font
@@ -19,8 +21,8 @@ public sealed partial class CodeEditor
     public CodePalette Palette { get; set; } = new();
     public int TabSize { get; set; } = 3;              // the script text indents with 3 spaces
     public bool ReadOnly { get; set; }
-    public int ErrorLine { get; set; } = -1;           // 0-based; -1 = none
-    public string? ErrorText { get; set; }
+    public List<CodeError> Errors { get; } = new(); // Amedo 2026-11-18
+    private uint _lastId; // Amedo 2026-11-18
 
     public bool Changed { get; private set; }           // the text changed this frame
     public int CaretLine => _caret.Line;
@@ -64,8 +66,17 @@ public sealed partial class CodeEditor
         _undo.Clear();
         _redo.Clear();
         _textCache = text;
-        ErrorLine = -1;
-        ErrorText = null;
+        Errors.Clear(); // Amedo 2026-11-18
+    }
+
+    // Amedo 2026-11-18
+    public void GoTo(int line, int column)
+    {
+        int l = Math.Clamp(line, 0, _lines.Count - 1);
+        _caret = _anchor = new Pos(l, Math.Clamp(column, 0, _lines[l].Length));
+        _wantX = -1f;
+        _scrollToCaret = true;
+        if (_lastId != 0) { _activeId = _lastId; _activeFrame = ImGui.GetFrameCount(); }
     }
 
     private static bool HasLoneLf(string s)
@@ -84,6 +95,7 @@ public sealed partial class CodeEditor
         ImGui.PushStyleColor(ImGuiCol.ChildBg, Palette.Background);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         uint myId = ImGui.GetID(id);
+        _lastId = myId; // Amedo 2026-11-18
         ImGui.BeginChild(id, size, ImGuiChildFlags.Border, ImGuiWindowFlags.HorizontalScrollbar | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoMove);
 
         var font = ImGui.GetFont();
@@ -126,7 +138,7 @@ public sealed partial class CodeEditor
             float y = origin.Y + li * lineH;
             string line = _lines[li];
             float x0 = origin.X + textX0;
-            if (li == ErrorLine) draw.AddRectFilled(new Vector2(winPos.X, y), new Vector2(winPos.X + winSize.X, y + lineH), Palette.ErrorLine);
+            if (Errors.Exists(e => e.Line == li)) draw.AddRectFilled(new Vector2(winPos.X, y), new Vector2(winPos.X + winSize.X, y + lineH), Palette.ErrorLine); // Amedo 2026-11-18
             else if (focused && li == _caret.Line && !hasSel) draw.AddRectFilled(new Vector2(winPos.X, y), new Vector2(winPos.X + winSize.X, y + lineH), Palette.CurrentLine);
             if (hasSel && li >= selA.Line && li <= selB.Line)
             {
@@ -135,6 +147,8 @@ public sealed partial class CodeEditor
                 draw.AddRectFilled(new Vector2(sx, y), new Vector2(ex, y + lineH), Palette.Selection);
             }
             DrawLine(draw, font, line, x0, y + 1.5f);
+            foreach (var e in Errors) // Amedo 2026-11-18
+                if (e.Line == li) DrawSquiggle(draw, font, line, e.Column, x0, y + lineH - 2f, charW);
         }
 
         // caret
@@ -152,13 +166,14 @@ public sealed partial class CodeEditor
             string num = (li + 1).ToString();
             float y = origin.Y + li * lineH + 1.5f;
             draw.AddText(new Vector2(winPos.X + gutterW - (num.Length + 1) * charW, y), li == _caret.Line ? Palette.LineNumberCurrent : Palette.LineNumber, num);
+            if (Errors.Exists(e => e.Line == li)) draw.AddCircleFilled(new Vector2(winPos.X + charW * 0.7f, y + lineH * 0.5f - 1.5f), charW * 0.4f, Palette.ErrorMark); // Amedo 2026-11-18
         }
 
-        if (ErrorLine >= 0 && ErrorText is { } err && hovered)
+        if (Errors.Count > 0 && hovered) // Amedo 2026-11-18
         {
-            float ey = origin.Y + ErrorLine * lineH;
-            var m = ImGui.GetMousePos();
-            if (m.Y >= ey && m.Y < ey + lineH) ImGui.SetTooltip(err);
+            int mouseLine = (int)MathF.Floor((ImGui.GetMousePos().Y - origin.Y) / lineH);
+            var here = Errors.Where(e => e.Line == mouseLine).Select(e => e.Text).ToList();
+            if (here.Count > 0) ImGui.SetTooltip(string.Join("\n", here));
         }
 
         if (_scrollToCaret) { ScrollToCaret(origin, textX0, lineH, font); _scrollToCaret = false; }
@@ -172,6 +187,19 @@ public sealed partial class CodeEditor
         ImGui.PopStyleVar();
         ImGui.PopStyleColor();
         if (mono) ImGui.PopFont();
+    }
+
+    // Amedo 2026-11-18
+    private void DrawSquiggle(ImDrawListPtr draw, ImFontPtr font, string line, int column, float x0, float y, float charW)
+    {
+        int start = Math.Clamp(column, 0, line.Length), end = start;
+        while (end < line.Length && !char.IsWhiteSpace(line[end])) end++;
+        float a = x0 + ColumnX(line, start, font);
+        float b = end > start ? x0 + ColumnX(line, end, font) : a + charW * 2f;
+        const float step = 2.5f;
+        bool up = true;
+        for (float x = a; x < b; x += step, up = !up)
+            draw.AddLine(new Vector2(x, y + (up ? 0f : 2f)), new Vector2(MathF.Min(x + step, b), y + (up ? 2f : 0f)), Palette.ErrorMark, 1f);
     }
 
     private void DrawLine(ImDrawListPtr draw, ImFontPtr font, string line, float x0, float y)

@@ -15,7 +15,21 @@ public sealed partial class AgentLabAgent : Component
         public PS2BehaviourGraph? Graph;
         public int Current = -1;
         public int Entered = -1;
-        public PS2BehaviourStateBody? Else;
+        public int Else = -1; // Amedo 2026-11-18
+        private Compiled.BehaviourScript? _script; // Amedo 2026-11-18
+        private int _scriptVersion = -1;
+
+        // Amedo 2026-11-18
+        public Compiled.BehaviourScript? Script
+        {
+            get
+            {
+                if (_scriptVersion == Compiled.CompiledBehaviours.Version) return _script;
+                _script = Compiled.CompiledBehaviours.For(Graph);
+                _scriptVersion = Compiled.CompiledBehaviours.Version;
+                return _script;
+            }
+        }
         public double EnterTime;
         public bool Stopped;
         public bool Reenter;

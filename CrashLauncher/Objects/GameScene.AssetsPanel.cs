@@ -14,7 +14,7 @@ public sealed partial class GameScene
     private string _assetsCategory = "";
     private string _assetsFilter   = "";
 
-    private enum AssetsView { Home, Scenes, MyAssets } // Amedo 2026-11-12
+    private enum AssetsView { Home, Scenes, MyAssets, Behaviours } // Amedo 2026-11-12
     private AssetsView _assetsView = AssetsView.Home;
 
     private readonly Dictionary<string, PS2AnyTwinsanitySM2?> _assetsSm2Cache = new(StringComparer.OrdinalIgnoreCase);
@@ -44,6 +44,7 @@ public sealed partial class GameScene
 
         if (ImGui.SmallButton("Assets")) GoToAssets(AssetsView.Home);
         if (_assetsView == AssetsView.Scenes) DrawScenesBreadcrumb(); // Amedo 2026-11-12
+        if (_assetsView == AssetsView.Behaviours) DrawBehaviourAssetsBreadcrumb(); // Amedo 2026-11-18
         if (_assetsView == AssetsView.MyAssets)
         {
             ImGui.SameLine(); ImGui.TextDisabled(">");
@@ -71,6 +72,8 @@ public sealed partial class GameScene
             DrawAssetsHome();
         else if (_assetsView == AssetsView.MyAssets)
             DrawMyAssetsUnified();
+        else if (_assetsView == AssetsView.Behaviours) // Amedo 2026-11-18
+            DrawBehaviourAssets();
         else if (_assetsLevel.Length == 0)
             DrawScenesFolder();
         else if (_assetsCategory.Length == 0)
@@ -92,12 +95,13 @@ public sealed partial class GameScene
         _assetsView = view;
         _assetsLevel = ""; _assetsCategory = ""; _assetsFilter = "";
         _assetsMyAssetsFolder = ""; _assetsScenesFolder = "";
+        _assetsBehaviourFolder = ""; // Amedo 2026-11-18
     }
 
     private void DrawAssetsHome()
     {
         const float cell = 84f;
-        foreach (var (name, view) in new[] { ("Scenes", AssetsView.Scenes), ("My Assets", AssetsView.MyAssets) })
+        foreach (var (name, view) in new[] { ("Scenes", AssetsView.Scenes), ("My Assets", AssetsView.MyAssets), ("Behaviours", AssetsView.Behaviours) }) // Amedo 2026-11-18
         {
             ImGui.PushID(name);
             ImGui.BeginGroup();

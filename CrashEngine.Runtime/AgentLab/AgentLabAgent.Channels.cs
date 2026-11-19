@@ -21,7 +21,7 @@ public sealed partial class AgentLabAgent
         public AgentLabAgent? Requester;
         public (PS2BehaviourGraph Graph, TwinBehaviourStarter? Starter, AgentLabAgent? Originator, AgentLabAgent? Requester)? Pending;
         public bool PendingDefault;
-        public PS2BehaviourStateBody? Body;
+        public int Body = -1; // Amedo 2026-11-18
         public int LockDepth = 0xFF;
         public int Timer5C;
         public bool PacketApplied, PacketRunning;
