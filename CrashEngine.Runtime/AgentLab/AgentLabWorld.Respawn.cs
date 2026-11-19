@@ -390,15 +390,22 @@ public sealed partial class AgentLabWorld
         if (RespawnAgent is { } old) RespawnAgent = Find(old.Instance.Section, old.Instance.Source.GetID());
         if (_restoring is { } cpRestored) cpRestored.Restored_02 = true; // Amedo
         _restoring = null; // Amedo
-        if (Player is { } p)
+        if (PutPlayerAtRespawn() is { } m && Player is { } p) // Amedo 2026-11-17
         {
-            var m = RespawnMatrix ?? p.GameMatrix;
-            p.GameMatrix = m;
-            if (RespawnMatrix is { } comeback) p.SetComebackPlacement_23CD80(comeback); // Amedo
             Log?.Invoke($"[AgentLab {Now:0.00}s] scene reset #{Respawns}: {Agents.Count} agents rebuilt, {p.Entity.Name} at {m.Translation} " +
                         $"({(RespawnAgent is { } r ? r.Entity.Name : "level start")}), hp {PlayerCharacter?.HitPoints}, states kept {_keptStates.Count}");
         }
         _sceneResetPending = false; // Amedo
+    }
+
+    // Amedo 2026-11-17
+    internal Matrix4x4? PutPlayerAtRespawn()
+    {
+        if (Player is not { } p) return null;
+        var m = RespawnMatrix ?? p.GameMatrix;
+        p.GameMatrix = m;
+        if (RespawnMatrix is { } comeback) p.SetComebackPlacement_23CD80(comeback); // Amedo
+        return m;
     }
 
     // Amedo 2026-09-29

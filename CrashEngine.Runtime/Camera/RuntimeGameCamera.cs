@@ -440,7 +440,12 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
 
     // Amedo
     public void Prepare_27DEC0() => Camera.CutDirectorPrepare_27DEC0(Camera.G + 0x210);
-    public void PlayerCameraReset_15E538() => Camera.PlayerCameraReset_15E538(_comp + 0x50); // Amedo
+    // Amedo
+    public void PlayerCameraReset_15E538()
+    {
+        if (_world.PlayerCharacter is { } c && _world.Player is { } player) Sync(c, player.GameMatrix); // Amedo 2026-11-17
+        Camera.PlayerCameraReset_15E538(_comp + 0x50);
+    }
 
     // Amedo
     public void CameraFocusObject_10F2D8(AgentLabAgent? focus)

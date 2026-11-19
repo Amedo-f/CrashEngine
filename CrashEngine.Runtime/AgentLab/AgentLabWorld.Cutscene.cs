@@ -263,6 +263,7 @@ public sealed partial class AgentLabWorld
     }
 
     public Action? EnableCharacters_17C0C8 { get; set; } // Amedo
+    public Action? PlaceRespawn_171E90 { get; set; } // Amedo 2026-11-17
     private int _modeEnteredFrame = -1; // Amedo
 
     // Amedo
@@ -303,6 +304,16 @@ public sealed partial class AgentLabWorld
     // Amedo
     private void GameProgressEnter_167B60(int kind, string chunkName, ushort instance)
     {
+        if (kind >= 3) // Amedo 2026-11-17
+        {
+            Progress.Reset_167D38(kind, GcNowTicks);
+            ChooseRespawn_167D38(kind);
+            PlaceRespawn_171E90?.Invoke();
+            if (_restoring is { } restored) restored.Restored_02 = true;
+            _restoring = null;
+            Log?.Invoke($"[mode {Now:0.00}s] GameProgress::Enter (kind {kind}): respawn point chosen again, player placed (0x167D38 + 0x171E90)");
+            return;
+        }
         if (kind != 2) return;
         Clear_17A6A0(Temp_588);
         Clear_17A6A0(Level_590);

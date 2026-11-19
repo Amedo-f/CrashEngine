@@ -13,6 +13,16 @@ public sealed partial class SceneSimulation
         World.ReleaseGlobal_197570 = ReleaseGlobal_197570;
         World.SwitchCharacter_177A90 = SwitchCharacter_177A90;
         World.EnableCharacters_17C0C8 = () => EnableCharacters_17C0C8(true); // Amedo
+        World.PlaceRespawn_171E90 = PlaceRespawn_171E90; // Amedo 2026-11-17
+    }
+
+    // Amedo 2026-11-17
+    private void PlaceRespawn_171E90()
+    {
+        if (RespawnChunk_175618() is not { } chunk) return;
+        MovePlayer_1954A8(chunk);
+        PlaceSecond_171E90(chunk);
+        World.PutPlayerAtRespawn();
     }
 
     private bool SwitchCharacter_177A90(int slot, bool primary)
