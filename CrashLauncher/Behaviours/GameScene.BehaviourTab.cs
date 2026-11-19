@@ -11,7 +11,7 @@ public sealed partial class GameScene
 {
     private bool _inspectedBehaviourIsGlobal;
     private bool _focusBehaviourTab;
-    private bool _showBehaviour = true;
+    private bool _showBehaviour;
     private const string BehaviourWindowName = "Behaviour##panel";
     private enum BehaviourView { CSharp, Readable, Raw } // Amedo 2026-11-18
     private static readonly string[] BehaviourViewNames = ["C#", "Readable", "Raw"]; // Amedo 2026-11-18

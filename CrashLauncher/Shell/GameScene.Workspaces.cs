@@ -135,7 +135,7 @@ DockSpace       ID=0x50DE06D3 Window=0x5B220BC7 Pos=0,32 Size=1920,977 Split=Y
 
 	private void ShowAllPanels()
 	{
-		_showHierarchy = _showInspector = _showProject = _showConsole = _showBehaviour = true;
+		_showHierarchy = _showInspector = _showProject = _showConsole = true;
 		_showAnimCharacters = _showAnimBones = _showAnimTimeline = true;
 	}
 
