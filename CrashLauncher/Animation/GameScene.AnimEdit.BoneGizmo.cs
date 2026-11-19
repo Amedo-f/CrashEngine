@@ -76,7 +76,6 @@ public sealed partial class GameScene
 			if (_workspace != Workspace.Animation && ImGui.IsItemHovered()) ImGui.SetTooltip(label);
 			if (clicked) _gizmoMode = mode;
 		}
-		DrawAiToolButton(icon); // Amedo 2026-11-15
 		ImGui.PopStyleVar();
 		ImGui.End();
 	}

@@ -120,6 +120,21 @@ public sealed partial class GameScene : Scene
 		}
 	}
 
+    // Amedo 2026-11-19
+    private readonly List<Entity> _selectionOrder = new();
+    private readonly HashSet<Entity> _selectionOrderSet = new();
+
+    // Amedo 2026-11-19
+    private bool SyncSelectionOrder()
+    {
+        if (_selectionOrder.Count == _selectedSet.Count && _selectionOrderSet.SetEquals(_selectedSet)) return false;
+        _selectionOrder.RemoveAll(e => !_selectedSet.Contains(e));
+        _selectionOrderSet.IntersectWith(_selectedSet);
+        foreach (var e in _selectedSet)
+            if (_selectionOrderSet.Add(e)) _selectionOrder.Add(e);
+        return true;
+    }
+
     private readonly List<Action<float>> _pulseResetters = new();
 
     private void UpdateSelectionPulse()

@@ -186,6 +186,7 @@ public sealed partial class GameScene : Scene
 	{
 		if (UpdateLevelLoad()) return; // Amedo 2026-11-12
 		RecordSelectionChangeIfAny(); // Amedo 2026-09-20
+		if (SyncSelectionOrder()) _collisionOutlinesDirty = true; // Amedo 2026-11-19
 		UpdateSimulation(); // Amedo 2026-09-26
 		UpdateBehaviourWatch(); // Amedo 2026-11-18
 
@@ -387,7 +388,7 @@ public sealed partial class GameScene : Scene
 		else DrawAnimationWorkspace();
 		DrawViewGizmo(); // Amedo 2026-10-04
 		DrawGizmoModeButtons(); // Amedo
-		DrawAiToolOverlay(); // Amedo 2026-11-15
+		DrawCollisionOutlines(); // Amedo 2026-11-19
 		_windowChrome.DrawEffects();
 	}
 }

@@ -167,39 +167,51 @@ public sealed partial class GameScene : Scene
         pathSection.RemoveItem(path);
     }
 
-    public void AddAiPathBetweenSelected()
+    public void AddAiPathBetweenSelected() => LinkAiChain(SelectedAiPositions()); // Amedo 2026-11-19
+
+    // Amedo 2026-11-19
+    private List<Entity> SelectedAiPositions() =>
+        _selectionOrder.Where(x => x.Parent is not null && x.Get<AiPositionMarker>() is not null).ToList();
+
+    // Amedo 2026-11-19
+    private void LinkAiChain(IReadOnlyList<Entity> chain)
     {
-        var nodes = _selectedSet
-            .Select(x => (Ent: x, Marker: x.Get<CrashEngine.Importer.AiPositionMarker>()))
-            .Where(t => t.Marker is not null).ToList();
-        if (nodes.Count < 2)
-        { _browser.Log($"Add AI Path: select at least TWO AI positions (Ctrl+click). You have {nodes.Count} selected."); return; }
-
-        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2 is null) { _browser.Log("Add AI Path: no level loaded."); return; }
-
-        Vector3 Pos(Entity e) => e.Transform.World.Translation;
-        var tour = new List<(Entity Ent, CrashEngine.Importer.AiPositionMarker? Marker)> { nodes[0] };
-        var remaining = nodes.Skip(1).ToList();
-        while (remaining.Count > 0)
-        {
-            var last = Pos(tour[^1].Ent);
-            int bi = 0; float bd = float.MaxValue;
-            for (int i = 0; i < remaining.Count; i++)
-            { var d = Vector3.DistanceSquared(last, Pos(remaining[i].Ent)); if (d < bd) { bd = d; bi = i; } }
-            tour.Add(remaining[bi]); remaining.RemoveAt(bi);
-        }
-
+        if (chain.Count < 2) { _browser.Log($"Link AI positions: select at least TWO AI positions (Shift+click). You have {chain.Count} selected."); return; }
         var rec = new LayoutEditRecorder();
-        int edges = tour.Count == 2 ? 1 : tour.Count;
-        int made = 0;
+        int made = 0, already = 0;
         string? lastError = null;
-        for (int i = 0; i < edges; i++)
+        for (int i = 0; i + 1 < chain.Count; i++)
         {
-            if (LinkAiPositions(rec, tour[i].Marker!, tour[(i + 1) % tour.Count].Marker!, out var error)) made++;
-            else if (error != "already linked" && error != "the same AI position") lastError = error;
+            if (LinkAiPositions(rec, chain[i].Get<AiPositionMarker>()!, chain[i + 1].Get<AiPositionMarker>()!, out var error)) made++;
+            else if (error == "already linked") already++;
+            else lastError = error;
         }
-        if (made > 0) _undoStack.Push(rec.Finish(tour[0].Ent));
-        _browser.Log($"Added {made} AI path(s) linking {tour.Count} selected AI position(s) into a connected {(tour.Count > 2 ? "loop" : "pair")}." +
-                     (lastError is null ? " Save Chunk to keep." : $" Some links were skipped: {lastError}."));
+        if (made > 0) _undoStack.Push(rec.Finish(chain[^1]));
+        _browser.Log($"Link AI positions: {made} new link(s) along {chain.Count} point(s)" +
+                     (already > 0 ? $", {already} already linked" : "") +
+                     (lastError is null ? "." : $", some skipped: {lastError}.") +
+                     (made > 0 ? " Save Chunk to keep." : ""));
+    }
+
+    // Amedo 2026-11-15
+    private IEnumerable<(BaseTwinSection Section, PS2AnyAIPath Path, Entity A, Entity B)> AiLinks()
+    {
+        if (_aiPosRoot is not { } root || Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2 is not { } rm2) yield break;
+        var markers = new Dictionary<object, Entity>(ReferenceEqualityComparer.Instance);
+        foreach (var e in root.Children)
+            if (e.Get<AiPositionMarker>()?.Source is { } s) markers[s] = e;
+        foreach (var layout in Layouts(rm2))
+        {
+            var posSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION);
+            var pathSec = layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_PATHS_SECTION);
+            if (posSec is null || pathSec is null) continue;
+            for (int i = 0; i < pathSec.GetItemsAmount(); i++)
+            {
+                if (pathSec.GetItem(i) is not PS2AnyAIPath p || p.Args.Length < 2) continue;
+                if (!posSec.ContainsItem(p.Args[0]) || !posSec.ContainsItem(p.Args[1])) continue;
+                if (!markers.TryGetValue(posSec.GetItem<PS2AnyAIPosition>(p.Args[0]), out var a) || !markers.TryGetValue(posSec.GetItem<PS2AnyAIPosition>(p.Args[1]), out var b)) continue;
+                yield return (pathSec, p, a, b);
+            }
+        }
     }
 }

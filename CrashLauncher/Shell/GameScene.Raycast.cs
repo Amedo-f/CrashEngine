@@ -21,21 +21,6 @@ public sealed partial class GameScene : Scene
         return _levelCollision;
     }
 
-    // Amedo 2026-11-15
-    private bool TryRaycastLevel(Vector2 mousePos, int sw, int sh, Entity space, out Vector3 local)
-    {
-        local = default;
-        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>() is not { } src || LevelCollision(src) is not { } world) return false;
-        if (!Matrix4x4.Invert(space.Transform.World, out var toLocal)) return false;
-        var (orig, dir) = GetMouseRay(mousePos, sw, sh);
-        var o = Vector3.Transform(orig, toLocal);
-        var d = Vector3.Normalize(Vector3.TransformNormal(dir, toLocal));
-        if (!world.SegmentCast(o, o + d * LevelRayLength, 0xFFFFFFFFu, out var hit)) return false;
-        local = hit.Point;
-        return true;
-    }
-    private const float LevelRayLength = 2000f;
-
     private static bool TryGetWorldAABB(Entity root, out Vector3 min, out Vector3 max)
     {
         var lo  = new Vector3(float.MaxValue);

@@ -14,7 +14,7 @@ public sealed partial class GameScene
     {
         var info = MovementOf(inst);
         bool hasPoints = inst.Source.Positions.Count > 0;
-        if (info.IdleModes.Count == 0 && !info.UsesKeys && !info.UsesAiNetwork && !hasPoints) return;
+        if (info.IdleModes.Count == 0 && !info.UsesKeys && !info.UsesAiNetwork) return; // Amedo 2026-11-19
         if (!ImGui.CollapsingHeader("Movement##movement", ImGuiTreeNodeFlags.DefaultOpen)) return;
 
         var current = info.Current(inst.Source.StateFlags);
@@ -33,30 +33,6 @@ public sealed partial class GameScene
                 ImGui.TextColored(MovementWarningColor, "Patrol needs points: without them it stands still.");
             if (current?.Name != "Patrol" && hasPoints && info.PatrolBit is not null)
                 ImGui.TextColored(MovementWarningColor, "It has patrol points, but it only walks them in Patrol mode.");
-        }
-
-        if (info.UsesKeys || hasPoints)
-        {
-            ImGui.TextUnformatted($"Patrol points ({inst.Source.Positions.Count}):");
-            var points = PatrolPoints(inst.Source);
-            for (int i = 0; i < points.Count; i++)
-            {
-                var (id, _, marker) = points[i];
-                ImGui.TextUnformatted($"  [{i}] Position_{id:X4}" + (marker is null ? "  (not in this layout)" : ""));
-                ImGui.SameLine();
-                if (marker is not null && ImGui.SmallButton($"Select##patsel{i}")) SelectClicked(marker, false);
-                ImGui.SameLine();
-                if (ImGui.SmallButton($"^##patup{i}")) EditPatrol(e, rec => MovePatrolPoint(rec, inst, i, -1));
-                ImGui.SameLine();
-                if (ImGui.SmallButton($"v##patdn{i}")) EditPatrol(e, rec => MovePatrolPoint(rec, inst, i, +1));
-                ImGui.SameLine();
-                if (ImGui.SmallButton($"x##patdel{i}")) { EditPatrol(e, rec => RemovePatrolPoint(rec, inst, i)); break; }
-            }
-            if (ImGui.Button("+ Add patrol points in the scene##patadd", new Vector2(-1f, 0f)))
-            {
-                SelectClicked(e, false);
-                SetAiTool(true);
-            }
         }
 
         ImGui.TextDisabled(info.UsesAiNetwork ? "Uses the AI network (AI points near it) when it moves around." : "Doesn't use the AI network.");
