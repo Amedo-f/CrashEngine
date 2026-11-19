@@ -91,11 +91,7 @@ public sealed partial class GameCamera
             m.M41 = target.X; m.M42 = target.Y; m.M43 = target.Z; m.M44 = target.W;
             var cand = GameMath.Transform_18E4F0(m, new Vector4(0f, 0f, -10f, 1f));
             if (!LineOfSight_275F80(y, target, cand, objects, false, out h)) { result = cand; ok = true; }
-            else if (TryPull(target, h, 4f, far, 0.2f, lim2, out var pulled))
-            {
-                result = new Vector4(pulled.X, pulled.Y, cand.Z, 1f);
-                ok = true;
-            }
+            else if (TryPull(target, h, 4f, far, 0.2f, lim2, out var pulled)) { result = pulled; ok = true; }
         }
         if (!ok) return false;
         M.Q(y + 0x40, (M.Q(y + 0x40) & 0xFFFEFFFCFFFDFFFFUL) | 0x4000000000UL);
@@ -121,9 +117,8 @@ public sealed partial class GameCamera
         bool floorClip = false;
         float k = M.F(y + 0x64);
         var dir = target - eye;
-        dir.W = 1f;
         float inv = GameMath.InvLength_11C030(2.4999998e-09f, dir);
-        dir = new Vector4(dir.X * inv, dir.Y * inv, dir.Z * inv, 1f);
+        dir = new Vector4(dir.X * inv, dir.Y * inv, dir.Z * inv, target.W);
         var right = new Vector4(-dir.Z, 0f, dir.X, 1f);
         var up = new Vector4(right.Y * dir.Z - right.Z * dir.Y, right.Z * dir.X - right.X * dir.Z, right.X * dir.Y - right.Y * dir.X, 1f);
         Vector4 nearTarget;
@@ -232,7 +227,7 @@ public sealed partial class GameCamera
     private static Vector4 Place(in Vector4 r, in Vector4 u, in Vector4 f, in Vector4 origin, in Vector4 v)
     {
         var p = RotateRows(r, u, f, v);
-        return new Vector4(p.X + origin.X, p.Y + origin.Y, p.Z + origin.Z, 1f);
+        return new Vector4(p.X + origin.X, p.Y + origin.Y, p.Z + origin.Z, r.W * v.X + u.W * v.Y + f.W * v.Z + origin.W * v.W);
     }
 
     public bool CollideScenery_275B00(uint y, Vector4 eye, Vector4 target, out Vector4 result)
@@ -283,6 +278,7 @@ public sealed partial class GameCamera
     private static float LenSq(Vector4 v) => v.X * v.X + v.Y * v.Y + v.Z * v.Z;
 
     public Func<Vector3, Vector3, IReadOnlyList<Character.CharacterBody>>? ObjectBodies { get; set; }
+    public Func<object, int, int>? HullSurfaceOf { get; set; }
 
     public bool CollideObjects_275728(uint y, Vector4 eye, Vector4 current, out Vector4 result)
     {
@@ -305,10 +301,11 @@ public sealed partial class GameCamera
         var min = p - new Vector3(r + 0.1f);
         var max = p + new Vector3(r + 0.1f);
         bool hit = false;
-        uint surfaceMask = Collision?.SurfaceMask(0) ?? 0x1FF0F0;
         foreach (var body in ObjectBodies(min, max))
-            foreach (var (hull, world) in body.Parts)
+            for (int part = 0; part < body.Parts.Count; part++)
             {
+                var (hull, world) = body.Parts[part];
+                uint surfaceMask = Collision?.SurfaceMask(HullSurfaceOf?.Invoke(body.Owner, part) ?? 0) ?? 0x1FF0F0;
                 if ((surfaceMask & 0x20) == 0) continue;
                 if (!Matrix4x4.Invert(world, out var inv)) continue;
                 var local = Vector3.Transform(P3(result), inv);

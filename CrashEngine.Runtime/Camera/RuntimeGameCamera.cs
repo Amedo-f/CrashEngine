@@ -192,6 +192,7 @@ public sealed class RuntimeGameCamera : ICutsceneCamera
         Camera.LinkedSecond_15FE98 = () => _world.PlayerCharacter?.Link?.Follower_15FE98() is { } fc && _world.Agents.FirstOrDefault(a => ReferenceEquals(a.OwnCharacter, fc)) is { } fa ? Proxy(fa) : 0u; // Amedo
         Camera.ObjectAt = obj => obj != 0 && _proxyAgents.TryGetValue(obj, out var pa) ? pa : null; // Amedo
         Camera.ObjectBodies = (min, max) => world.QueryBodies(min, max, 0xFFFFFFFF, 1, 0x10, null, requireAll: true);
+        Camera.HullSurfaceOf = (owner, part) => owner is AgentLabAgent a ? a.HullSurfaceIndex_1F07D8(part) : 0;
         _inst   = Camera.Alloc(0x160, "crash instance");
         _node   = Camera.Alloc(0x70, "crash node");
         _c      = Camera.Alloc(0x310, "crash controller");

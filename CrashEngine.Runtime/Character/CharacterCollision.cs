@@ -356,7 +356,7 @@ public sealed class CharacterCollision
             if ((r.Flags & 0x800) != 0) continue;
             if (!((dynamic && (r.Flags & Dynamic) != 0) || (statics && (r.Flags & Static) != 0))) continue;
             var q = p + push;
-            if (!Inside(r, q, 0f)) continue;
+            if (!Inside(r, p, 0f)) continue;
             if ((r.Flags & 0x80) != 0)
             {
                 r.Flags |= 0x100;

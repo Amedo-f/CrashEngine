@@ -271,6 +271,7 @@ public sealed partial class SceneSimulation
         {
             var agent = agents[i];
             if (agent.Destroyed || ReferenceEquals(agent, World.Player)) continue; // Amedo
+            if (!agent.InChunk_A0) continue; // Amedo 2026-11-17
             if ((agent.AgentFlags & 0x20000) != 0x20000) continue; // Amedo 2026-10-05
             if (ResourceOf(agent.Chunk)?.Links is not { } links) continue;
             var best = Select_1ED690(links, agent.Chunk, agent.GamePosition);

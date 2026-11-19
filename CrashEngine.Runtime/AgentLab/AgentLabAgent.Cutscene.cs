@@ -94,7 +94,7 @@ public sealed partial class AgentLabAgent
         const int IdleSlot = 0xC;
         static void Idle(AgentLabAgent? who) // Amedo
         {
-            if (who is not null && !who.Destroyed && (who.ComponentMask & (1u << 12)) != 0) who.TriggerEventSlot(IdleSlot, who);
+            if (who is not null && !who.Destroyed && (who.ComponentMask & (1u << 12)) != 0) who.TriggerEventSlot(IdleSlot, who, true); // Amedo 2026-11-17
         }
         if ((arg0 & 1) != 0)
         {

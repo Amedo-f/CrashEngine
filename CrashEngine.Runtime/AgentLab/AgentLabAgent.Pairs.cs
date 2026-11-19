@@ -21,6 +21,7 @@ public sealed partial class AgentLabAgent
 
     internal void PairsPass_246D00(float dt)
     {
+        if (!InChunk_A0) return; // Amedo 2026-11-17
         if (_physics is not { } ctrl || ctrl.PairType >= 9) return; // Amedo
         if (_destroyed || !(SteppedNow || _attachedTo is not null)) return;
         int type = ctrl.PairType;

@@ -20,6 +20,7 @@ public sealed partial class CharacterController
 
     public void EnterVehicle_13B938(int kind, CharacterController? other, int param4, object? otherObject = null)
     {
+        Unlink_132E50();
         Vector3 v;
         if (Vehicle is not { } old)
         {

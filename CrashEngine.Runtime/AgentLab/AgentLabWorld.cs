@@ -553,6 +553,7 @@ public sealed partial class AgentLabWorld
         foreach (var agent in UpdateOrder_1999F0())
         {
             if (!ReferenceEquals(agent.Chunk, chunk)) continue;
+            if (!agent.InChunk_A0) continue; // Amedo 2026-11-17
             Current = agent;
             if (!ChunkClocksRunning) // Amedo
             {
