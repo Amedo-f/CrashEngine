@@ -48,14 +48,14 @@ public sealed partial class SceneSimulation
     public static SceneSimulation? Start(Entity chunkRoot, Action<string>? log, PlaySettings play,
                                          Func<Entity, PS2AnyInstance, BaseTwinSection, Entity?>? spawnHost = null,
                                          Func<Entity, ushort, ushort, AnimatedObject.SlotGroup?, MeshDecoder.ForeignGroupBuild?>? groupHost = null,
-                                         ChunkHost? chunkHost = null, string? traceFilter = null)
+                                         ChunkHost? chunkHost = null, string? traceFilter = null, bool continuesLoading = false) // Amedo 2026-11-16
     {
         log?.Invoke($"[play] settings: jump rules 0x{play.JumpRules:X}, classic Aku Aku {play.ClassicAku}, golden {play.GoldenSeconds:0.##} s, " +
                     $"touch breaks {play.AkuTouchBreak}, golden music {play.GoldenMusic} at {play.GoldenMusicVolume:0.##}, language {play.LanguageDirectory ?? "disc"}, disc language {play.DiscLanguage}"); // Amedo
         return Start(chunkRoot, log, traceFilter, spawnHost, jumpRules: play.JumpRules, musicDirectory: play.MusicDirectory, groupHost: groupHost,
                      chunkHost: chunkHost, languageDirectory: play.LanguageDirectory, classicAku: play.ClassicAku, goldenSeconds: play.GoldenSeconds,
                      akuTouchBreak: play.AkuTouchBreak, goldenMusic: play.GoldenMusic, goldenMusicVolume: play.GoldenMusicVolume, discLanguage: play.DiscLanguage,
-                     savesDirectory: play.SavesDirectory); // Amedo
+                     savesDirectory: play.SavesDirectory, continuesLoading: continuesLoading); // Amedo
     }
 
     public static SceneSimulation? Start(Entity chunkRoot, Action<string>? log, string? traceFilter = null,
@@ -65,7 +65,7 @@ public sealed partial class SceneSimulation
                                          ChunkHost? chunkHost = null, string? languageDirectory = null, // Amedo 2026-10-01
                                          bool classicAku = false, float goldenSeconds = 8f, // Amedo 2026-10-04
                                          bool akuTouchBreak = false, int goldenMusic = -1, float goldenMusicVolume = 0.75f, // Amedo 2026-10-04
-                                         string? discLanguage = null, string? savesDirectory = null) // Amedo
+                                         string? discLanguage = null, string? savesDirectory = null, bool continuesLoading = false) // Amedo
     {
         discLanguage ??= PlaySettings.DetectDiscLanguage(musicDirectory); // Amedo
         Region.RegionProfile.Current = Region.RegionProfile.For(discLanguage); // Amedo 2026-11-11
@@ -143,7 +143,8 @@ public sealed partial class SceneSimulation
         if (sim.BindPlayer() is { } character) // Amedo 2026-09-28
         {
             Mark("characters"); // Amedo 2026-10-02
-            sim.StepStreaming(block: true); // Amedo 2026-09-28
+            if (continuesLoading) sim._streamFocus = false; // Amedo 2026-11-16
+            sim.StepStreaming(block: true, takeFocus: !continuesLoading); // Amedo 2026-09-28
             Mark("linked chunks"); // Amedo 2026-10-02
             if (chunkHost is not null && sim.Streamer is { Root: { } streamRoot } streamer)
             {

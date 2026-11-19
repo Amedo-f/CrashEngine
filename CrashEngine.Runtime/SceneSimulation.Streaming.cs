@@ -447,10 +447,15 @@ public sealed partial class SceneSimulation
             if (a.Entity.Parent is { } p && ReferenceEquals(p, _gameSpace)) { a.CanChangeChunk_23D060(_anchorChunk); a.Chunk = _anchorChunk; } // Amedo
     }
 
-    private void StepStreaming(bool block = false)
+    private bool _streamFocus = true; // Amedo 2026-11-16
+
+    private void StepStreaming(bool block = false, bool takeFocus = true)
     {
         if (Streamer is not { Root: { } root } streamer || World.Player is not { } player) return;
         FreeLaterStep(); // Amedo 2026-11-14
+        if (World.TakeStreamFocusRelease_2AA3E8()) _streamFocus = false; // Amedo 2026-11-16
+        if (takeFocus && World.GameMode is AgentLabWorld.ModePlay or AgentLabWorld.ModeCutscene) _streamFocus = true; // Amedo 2026-11-16
+        streamer.HasViewer = _streamFocus; // Amedo 2026-11-16
         streamer.Viewer = player.GamePosition;
         streamer.Update_2AA8D0();
         if (_dropped.Count > 0) KeepDropped(); // Amedo

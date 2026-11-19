@@ -161,8 +161,19 @@ public sealed partial class AgentLabWorld
     // Amedo
     public bool WorldShown { get; private set; } = true; // Amedo
 
+    private bool _streamFocusReleased; // Amedo 2026-11-16
+
+    // Amedo 2026-11-16
+    internal bool TakeStreamFocusRelease_2AA3E8()
+    {
+        bool released = _streamFocusReleased;
+        _streamFocusReleased = false;
+        return released;
+    }
+
     private void StreamLoadStartChunk_2AA3E8(int kind)
     {
+        _streamFocusReleased = true; // Amedo 2026-11-16
         WorldShown = true; // Amedo
         if (string.Equals(Streaming.StreamLink.Normalize(StartChunk_500), RootChunk.Name, StringComparison.OrdinalIgnoreCase))
         {

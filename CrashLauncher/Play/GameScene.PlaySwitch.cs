@@ -17,7 +17,7 @@ public sealed partial class GameScene
     private (System.Numerics.Vector3 Color, int? Index)? _switchFog;
 
     // Amedo
-    private SceneSimulation? StartSimOn(Entity root, PlaySettings settings, ChunkSource? source)
+    private SceneSimulation? StartSimOn(Entity root, PlaySettings settings, ChunkSource? source, bool continuesLoading = false) // Amedo 2026-11-16
     {
         var sim = SceneSimulation.Start(root, _browser.Log, settings, spawnHost: (parent, inst, section) =>
         {
@@ -27,7 +27,7 @@ public sealed partial class GameScene
             return entity;
         }, groupHost: (e, ogi, anim, same) => SourceOf(e)?.MeshTables is { } tables
                ? MeshDecoder.BuildForeignGroup(Engine.Instance.GL, tables, e, ogi, anim, same) : null,
-           chunkHost: PlayHost(source));
+           chunkHost: PlayHost(source), continuesLoading: continuesLoading); // Amedo 2026-11-16
         if (sim is not null) sim.World.LevelSwitch = (chunk, _) => _switchTo = chunk;
         return sim;
     }
@@ -88,7 +88,7 @@ public sealed partial class GameScene
             _playHost = builtHost;
             _playHostSource = source;
         }
-        _simulation = StartSimOn(root, CurrentPlaySettings(source), source);
+        _simulation = StartSimOn(root, CurrentPlaySettings(source), source, continuesLoading: true); // Amedo 2026-11-16
         if (_simulation is null)
         {
             _browser.Log($"Play Scene: {next} has no level to play.");

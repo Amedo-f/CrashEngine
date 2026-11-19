@@ -9,6 +9,7 @@ public sealed class StreamLink
 {
     public const uint TargetPresent = 0x20000;
     public const uint TargetReady = 0x40000;
+    public const uint LoadsWithoutViewer = 0x2; // Amedo 2026-11-16
 
     public TwinChunkLink Source { get; }
     public string Path { get; }
@@ -112,6 +113,7 @@ public sealed class ChunkStreamer
     public int Frame { get; private set; }
     public int Mode { get; set; } = 5;
     public Vector3 Viewer { get; set; }
+    public bool HasViewer { get; set; } = true; // Amedo 2026-11-16
     public Action<string>? Trace { get; set; }
     public Func<StreamResource, bool>? Loading { get; set; } // Amedo
     public Action<StreamResource>? Removed { get; set; } // Amedo
@@ -187,7 +189,11 @@ public sealed class ChunkStreamer
             link.Flags = (link.Flags & ~StreamLink.TargetPresent) | (target?.SceneryLoaded == true ? StreamLink.TargetPresent : 0u);
             link.Flags = (link.Flags & ~StreamLink.TargetReady) | (target?.ObjectsLoaded == true ? StreamLink.TargetReady : 0u);
             if (target is null) { loaded = queued = false; continue; } // Amedo 2026-09-30
-            if (link.Boxes.Count > 0)
+            if (link.Boxes.Count > 0 && !HasViewer) // Amedo 2026-11-16
+            {
+                if ((link.Flags & StreamLink.LoadsWithoutViewer) != 0) Walk_2A9898(target, frame, na, nb);
+            }
+            else if (link.Boxes.Count > 0)
             {
                 bool inside = false; // Amedo
                 for (int bi = 0; bi < link.Boxes.Count && !inside; bi++)

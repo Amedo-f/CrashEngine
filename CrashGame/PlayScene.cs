@@ -117,7 +117,7 @@ sealed class PlayScene : Scene
                 return entity;
             }),
             groupHost: (e, ogi, anim, same) => SourceOf(e)?.MeshTables is { } tables ? OnLevelGpu(() => MeshDecoder.BuildForeignGroup(gl, tables, e, ogi, anim, same)) : null,
-            chunkHost: host); // Amedo 2026-11-09
+            chunkHost: host, continuesLoading: _from is not null); // Amedo 2026-11-16
         if (_sim is null) throw new InvalidOperationException($"Could not start the level {_cfg.Level}");
         StartupChunksByLevel[_cfg.Level] = host.StartupChunks.ToList(); // Amedo 2026-11-09
         _sim.World.LevelSwitch = (chunk, _) => _switchTo = chunk; // Amedo
