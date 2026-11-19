@@ -49,6 +49,13 @@ public sealed partial class AgentLabWorld
                 _stateChunks.AddOrUpdate(section, name);
     }
 
+    // Amedo 2026-11-16
+    private void CarryKeptStates(AgentLabWorld from)
+    {
+        _keptStates.Clear();
+        _keptStates.UnionWith(from._keptStates);
+    }
+
     // Amedo
     internal void SaveChunkStates_2686B0(SaveStream stream)
     {

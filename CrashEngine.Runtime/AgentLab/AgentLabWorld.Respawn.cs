@@ -189,6 +189,7 @@ public sealed partial class AgentLabWorld
         public bool Set_00, Restored_02;
         public uint PlayerMode;
         public string Chunk_04 = "";
+        public string? Instance_10; // Amedo 2026-11-16
         public AgentLabAgent? Agent;
         public Matrix4x4 Placement_20, ToAnchor;
     }
@@ -207,8 +208,9 @@ public sealed partial class AgentLabWorld
     // Amedo
     private bool Release_17A770(Checkpoint cp, bool clear, AgentLabAgent? instance)
     {
-        bool other = cp.Agent is { } old && !ReferenceEquals(old, instance);
-        if (other && cp.Agent is { ControllerType: 13 } crate) crate.TriggerEventSlot(15);
+        var held = Resolve(cp); // Amedo 2026-11-16
+        bool other = held is not null && !ReferenceEquals(held, instance);
+        if (other && held is { ControllerType: 13 } crate) crate.TriggerEventSlot(15);
         if (clear) Forget(cp);
         cp.Restored_02 = false;
         return other;
@@ -218,6 +220,13 @@ public sealed partial class AgentLabWorld
     {
         foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590])
             if (ReferenceEquals(cp.Agent, agent)) cp.Agent = null;
+    }
+
+    // Amedo 2026-11-16
+    private AgentLabAgent? Resolve(Checkpoint cp)
+    {
+        if (cp.Agent is not null || cp.Instance_10 is not { } name) return cp.Agent;
+        return cp.Agent = Agents.FirstOrDefault(a => a.Chunk.Name == cp.Chunk_04 && a.Entity.Name == name);
     }
 
     // Amedo 2026-11-09
@@ -236,7 +245,8 @@ public sealed partial class AgentLabWorld
             cp.Chunk_04 = old.Chunk_04;
             cp.Placement_20 = old.Placement_20;
             cp.ToAnchor = old.Chunk_04 == root ? RootChunk.ToAnchor : rebase is { } m ? old.ToAnchor * m : old.ToAnchor;
-            string? name = old.Agent?.Entity.Name;
+            string? name = old.Agent?.Entity.Name ?? old.Instance_10; // Amedo 2026-11-16
+            cp.Instance_10 = name; // Amedo 2026-11-16
             cp.Agent = name is null ? null : Agents.FirstOrDefault(a => a.Chunk.Name == old.Chunk_04 && a.Entity.Name == name);
             if (cp.Set_00) Log?.Invoke($"[AgentLab {Now:0.00}s] level switch keeps the {(ReferenceEquals(cp, Level_590) ? "level" : "temporary")} respawn point {name ?? "-"} in {cp.Chunk_04}{(cp.Agent is null && name is not null ? " (not in this level yet)" : "")}");
         }
@@ -247,16 +257,18 @@ public sealed partial class AgentLabWorld
     {
         cp.Set_00 = false;
         cp.Agent = null;
+        cp.Instance_10 = null; // Amedo 2026-11-16
         cp.Chunk_04 = "";
     }
 
     // Amedo
     private bool Set_172070(Checkpoint cp, AgentLabAgent checkpoint)
     {
-        if (ReferenceEquals(cp.Agent, checkpoint)) return !cp.Restored_02;
+        if (ReferenceEquals(Resolve(cp), checkpoint)) return !cp.Restored_02; // Amedo 2026-11-16
         Release_17A770(cp, false, checkpoint);
         cp.Set_00 = true;
         cp.Agent = checkpoint;
+        cp.Instance_10 = checkpoint.Entity.Name; // Amedo 2026-11-16
         cp.Placement_20 = checkpoint.GameMatrix;
         cp.Chunk_04 = checkpoint.Chunk.Name;
         cp.ToAnchor = checkpoint.Chunk.ToAnchor;
@@ -268,7 +280,7 @@ public sealed partial class AgentLabWorld
     // Amedo
     private void Clear_17A6A0(Checkpoint cp)
     {
-        if (cp.Agent is { ControllerType: 13 } crate) SetZoneState(crate, false);
+        if (Resolve(cp) is { ControllerType: 13 } crate) SetZoneState(crate, false); // Amedo 2026-11-16
         Forget(cp);
     }
 
@@ -296,7 +308,7 @@ public sealed partial class AgentLabWorld
                 break;
         }
         UseRespawn(chosen);
-        if (chosen?.Agent is { ControllerType: 13 } crate) SetZoneState(crate, true); // Amedo
+        if (chosen is not null && Resolve(chosen) is { ControllerType: 13 } crate) SetZoneState(crate, true); // Amedo 2026-11-16
     }
 
     // Amedo

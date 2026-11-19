@@ -201,6 +201,7 @@ public sealed partial class AgentLabWorld
         AutosavePauses_8F0 = from.AutosavePauses_8F0;
         Progress.CopyFrom(from.Progress);
         CarryCheckpoints(from); // Amedo 2026-11-09
+        CarryKeptStates(from); // Amedo 2026-11-16
         SaveController_594.CopyFrom(from.SaveController_594);
         if (SaveManager_309724 is { } manager && from.SaveManager_309724 is { } old) manager.CopyStateFrom(old); // Amedo
         if (AutosaveState == 2)
