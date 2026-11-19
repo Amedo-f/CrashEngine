@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Reflection;
 using CrashEngine.Core;
 using CrashEngine.Renderer;
 using ImGuiNET;
@@ -24,9 +23,6 @@ public sealed class SplashScene : Scene
         _project = project;
         _scriptOut = scriptOut;
     }
-
-    private static string Version =>
-        Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "";
 
     protected override void Build()
     {
@@ -79,7 +75,7 @@ public sealed class SplashScene : Scene
         DrawText(dl, s_title, 34f, band + new Vector2(126f, 48f), white, "CrashEngine");
         DrawText(dl, s_medium, 17f, band + new Vector2(right, 34f), _error is null ? gray : ImGui.GetColorU32(new Vector4(1f, 0.45f, 0.4f, 1f)), step, alignRight: true);
         DrawText(dl, s_large, 21f, band + new Vector2(right, 62f), white, _project.Name, alignRight: true);
-        DrawText(dl, s_small, 15f, band + new Vector2(30f, bandH - 32f), gray, Version.Length > 0 ? $"v{Version}" : "");
+        DrawText(dl, s_small, 15f, band + new Vector2(30f, bandH - 32f), gray, AppVersion.Text.Length > 0 ? $"v{AppVersion.Text}" : ""); // Amedo 2026-11-19
         DrawText(dl, s_large, 21f, band + new Vector2(right, bandH - 40f), white, pct, alignRight: true);
         ImGui.SetCursorScreenPos(band + new Vector2(w - 130f, bandH + 14f));
         if (_error is null)
