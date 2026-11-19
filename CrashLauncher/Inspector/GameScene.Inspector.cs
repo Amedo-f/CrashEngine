@@ -60,6 +60,7 @@ public sealed partial class GameScene : Scene
         DrawInspectorPlayerCamera(e); // Amedo 2026-11-15
 
         DrawInspectorPosition(e);
+        DrawAddKeysFromPositions(e); // Amedo 2026-11-19
 
         DrawInspectorAiPosition(e);
         DrawInspectorAiLinks(e); // Amedo 2026-11-19

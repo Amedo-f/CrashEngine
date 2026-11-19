@@ -32,10 +32,10 @@ public sealed partial class GameScene
         ImGui.BeginDisabled(_building);
         if (ImGui.MenuItem("Save Chunk (.rm2/.sm2)")) SaveChunk();
         ImGui.Separator();
-        if (ImGui.MenuItem("Reload Level (keep saved edits)")) ReloadLevel(fromDiscOnly: false);
-        if (ImGui.MenuItem("Reload Level from Disc (discard saved edits)")) ReloadLevel(fromDiscOnly: true);
+        if (ImGui.MenuItem("Reload Level (keep saved edits)")) ReloadLevel();
+        if (ImGui.MenuItem("Reload Level from Disc (back to the original)...", null, false, LevelOpen)) _openRevertLevelPopup = true; // Amedo 2026-11-19
         ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(1f, 0.45f, 0.45f, 1f));
-        if (ImGui.MenuItem("Reset ALL Levels From Disc (delete all saved edits)...")) _openResetAllConfirmPopup = true;
+        if (ImGui.MenuItem("Reset ALL Levels From Disc (every level back to the original)...")) _openResetAllConfirmPopup = true; // Amedo 2026-11-19
         ImGui.PopStyleColor();
         ImGui.Separator();
         if (ImGui.MenuItem("Build...")) _showBuildWindow = true;

@@ -64,8 +64,15 @@ public sealed partial class GameScene : Scene
 		DropPlayHost();
 	}
 
-	private (string Source, string? ShadowDir) LevelPackage(bool useShadowDir) =>
-		(useShadowDir ? _extractedRoot : ResolvePristinePackageSource(), useShadowDir ? SavedChunksDir : null);
+	// Amedo 2026-11-19
+	private bool _nextLoadFromPristine;
+
+	private (string Source, string? ShadowDir) LevelPackage(bool useShadowDir)
+	{
+		bool pristine = !useShadowDir || _nextLoadFromPristine; // Amedo 2026-11-19
+		_nextLoadFromPristine = false;
+		return (pristine ? ResolvePristinePackageSource() : _extractedRoot, useShadowDir ? SavedChunksDir : null);
+	}
 
 	// Amedo 2026-11-12: no scene state here (it may run off the main thread); GPU data goes to uploads when there is one
 	private LevelParts ReadLevel(GL gl, string source, string? shadowDir, GpuUploadQueue? uploads)
@@ -226,7 +233,7 @@ public sealed partial class GameScene : Scene
 		_browser.Log(_statusLine);
 	}
 
-	private void ReloadLevel(bool fromDiscOnly)
+	private void ReloadLevel(bool fromPristineDisc = false) // Amedo 2026-11-19
 	{
 		Entity entity = base.Roots.FirstOrDefault((Entity r) => r.Has<ChunkSource>());
 		if (entity != null)
@@ -242,6 +249,7 @@ public sealed partial class GameScene : Scene
 		_collisionTileBaselinePos.Clear();
 		_undoStack.Clear();
 		_animUndo.Clear(); // Amedo 2026-10-04
+		_scriptTextCache.Clear(); // Amedo 2026-11-19
 		GL gL = Engine.Instance.GL;
 		RenderPipeline renderPipeline = FindFirst<RenderPipeline>();
 		if (renderPipeline == null)
@@ -249,7 +257,8 @@ public sealed partial class GameScene : Scene
 			_browser.Log("Reload Level: no RenderPipeline found (unexpected).");
 			return;
 		}
-		_browser.Log(fromDiscOnly ? "Reloading level from the true disc data (ignoring any saved edits)..." : "Reloading level...");
-		BeginLevelLoad(gL, renderPipeline, !fromDiscOnly); // Amedo 2026-11-12
+		_browser.Log(fromPristineDisc ? "Reloading the level from the original disc (shared edits kept)..." : "Reloading level..."); // Amedo 2026-11-19
+		_nextLoadFromPristine = fromPristineDisc; // Amedo 2026-11-19
+		BeginLevelLoad(gL, renderPipeline, useShadowDir: true); // Amedo 2026-11-19
 	}
 }

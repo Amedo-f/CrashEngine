@@ -146,7 +146,7 @@ public sealed partial class GameScene : Scene
                       $"{camCount} camera(s), {posCount} position(s), {aiCount} AI position(s) — saving + reloading...");
 
         SaveChunk();
-        ReloadLevel(fromDiscOnly: false);
+        ReloadLevel();
     }
 
     private string? _saveConfirmMessage;
@@ -167,92 +167,6 @@ public sealed partial class GameScene : Scene
             ImGui.TextWrapped(_saveConfirmMessage ?? "");
             ImGui.Spacing();
             if (ImGui.Button("OK", new Vector2(120f, 0f))) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
-    }
-
-    private bool _openResetAllConfirmPopup;
-
-    private void ResetAllLevelsFromDisc()
-    {
-        // Amedo 2026-09-20
-        var savedChunksDir = SavedChunksDir;
-        if (Directory.Exists(savedChunksDir))
-        {
-            int fileCount = Directory.GetFiles(savedChunksDir, "*", SearchOption.AllDirectories).Length;
-            try
-            {
-                Directory.Delete(savedChunksDir, recursive: true);
-                _browser.Log($"Reset All Levels From Disc: deleted {fileCount} saved edit file(s) across the whole project.");
-            }
-            catch (Exception ex)
-            {
-                _browser.Log("Reset All Levels From Disc: FAILED to delete SavedChunks -- " + ex.Message);
-                return;
-            }
-        }
-
-        // Amedo 2026-09-21
-        try
-        {
-            var wlDir = ModeDir("WorldLighting");
-            if (Directory.Exists(wlDir)) Directory.Delete(wlDir, recursive: true);
-        }
-        catch { }
-
-        try
-        {
-            var backupDir = DiscBackup.DirFor(_scriptOut, _extractedRoot);
-            var backupBd  = Path.Combine(backupDir, "Crash.BD");
-            var backupBh  = Path.Combine(backupDir, "Crash.BH");
-            var liveBd    = Path.Combine(_extractedRoot, "Crash6", "Crash.BD");
-            var liveBh    = Path.Combine(_extractedRoot, "Crash6", "Crash.BH");
-            if (File.Exists(backupBd) && File.Exists(backupBh) && File.Exists(liveBd))
-            {
-                File.Copy(backupBd, liveBd, overwrite: true);
-                File.Copy(backupBh, liveBh, overwrite: true);
-                _browser.Log("Reset All Levels From Disc: restored the disc archive (Crash.BD/BH) from the pristine " +
-                              "original backup -- every level now reads truly original data (including changes Build ISO had baked in).");
-            }
-        }
-        catch (Exception ex)
-        {
-            _browser.Log("Reset All Levels From Disc: WARNING -- could not restore disc archive from backup: " + ex.Message);
-        }
-
-        var openChunk = Roots.FirstOrDefault(r => r.Has<ChunkSource>());
-        if (openChunk is not null)
-            ReloadLevel(fromDiscOnly: true);
-        else
-            _browser.Log("Reset All Levels From Disc: done. Open any level to see the original data.");
-    }
-
-    private void DrawResetAllConfirmPopup()
-    {
-        if (_openResetAllConfirmPopup)
-        {
-            ImGui.OpenPopup("Reset All Levels From Disc?");
-            _openResetAllConfirmPopup = false;
-        }
-
-        var center = ImGui.GetMainViewport().GetCenter();
-        ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-        if (ImGui.BeginPopupModal("Reset All Levels From Disc?", ImGuiWindowFlags.AlwaysAutoResize))
-        {
-            ImGui.TextWrapped("This permanently deletes EVERY saved edit for EVERY level in this " +
-                               "project (the whole SavedChunks folder) -- not just the level you have " +
-                               "open right now. There is no backup and no Undo. Only the real, " +
-                               "unmodified disc data will remain.");
-            ImGui.Spacing();
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.15f, 0.15f, 1f));
-            if (ImGui.Button("Delete All Saved Edits", new Vector2(200f, 0f)))
-            {
-                ResetAllLevelsFromDisc();
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.PopStyleColor();
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel", new Vector2(120f, 0f))) ImGui.CloseCurrentPopup();
             ImGui.EndPopup();
         }
     }

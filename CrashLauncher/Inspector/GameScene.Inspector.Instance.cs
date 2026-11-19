@@ -59,6 +59,7 @@ public sealed partial class GameScene : Scene
                 DrawInspectorInstanceFlags(inst);
 
                 DrawInspectorMovement(e, inst); // Amedo 2026-11-15
+                DrawInspectorKeys(e, inst); // Amedo 2026-11-19
 
                 DrawInspectorInstanceRefs(inst);
 

@@ -323,6 +323,7 @@ public sealed partial class GameScene : Scene
 		ApplyPendingWorkspaceLayout(); // Amedo 2026-10-04
 		DrawSaveConfirmPopup();
 		DrawResetAllConfirmPopup();
+		DrawRevertLevelPopup(); // Amedo 2026-11-19
 		DrawLeavePlayConfirmPopup(); // Amedo 2026-09-28
 		DrawBuildProgress();
 		if (PlayFullView) // Amedo 2026-09-28

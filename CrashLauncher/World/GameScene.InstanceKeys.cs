@@ -1,7 +1,5 @@
 using CrashEngine.Core;
 using CrashEngine.Importer;
-using System.Numerics;
-using TwinVec4 = Twinsanity.TwinsanityInterchange.Common.Vector4;
 using BaseTwinSection = Twinsanity.TwinsanityInterchange.Implementations.Base.BaseTwinSection;
 using TwinConstants = Twinsanity.TwinsanityInterchange.Enumerations.Constants;
 using PS2AnyPosition = Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition;
@@ -52,37 +50,46 @@ public sealed partial class GameScene
         return result;
     }
 
-    private Entity? AddPatrolPoint(LayoutEditRecorder rec, InstanceData inst, Vector3 pos)
+    // Amedo 2026-11-19
+    private const double KeyUseRescanSeconds = 3.0;
+    private readonly Dictionary<(object Rm2, ushort ObjectId), (double At, List<(KeyUseScan.KeyRange Range, string Script)> Uses)> _keyUseCache = new();
+
+    // Amedo 2026-11-19
+    private List<(KeyUseScan.KeyRange Range, string Script)> KeyUsesOf(InstanceData inst)
     {
-        var posSec = InstanceLayoutOf(inst.Source)?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_POSITIONS_SECTION);
-        if (posSec is null || _positionsRoot is null) { _browser.Log("Add patrol point: this enemy's layout has no Positions section."); return null; }
-        rec.Section(posSec).Instance(inst.Source);
-        uint id = 0;
-        while (posSec.ContainsItem(id)) id++;
-        if (id > ushort.MaxValue) { _browser.Log("Add patrol point: no free position id left in this layout."); return null; }
-        var point = new PS2AnyPosition { Position = new TwinVec4(pos.X, pos.Y, pos.Z, 1f) };
-        point.SetID(id);
-        posSec.AddItem(point);
-        var marker = MakePositionMarker(_positionsRoot, $"Position_{id:X4}", point.Position);
-        marker.Add(new PositionMarker { Source = point });
-        rec.Added(_positionsRoot, marker);
-        inst.Source.Positions.Add((ushort)id);
-        _positionsRoot.Active = true; _showPositions = true;
-        UsePatrolMode(inst);
-        return marker;
+        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>() is not { Rm2: { } rm2 } src) return new();
+        var key = ((object)rm2, inst.ObjectId);
+        double now = EngineTime.Total;
+        if (_keyUseCache.TryGetValue(key, out var cached) && now - cached.At < KeyUseRescanSeconds) return cached.Uses;
+        var uses = new List<(KeyUseScan.KeyRange, string)>();
+        if (AnimEventScan.FindObject(inst.ObjectId, rm2, src.GlobalRm2) is { } obj)
+            foreach (var graph in AnimEventScan.GraphsOf(obj, rm2, src.GlobalRm2))
+                foreach (var range in KeyUseScan.OwnKeys(BehaviourSource.ToCSharp(graph, graph.GetID(), "keys")))
+                    uses.Add((range, graph.Name));
+        _keyUseCache[key] = (now, uses);
+        return uses;
     }
 
-    private bool AppendPatrolPoint(LayoutEditRecorder rec, InstanceData inst, PositionMarker existing, out string? error)
+    // Amedo 2026-11-19
+    private void AppendKeys(Entity owner, InstanceData inst, IReadOnlyList<Entity> points)
     {
-        error = null;
         var posSec = InstanceLayoutOf(inst.Source)?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_POSITIONS_SECTION);
-        if (posSec is null || !SectionHolds(posSec, existing.Source)) { error = "that point is in a different layout than this enemy"; return false; }
-        ushort id = (ushort)existing.Source.GetID();
-        if (inst.Source.Positions.Count > 0 && inst.Source.Positions[^1] == id) { error = "already the last patrol point"; return false; }
+        var rec = new LayoutEditRecorder();
         rec.Instance(inst.Source);
-        inst.Source.Positions.Add(id);
-        UsePatrolMode(inst);
-        return true;
+        int added = 0, otherLayout = 0, repeated = 0;
+        foreach (var point in points)
+        {
+            if (point.Get<PositionMarker>() is not { } marker || posSec is null || !SectionHolds(posSec, marker.Source)) { otherLayout++; continue; }
+            ushort id = (ushort)marker.Source.GetID();
+            if (inst.Source.Positions.Count > 0 && inst.Source.Positions[^1] == id) { repeated++; continue; }
+            inst.Source.Positions.Add(id);
+            added++;
+        }
+        if (added > 0) _undoStack.Push(rec.Finish(owner));
+        _browser.Log($"{owner.Name}: {added} key(s) added at the end ({inst.Source.Positions.Count} now)" +
+                     (otherLayout > 0 ? $", {otherLayout} skipped (another layout)" : "") +
+                     (repeated > 0 ? $", {repeated} skipped (same as the last key)" : "") +
+                     (added > 0 ? ". Save Chunk to keep." : "."));
     }
 
     private void RemovePatrolPoint(LayoutEditRecorder rec, InstanceData inst, int index)
@@ -122,12 +129,5 @@ public sealed partial class GameScene
         uint flags = inst.Source.StateFlags & ~info.ModeMask;
         if (mode is not null) flags |= 1u << mode.Bit;
         inst.Source.StateFlags = flags;
-    }
-
-    private void UsePatrolMode(InstanceData inst)
-    {
-        var info = MovementOf(inst);
-        if (info.IdleModes.FirstOrDefault(m => m.Name == "Patrol") is { } patrol && info.Current(inst.Source.StateFlags) != patrol)
-            SetIdleMode(inst, info, patrol);
     }
 }
