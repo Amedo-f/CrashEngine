@@ -764,6 +764,11 @@ public sealed partial class AgentLabWorld
     internal void PostSlotRequest_260E68(AgentLabAgent to, int slot, AgentLabAgent? from, bool force, int channel = 0) =>
         Enqueue_197A30((to, (ushort)slot, from, SlotRequest, (force ? 1 : 0) + ((channel & 1) << 1)));
 
+    internal const int BehaviourRequest = -5; // Amedo 2026-11-17
+
+    // Amedo 2026-11-17
+    internal void PostBehaviourRequest_260C30(AgentLabAgent to, ushort id) => Enqueue_197A30((to, id, null, BehaviourRequest, 1f));
+
     // Amedo 2026-10-01
     internal void PostTouch_13E0A0(AgentLabAgent to, int type, AgentLabAgent? from) => Enqueue_197A30((to, 0, from, type, 0f));
 
@@ -789,7 +794,16 @@ public sealed partial class AgentLabWorld
                     if (touch == Dropped) continue; // Amedo
                     if (touch >= 0) to.HandleMessage(touch, from); // Amedo 2026-10-01
                     else if (touch == NoiseTouch) to.NoiseEvent_209A30(loudness, from); // Amedo
-                    else if (touch == SlotRequest) to.RequestSlot_20E5A8(message, from, ((int)loudness & 1) != 0, (int)loudness >> 1); // Amedo
+                    else if (touch == SlotRequest) // Amedo 2026-11-17
+                    {
+                        to.MessageArrived_22E770();
+                        to.RequestSlot_20E5A8(message, from, ((int)loudness & 1) != 0, (int)loudness >> 1);
+                    }
+                    else if (touch == BehaviourRequest) // Amedo 2026-11-17
+                    {
+                        to.MessageArrived_22E770();
+                        to.RequestById_20E5A8(message, from);
+                    }
                     else to.Receive_22E770(message, from);
                 }
             }

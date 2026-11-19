@@ -191,10 +191,12 @@ public sealed partial class AgentLabAgent : Component
 
     public void Deliver(ushort message, AgentLabAgent? sender = null) => World.PostMessage_197A30(this, message, sender); // Amedo 2026-09-30
 
+    internal void MessageArrived_22E770() => _wakeOnce = true; // Amedo 2026-11-17
+
     internal void Receive_22E770(ushort message, AgentLabAgent? sender) // Amedo 2026-09-30
     {
         _inbox    = (message, sender); // Amedo 2026-09-28
-        _wakeOnce = true;
+        MessageArrived_22E770(); // Amedo 2026-11-17
         Trace($"message {message} from {sender?.Entity.Name ?? "-"}"); // Amedo
         if (GameObject is null) return;
         foreach (var tb in GameObject.TriggerBehaviours)
@@ -255,12 +257,20 @@ public sealed partial class AgentLabAgent : Component
 
     internal void RestartDefaultBehaviour() => RestartSpawnBehaviour(); // Amedo 2026-09-28
 
+    // Amedo 2026-11-17
     private void RestartSpawnBehaviour()
     {
         var spawnId = Instance.Source.OnSpawnHeaderScriptID;
-        var r = spawnId != 0xFFFF ? World.ResolveBehaviour(spawnId) : Slot(0);
-        if (r.Graph is { } g) StartBehaviour(g, r.Starter, this);
-        else Finish();
+        if (spawnId != 0xFFFF) World.PostBehaviourRequest_260C30(this, (ushort)spawnId);
+        else World.PostSlotRequest_260E68(this, 0, null, true);
+    }
+
+    // Amedo 2026-11-17
+    internal void RequestById_20E5A8(ushort id, AgentLabAgent? originator)
+    {
+        if (World.ResolveBehaviour(id) is not { Graph: { } g } r) return;
+        Trace($"behaviour 0x{id:X} -> '{g.Name}'");
+        _pendingBehaviour = (g, r.Starter, originator ?? this, originator);
     }
 
     private void AssignParticipants(TwinBehaviourStarter? starter, AgentLabAgent originator)
