@@ -9,14 +9,19 @@ namespace CrashLauncher;
 
 public sealed partial class GameScene : Scene
 {
+    // Amedo 2026-11-19
+    private (PS2AnyObject? Local, PS2AnyObject? Global) InstanceObjects(InstanceData inst)
+    {
+        var src = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
+        return (MeshDecoder.CodeSection(src?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)?.GetItem<PS2AnyObject>(inst.ObjectId),
+                MeshDecoder.CodeSection(src?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)?.GetItem<PS2AnyObject>(inst.ObjectId));
+    }
+
     private void DrawInspectorObjectDefinition(Entity e, InstanceData inst)
     {
         var scriptChunkSrc = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
-        var objSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.Rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
         var behSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.Rm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
-        var localObjForInsp = objSecForInsp?.GetItem<PS2AnyObject>(inst.ObjectId);
-        var globalObjSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION);
-        var globalObjForInsp = globalObjSecForInsp?.GetItem<PS2AnyObject>(inst.ObjectId);
+        var (localObjForInsp, globalObjForInsp) = InstanceObjects(inst); // Amedo 2026-11-19
         var globalBehSecForInsp = MeshDecoder.CodeSection(scriptChunkSrc?.GlobalRm2, TwinConstants.CODE_BEHAVIOURS_SECTION);
 
         var thisObj = globalObjForInsp ?? localObjForInsp;

@@ -8,41 +8,69 @@ namespace CrashLauncher;
 
 public sealed partial class GameScene : Scene
 {
-    private static readonly Dictionary<int, string> ParamList2Labels = new()
+    // Amedo 2026-11-19
+    private static readonly Dictionary<int, string> CharacterFloatNames = new()
     {
-        [1]  = "WalkSpeedPercentage",
-        [3]  = "BaseGravity",
-        [4]  = "AirGravity",
-        [5]  = "StrafingSpeed",
+        [0]  = "AiTurnSpeed",
+        [1]  = "Gravity",
+        [2]  = "AiMoveSpeed",
+        [3]  = "FallStartSpeed",
+        [5]  = "GroundSnapHeight",
         [6]  = "WalkSpeed",
         [7]  = "RunSpeed",
-        [9]  = "SpinThrowForwardForce",
-        [10] = "SpinLength",
-        [11] = "SpinDelay",
+        [8]  = "StrafeSpeed",
+        [9]  = "SpinMoveSpeed",
+        [10] = "SpinTime (s)",
+        [11] = "SpinRecoverTime (s)",
+        [12] = "SpinPunchAnimTime (s)",
+        [13] = "SpinPunchRecoverAnimTime (s)",
+        [14] = "JumpAnimTime (s)",
         [15] = "JumpAirSpeed",
-        [16] = "JumpHeight",
-        [17] = "JumpArcUnk18",
-        [18] = "JumpArcUnk19",
-        [19] = "JumpEdgeSpeed",
-        [20] = "DoubleJumpHeight",
-        [21] = "DoubleJumpUnk22",
-        [22] = "DoubleJumpArcUnk",
-        [23] = "SlideJumpForce1",
-        [24] = "SlideJumpForce2",
-        [25] = "SlideJumpForce3",
-        [26] = "SlideJumpArc",
-        [32] = "BodyslamUpwardForce",
-        [33] = "BodyslamGravityForce",
+        [16] = "JumpUpSpeed",
+        [17] = "JumpRiseGravity",
+        [18] = "JumpFallGravity",
+        [19] = "DoubleJumpAirSpeed",
+        [20] = "DoubleJumpUpSpeed",
+        [21] = "DoubleJumpRiseGravity",
+        [22] = "DoubleJumpFallGravity",
+        [23] = "SlideJumpAirSpeed",
+        [24] = "SlideJumpUpSpeed",
+        [25] = "SlideJumpRiseGravity",
+        [26] = "SlideJumpFallGravity",
+        [29] = "AirAttackWindowRising (s)",
+        [30] = "AirAttackWindowFalling (s)",
+        [31] = "BodySlamHangTime (s)",
+        [32] = "BodySlamDropSpeed",
+        [33] = "BodySlamGravity",
+        [34] = "FlyingKickHangTime (s)",
+        [35] = "FlyingKickAirSpeed",
+        [36] = "FlyingKickFallGravity",
+        [37] = "RadialBlastHangTime (s)",
+        [38] = "RadialBlastUpSpeed",
+        [39] = "RadialBlastGravity",
         [40] = "CrawlSpeed",
-        [41] = "CrawlTimeFromStand",
-        [42] = "CrawlTimeToStand",
-        [43] = "CrawlTimeToRun",
+        [41] = "StandToCrouchTime (s)",
+        [42] = "CrouchToStandTime (s)",
+        [43] = "CrawlToStandTime (s)",
         [44] = "SlideSpeed",
-        [45] = "SlideSlowdownTime1",
-        [46] = "SlideSlowdownTime2",
-        [47] = "SlideSlowdownTime3",
-        [48] = "SlideUnk49",
-        [49] = "SlideUnk50",
+        [45] = "SlideStartTime (s)",
+        [46] = "SlideMainTime (s)",
+        [47] = "SlideSlowdownTime (s)",
+        [48] = "SlideToCrouchTime (s)",
+        [49] = "SlideToStandTime (s)",
+        [50] = "GunChargeDelay (s)",
+        [51] = "GunChargedTime (s)",
+        [52] = "GunChargedShotTime (s)",
+        [53] = "GunShotTime (s)",
+        [54] = "GunChargedEmptyTime (s)",
+        [55] = "GunEmptyTime (s)",
+    };
+
+    // Amedo 2026-11-19
+    private static readonly Dictionary<int, string> CharacterIntNames = new()
+    {
+        [0] = "PlayerSlot",
+        [2] = "HitPoints",
     };
 
     private void DrawInspectorInstance(Entity e, InstanceData? inst)
@@ -143,15 +171,17 @@ public sealed partial class GameScene : Scene
 
     private void DrawInspectorInstanceParams(InstanceData inst)
     {
+        var (localObj, globalObj) = InstanceObjects(inst); // Amedo 2026-11-19
+        bool character = (globalObj ?? localObj)?.Type == Twinsanity.TwinsanityInterchange.Interfaces.Items.RM.Code.ITwinObject.ObjectType.Character;
         if (inst.Source.ParamList2.Count > 0)
         {
-            if (ImGui.CollapsingHeader("Character Settings##paramlist2"))
+            if (ImGui.CollapsingHeader(character ? "Character Settings##paramlist2" : "Instance Floats##paramlist2"))
             {
                 if (ImGui.Button("Reset to Original##resetparamlist2"))
                     ResetParamList2ToOriginal(inst);
                 for (int p = 0; p < inst.Source.ParamList2.Count; p++)
                 {
-                    string plabel = ParamList2Labels.TryGetValue(p, out var name) ? $"[{p}] {name}" : $"Param[{p}]";
+                    string plabel = character && CharacterFloatNames.TryGetValue(p, out var name) ? $"[{p}] {name}" : $"Param[{p}]";
                     float pval = inst.Source.ParamList2[p];
                     if (ImGui.InputFloat($"{plabel}##paramlist2_{p}", ref pval))
                         inst.Source.ParamList2[p] = pval;
@@ -179,12 +209,13 @@ public sealed partial class GameScene : Scene
         // Amedo 2026-09-23
         if (inst.Source.ParamList3.Count > 0)
         {
-            if (ImGui.CollapsingHeader("IVars (raw)##paramlist3ivars"))
+            if (ImGui.CollapsingHeader(character ? "Player##paramlist3ivars" : "IVars (raw)##paramlist3ivars")) // Amedo 2026-11-19
             {
                 for (int p = 0; p < inst.Source.ParamList3.Count; p++)
                 {
                     int pval3 = unchecked((int)inst.Source.ParamList3[p]);
-                    if (ImGui.InputInt($"[{p}]##ivars_{p}", ref pval3))
+                    string ilabel = character && CharacterIntNames.TryGetValue(p, out var iname) ? $"[{p}] {iname}" : $"[{p}]"; // Amedo 2026-11-19
+                    if (ImGui.InputInt($"{ilabel}##ivars_{p}", ref pval3))
                         inst.Source.ParamList3[p] = unchecked((uint)pval3);
                 }
             }
