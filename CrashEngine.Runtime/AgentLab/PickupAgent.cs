@@ -164,13 +164,14 @@ public sealed class PickupAgent
         var s = World.PickupSettings(SettingsIndex);
         switch (State)
         {
-            case 2: SetState(Idle, now); break;
+            case 2: Trails(); SetState(Idle, now); break; // Amedo 2026-11-16
             case Idle:
                 if (((s.Flags >> 6) & 1) != 0) SpinStep();
+                Trails(); // Amedo 2026-11-16
                 break;
-            case SuckIn: StepMotion(s, now); break; // Amedo 2026-09-30
-            case Collect: SetState(Inactive, now); break;
-            case FlyAway: StepMotion(s, now); break; // Amedo 2026-09-30
+            case SuckIn: Trails(); StepMotion(s, now); break; // Amedo 2026-11-16
+            case Collect: Trails(); SetState(Inactive, now); break; // Amedo 2026-11-16
+            case FlyAway: Trails(); StepMotion(s, now); break; // Amedo 2026-11-16
             case 9: SetState(Inactive, now); break;
         }
         _updated = now;
@@ -183,6 +184,9 @@ public sealed class PickupAgent
         uint over = metric - _extra;
         return over <= AgentLabWorld.GateNear ? 0 : over - AgentLabWorld.GateNear;
     }
+
+    // Amedo 2026-11-16
+    private void Trails() => _owner.UpdateParticleTrails_237A18();
 
     private void SpinStep()
     {

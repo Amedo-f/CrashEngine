@@ -14,7 +14,7 @@ public sealed partial class AgentLabAgent
 
     internal void UpdateTrailsNow()
     {
-        if (!_destroyed && Entity.Active) UpdateTrails();
+        if (!_destroyed && Entity.Active) UpdateParticleTrails_237A18(); // Amedo 2026-11-16
     }
 
     internal void DespawnSelf() => DestroySelf();

@@ -151,6 +151,32 @@ public sealed partial class AgentLabAgent
         return -1;
     }
 
+    // Amedo 2026-11-16
+    internal void UpdateParticleTrails_237A18()
+    {
+        if (_trails is null || World.Particles is not { } fx) return;
+        foreach (var t in _trails)
+        {
+            int handle = t.Handle;
+            if (t.System != 0xFFFF)
+            {
+                if (handle < 0) handle = StartTrail_23EA48(fx, t);
+            }
+            else handle = StopEmitter_23EB00(handle);
+            if (handle >= 0)
+            {
+                var m = RootMatrix(TrailEmitMatrix(t));
+                if ((t.Flags & TrailFollow) != 0) fx.SetRenderMatrix(handle, m);
+                else fx.SetEmitMatrix(handle, m);
+            }
+            t.Handle = handle;
+        }
+    }
+
+    // Amedo 2026-11-16
+    private int StartTrail_23EA48(RuntimeParticles fx, Trail t) =>
+        fx.Spawn(t.System, 0, (t.Flags & TrailFollow) == 0, RootPoint(GamePosition));
+
     internal void AddDefaultTrail(ushort system)
     {
         TrailList(); // Amedo

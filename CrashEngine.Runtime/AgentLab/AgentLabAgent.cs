@@ -124,7 +124,7 @@ public sealed partial class AgentLabAgent : Component
         StepBehaviour(); // Amedo 2026-09-27
         if (Pickup is not null || Projectile is not null || !HasScript_22FA24) TrajectoryFrame_23A6D8(); // Amedo
         if (character) EndCharacterStep_22F758(); // Amedo 2026-09-29
-        if (!_destroyed && Entity.Active && Projectile is null) UpdateTrails(); // Amedo 2026-10-06
+        if (!_destroyed && Entity.Active && Projectile is null && Pickup is null) UpdateTrails(); // Amedo 2026-11-16
     }
 
     private bool HasScript_22FA24 => Behaviour is not null || _otherChannel is { Behaviour: not null }; // Amedo
