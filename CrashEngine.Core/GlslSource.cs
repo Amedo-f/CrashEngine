@@ -32,6 +32,7 @@ public static partial class GlslSource
     public static string ForContext(string src, List<UniformDefault>? defaults = null)
     {
         foreach (var name in Defines) src = WithDefine(src, name);
+        if (GlCaps.ModernSkin) src = WithDefine(src, "MODERN_SKIN"); // Amedo 2026-11-18
         return Engine.Instance is { Gles: true } ? ToEs(src, defaults) : src;
     }
 

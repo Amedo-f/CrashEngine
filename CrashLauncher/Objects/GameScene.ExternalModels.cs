@@ -15,6 +15,7 @@ public sealed partial class GameScene : Scene
         if (chunkRoot is null || chunkSource?.Rm2 is null) { _browser.Log("Add Model: no level currently loaded."); return; }
         if (CrashEngine.Assets.CharacterImporter.HasSkeleton(modelPath) && ImportCharacter(modelPath, flipX)) return; // Amedo 2026-10-05
 
+        var modern = ReadModernCharacter(modelPath); // Amedo 2026-11-18
         var raw = CrashEngine.Assets.ModelImporter.ExtractRawSubmeshes(modelPath);
         if (raw is null || raw.Count == 0) { _browser.Log($"Add Model: couldn't read any meshes from {Path.GetFileName(modelPath)}. {CrashEngine.Assets.ModelImporter.LastReport}"); return; } // Amedo
 
@@ -52,6 +53,7 @@ public sealed partial class GameScene : Scene
 
             var instRoot = InstancesRoot(chunkRoot);
             var newEntity = AddOrReuseInstance(section, inst, instRoot, chunkSource);
+            if (modern is not null) AddModernLook(newEntity, modelPath, modern); // Amedo 2026-11-18
 
             SelectClicked(newEntity, false);
             if (CrashEngine.Assets.ModelImporter.LastReport is { Length: > 0 } importNotes) _browser.Log($"Add Model: {importNotes}"); // Amedo 2026-10-02

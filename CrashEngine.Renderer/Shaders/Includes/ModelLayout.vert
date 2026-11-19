@@ -11,6 +11,23 @@ layout (location = 5) in vec3 in_BoneMatrixIndices;
 layout (location = 6) in vec3 in_BoneWeights;
 layout (location = 7) in mat4 in_InstanceModelMatrix;
 layout (location = 11) in vec3 in_SmoothNormal; // Amedo
+#ifdef MODERN_SKIN
+layout (location = 12) in uvec4 in_ModernJoints; // Amedo 2026-11-18
+layout (location = 13) in vec4 in_ModernWeights0; // Amedo 2026-11-18
+layout (location = 14) in vec4 in_ModernWeights1; // Amedo 2026-11-18
+uniform int ModernSkin; // Amedo 2026-11-18
+layout (std430, binding = 4) readonly buffer ModernBoneBlock { mat4 ModernBones[]; }; // Amedo 2026-11-18
+
+// Amedo 2026-11-18
+mat4 ModernSkinMatrix()
+{
+    uvec4 j = in_ModernJoints;
+    vec4 a = in_ModernWeights0, b = in_ModernWeights1;
+    if (dot(a, vec4(1.0)) + dot(b, vec4(1.0)) <= 0.0) return mat4(1.0);
+    return ModernBones[j.x & 0xFFFFu] * a.x + ModernBones[j.x >> 16] * a.y + ModernBones[j.y & 0xFFFFu] * a.z + ModernBones[j.y >> 16] * a.w
+         + ModernBones[j.z & 0xFFFFu] * b.x + ModernBones[j.z >> 16] * b.y + ModernBones[j.w & 0xFFFFu] * b.z + ModernBones[j.w >> 16] * b.w;
+}
+#endif
 
 out vec3 Position;
 out vec2 Texpos;

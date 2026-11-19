@@ -251,6 +251,20 @@ public static partial class MeshDecoder // Amedo 2026-10-05
         return true;
     }
 
+    // Amedo 2026-11-18
+    public static bool SetStillSlotCount(object tablesHandle, uint objectId, int count)
+    {
+        if (tablesHandle is not RmTables tables || !tables.Objects.TryGetValue(objectId, out var obj) || obj.OGISlots.Count == 0) return false;
+        ushort ogi = obj.OGISlots[0];
+        if (obj.OGISlots.Any(o => o != ogi) || obj.AnimationSlots.Any(a => a != 0xFFFF)) return false;
+        count = Math.Max(count, 1);
+        while (obj.OGISlots.Count > count) obj.OGISlots.RemoveAt(obj.OGISlots.Count - 1);
+        while (obj.AnimationSlots.Count > count) obj.AnimationSlots.RemoveAt(obj.AnimationSlots.Count - 1);
+        while (obj.OGISlots.Count < count) obj.OGISlots.Add(ogi);
+        while (obj.AnimationSlots.Count < count) obj.AnimationSlots.Add(0xFFFF);
+        return true;
+    }
+
     public static bool SwapCharacterSkin(PS2AnyTwinsanityRM2 rm2, object tablesHandle,
         uint targetObjectId, uint sourceOgiId, out ushort originalOgiId, out ushort clonedOgiId, out string log)
     {

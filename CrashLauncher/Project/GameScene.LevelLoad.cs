@@ -113,6 +113,7 @@ public sealed partial class GameScene : Scene
 	private void FinishLevelLoad(GL gl, RenderPipeline pipeline, bool useShadowDir, LevelParts parts, CollisionTileMatch? tiles)
 	{
 		Entity entity = parts.Root;
+		AttachModernLooks(entity); // Amedo 2026-11-18
 		if (parts.GlobalEffectsPending && entity.Get<ChunkSource>()?.Sm2 is { } sm2) MeshDecoder.ApplyGlobalEffects(sm2, entity); // Amedo 2026-11-15
 		if (parts.ScriptCount is { } scriptCount) _scriptCount = scriptCount;
 		System.Numerics.Vector3? lastFogColor = MeshDecoder.LastFogColor;

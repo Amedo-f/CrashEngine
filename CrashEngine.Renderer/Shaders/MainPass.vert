@@ -102,6 +102,17 @@ void main()
 	vec3 skinnedSmooth = in_SmoothNormal; // Amedo
 	vec3 half2 = max(ShapeHalf * ShapeHalf, vec3(1e-4)); // Amedo
 	vec3 skinnedShape = ShapeCenter.w > 0.5 ? (in_Position - ShapeCenter.xyz) / half2 : vec3(0.0);
+#ifdef MODERN_SKIN
+	if (ModernSkin != 0) // Amedo 2026-11-18
+	{
+	mat4 skin = ModernSkinMatrix();
+	processedPosition = (skin * vec4(processedPosition, 1.0)).xyz;
+	skinnedNormal = normalize(mat3(skin) * in_Normal);
+	skinnedSmooth = skinnedNormal;
+	skinnedShape = vec3(0.0);
+	}
+	else
+#endif
 	if (boneWeight != 0.0)
 	{
 	vec4 pos1 = (BoneMatrices[uint(in_BoneMatrixIndices.x)] * vec4(processedPosition, 1.0)) * in_BoneWeights.x;
@@ -136,6 +147,13 @@ void main()
 	Texpos = in_Texpos;
 	Normal = mat3(model) * skinnedNormal;
 	SmoothNormal = mat3(model) * skinnedSmooth; // Amedo
+#ifdef MODERN_SKIN
+	if (ModernSkin != 0) // Amedo 2026-11-18
+	{
+	Normal = normalize(Normal);
+	SmoothNormal = Normal;
+	}
+#endif
 	ShapeNormal = mat3(model) * skinnedShape; // Amedo
 	EnvTexpos = twin_material.env_map <= 0.5 ? vec2(0.0) // Amedo 2026-09-30
 		: twin_material.env_map > 2.5 // Amedo 2026-09-26

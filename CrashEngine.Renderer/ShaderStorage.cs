@@ -24,6 +24,15 @@ public sealed class ShaderStorage : IDisposable
         _gl.BindBuffer(BufferTargetARB.ShaderStorageBuffer, 0);
     }
 
+    // Amedo 2026-11-18
+    public void Upload(ReadOnlySpan<Matrix4x4> data, uint binding) => Upload(System.Runtime.InteropServices.MemoryMarshal.Cast<Matrix4x4, Vector4>(data), binding);
+
+    // Amedo 2026-11-18
+    public void Bind(uint binding)
+    {
+        if (_id != 0) _gl.BindBufferBase(BufferTargetARB.ShaderStorageBuffer, binding, _id);
+    }
+
     public void Dispose()
     {
         if (_id != 0) _gl.DeleteBuffer(_id);

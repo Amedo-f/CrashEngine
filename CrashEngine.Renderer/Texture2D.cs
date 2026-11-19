@@ -260,10 +260,16 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         try
         {
             using var stream = File.OpenRead(path);
-            var img = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
-            return new Texture2D(gl, img.Data, (uint)img.Width, (uint)img.Height);
+            return FromStream(gl, stream); // Amedo 2026-11-18
         }
         catch { return null; }
+    }
+
+    // Amedo 2026-11-18
+    public static Texture2D FromStream(GL gl, Stream stream)
+    {
+        var img = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+        return new Texture2D(gl, img.Data, (uint)img.Width, (uint)img.Height);
     }
 
     // Amedo 2026-09-22

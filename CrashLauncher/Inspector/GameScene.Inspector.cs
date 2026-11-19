@@ -75,6 +75,7 @@ public sealed partial class GameScene : Scene
 
         var anim = e.Get<CrashEngine.Importer.AnimatedObject>();
         DrawInspectorAnimations(e, anim, inst);
+        DrawInspectorModernCharacter(e); // Amedo 2026-11-18
 
         DrawInspectorAgentLabState(e);
 

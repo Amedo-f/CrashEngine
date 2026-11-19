@@ -11,6 +11,7 @@ public static class GlCaps
     public static bool GpuTimer { get; private set; } = true;
     public static bool PolygonMode { get; private set; } = true;
     public static int VertexStorageBlocks { get; private set; } = 16;
+    public static bool ModernSkin => VertexStorageBlocks >= 2; // Amedo 2026-11-18
     public static bool TiledMsaa { get; private set; }
     public static bool InvalidateFramebuffer { get; private set; }
     public static bool Mesa { get; private set; } // Amedo 2026-11-15

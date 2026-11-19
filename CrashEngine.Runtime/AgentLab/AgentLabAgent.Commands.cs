@@ -441,6 +441,7 @@ public sealed partial class AgentLabAgent
             PlayGroup(foreign, arg0, args, blend);
             return;
         }
+        if (PlayModernSlot(slot, arg0, args, blend)) return; // Amedo 2026-11-18
         if (Anim is null) return;
         if (GameObject is { } own && (slot >= own.OGISlots.Count || own.OGISlots[slot] == 0xFFFF)) return; // Amedo
         var group = Anim.Groups.FirstOrDefault(g => g.SlotIndex == slot);
@@ -462,6 +463,14 @@ public sealed partial class AgentLabAgent
     private void PlayGroup(AnimatedObject.SlotGroup group, uint arg0, List<uint> args, float blend)
     {
         if (Anim is null) return;
+        float speed = RequestSpeed(arg0, args, AnimatedObject.NaturalDuration(group)); // Amedo 2026-11-18
+        Anim.Request(group, arg0, blend, speed, BitConverter.UInt32BitsToSingle(args[4])); // Amedo 2026-09-27
+        if (!Rendered) ApplyRendered(); // Amedo 2026-09-27
+    }
+
+    // Amedo 2026-11-18
+    private float RequestSpeed(uint arg0, List<uint> args, float naturalDuration)
+    {
         float speed = 1f;
         if ((arg0 & 0x4000) != 0)
         {
@@ -471,10 +480,9 @@ public sealed partial class AgentLabAgent
         else if ((arg0 & 0x8000) != 0)
         {
             float wanted = FloatValueOf(args[2]);
-            speed = wanted > 0f ? AnimatedObject.NaturalDuration(group) / wanted : 1e30f;
+            speed = wanted > 0f ? naturalDuration / wanted : 1e30f;
         }
-        Anim.Request(group, arg0, blend, speed, BitConverter.UInt32BitsToSingle(args[4])); // Amedo 2026-09-27
-        if (!Rendered) ApplyRendered(); // Amedo 2026-09-27
+        return speed;
     }
 
     private void SetCounter(uint arg0, uint valueWord)

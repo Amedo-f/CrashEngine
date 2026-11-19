@@ -63,7 +63,7 @@ public sealed class AnimatedObject : CrashEngine.Core.Component
     public const uint LoopFlag = 0x1000, BlendFlag = 0x2000, StartPhaseFlag = 0x20000, SyncPhaseFlag = 0x40000, AppendFlag = 0x100000;
 
     private const float TickRate = 9000f;
-    private const float TickTime = 1f / 9000f;
+    internal const float TickTime = 1f / 9000f; // Amedo 2026-11-18
 
     // Amedo 2026-09-27
     private sealed class Layer

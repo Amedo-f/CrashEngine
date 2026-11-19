@@ -100,6 +100,8 @@ public static class CharacterImporter
         foreach (var n in order)
             if (boneNames.Contains(n.Name))
                 for (var p = n; p is not null && p != scene.RootNode; p = p.Parent) wanted.Add(p);
+        foreach (var n in order) // Amedo 2026-11-18
+            if (!wanted.Contains(n) && n.MeshCount == 0 && n.Parent is { } wp && wanted.Contains(wp)) wanted.Add(n); // Amedo 2026-11-18
         var rc = new RawCharacter();
         var index = new Dictionary<string, int>();
         var nodes = new List<Node>();
@@ -141,10 +143,12 @@ public static class CharacterImporter
                 }
                 var joint = new int[m.VertexCount * WeightsPerVertex];
                 var weight = new float[m.VertexCount * WeightsPerVertex];
+                int rigidJoint = RigidJoint(n, index); // Amedo 2026-11-18
+                if (m.BoneCount == 0) rc.Notes.Add(rigidJoint >= 0 ? $"mesh '{m.Name}' has no bone weights and moves with bone '{rc.Joints[rigidJoint].Name}'" : $"mesh '{m.Name}' has no bone weights and follows the first bone"); // Amedo 2026-11-18
                 for (int v = 0; v < m.VertexCount; v++)
                 {
                     var list = influences[v];
-                    if (list is null || list.Count == 0) { unweighted++; weight[v * WeightsPerVertex] = 1f; continue; }
+                    if (list is null || list.Count == 0) { unweighted++; joint[v * WeightsPerVertex] = Math.Max(rigidJoint, 0); weight[v * WeightsPerVertex] = 1f; continue; } // Amedo 2026-11-18
                     var top = list.OrderByDescending(x => x.Weight).Take(WeightsPerVertex).ToList();
                     float sum = top.Sum(x => x.Weight);
                     for (int k = 0; k < top.Count; k++)
@@ -179,10 +183,18 @@ public static class CharacterImporter
                     pose[j] = Scaled(l, unit);
                 }
             }
-            rc.Clips.Add(new RawClip { Name = anim.Name, Fps = fps, Local = local });
+            rc.Clips.Add(new RawClip { Name = anim.Name[(anim.Name.LastIndexOf('|') + 1)..], Fps = fps, Local = local }); // Amedo 2026-11-18
         }
         if (unit != 1f) rc.Notes.Add(FormattableString.Invariant($"FBX unit scaled x{unit:0.####} to meters"));
         return rc;
+    }
+
+    // Amedo 2026-11-18
+    private static int RigidJoint(Node meshNode, Dictionary<string, int> joints)
+    {
+        for (var p = meshNode.Parent; p is not null; p = p.Parent)
+            if (joints.TryGetValue(p.Name, out int j)) return j;
+        return -1;
     }
 
     private static SysMat Sample(NodeAnimationChannel ch, double t, Matrix4x4 rest)
