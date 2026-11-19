@@ -218,7 +218,7 @@ public sealed class CharacterLocomotion
     private bool AnalogSpeed_13FD18() => _c.Controlled_13FD18(); // Amedo
 
     // Amedo 2026-10-05
-    private float Speed_1602E0() => 0f < _c.Param(7) ? _c.Param(7) : _c.Param(6);
+    internal float Speed_1602E0() => 0f < _c.Param(7) ? _c.Param(7) : _c.Param(6); // Amedo 2026-11-19
 
     public bool ForcedTimed;
     public int ForcedDuration;

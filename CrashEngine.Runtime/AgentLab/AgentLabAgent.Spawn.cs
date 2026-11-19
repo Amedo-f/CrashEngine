@@ -32,7 +32,7 @@ public sealed partial class AgentLabAgent
         if (_spawnedBy is { _spawnCount: > 0 } parent) parent._spawnCount--;
     }
 
-    private AgentLabAgent? CachedTemplate()
+    internal AgentLabAgent? CachedTemplate() // Amedo 2026-11-19
     {
         if (_slot11C is { Destroyed: true } && !_keepCached) _slot11C = null;
         return _slot11C;

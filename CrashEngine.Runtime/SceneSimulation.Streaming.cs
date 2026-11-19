@@ -349,6 +349,8 @@ public sealed partial class SceneSimulation
         if (agent.OwnCharacter is not { } c) return; // Amedo 2026-09-29
         c.Body5?.Transfer_28D698(obj);
         c.Transfer_13BEA0(obj);
+        if (c.InstanceInt_2619D8?.Invoke(0) == 1 && agent.CachedTemplate() is { Pickup: null, Projectile: null } held && (held.Instance.ObjectId & 0x7FFF) == 0x264) // Amedo 2026-11-19
+            Transfer_197650(held, obj, target, home, moving);
         if (c.Link is { IsLeader: true } link && link.Follower_15FE98() is { } fc // Amedo 2026-10-05
             && World.Agents.FirstOrDefault(a => ReferenceEquals(a.OwnCharacter, fc)) is { } follower && ReferenceEquals(follower.Chunk, from))
             Transfer_197650(follower, obj, target, home, moving);

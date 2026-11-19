@@ -202,7 +202,7 @@ public sealed partial class CharacterController
     public int IntParam(int i) => i < _ints.Count ? (int)_ints[i] : 0;
 
     // Amedo
-    internal bool Controlled_13FD18() => IntParam(0) == 4 || AutomaticInput;
+    internal bool Controlled_13FD18() => InstanceInt_2619D8?.Invoke(0) == 4 || AutomaticInput; // Amedo 2026-11-19
     public void SetParam(int i, float value) { if (i < _floats.Length) _floats[i] = value; }
 
     public bool Carrying => (MotionFlagsHigh & ((1u << 21) | (1u << 22))) != 0;
@@ -993,7 +993,7 @@ public sealed partial class CharacterController
             if (((ComponentMaskOf?.Invoke(owner) ?? 0u) & 0x1FF000u) == 0) continue;
             if (((StateFlagsOf?.Invoke(owner) ?? 0u) & 0x800) != 0) continue;
             crushed = false;
-            Touch?.Invoke(owner, 8);
+            if (TouchClass_131ED0(owner) != 0) Touch?.Invoke(owner, 8); // Amedo 2026-11-19
         }
         return crushed;
     }
@@ -1353,7 +1353,7 @@ public sealed partial class CharacterController
     {
         GroundPoint = Vector3.Transform(GroundPoint, obj);
         FallStart = Vector3.Transform(FallStart, obj);
-        GroundNormal = Vector3.TransformNormal(GroundNormal, obj);
+        Override1A0 = Vector3.TransformNormal(Override1A0, obj); // Amedo 2026-11-19
         PrevCenter_280 = Vector3.Transform(PrevCenter_280, obj); // Amedo 2026-11-14
         if (Link is { IsLeader: false } own) // Amedo 2026-10-05
         {
@@ -1484,9 +1484,8 @@ public sealed partial class CharacterController
     // Amedo 2026-09-29
     private float MaxSpeed_13FDA8()
     {
-        if (Bones.Kind == 4) return 1f;
-        float run = Param(7);
-        return run <= 0f ? Param(6) : run;
+        if (Vehicle is not null || !HasAir) return 1f; // Amedo 2026-11-19
+        return Locomotion.Speed_1602E0(); // Amedo 2026-11-19
     }
 
     private void MoveFromDirection(Vector3 dir, float len, Matrix4x4 m)
