@@ -58,6 +58,10 @@
       <Link>libminizip.copyright</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\Libraries\Native\Linux\libPS2ImageMaker.so">
+      <Link>libPS2ImageMaker.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- 2026-09-04: editor-only UI assets (not real game data), e.g. the Camera layout marker's
@@ -75,7 +79,7 @@
 
   <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs).
        Content item so it lands in BOTH build and publish output. -->
-  <ItemGroup>
+  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux'))">
     <Content Include="..\Libraries\Native\Windows\PS2ImageMaker.dll">
       <Link>PS2ImageMaker.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
