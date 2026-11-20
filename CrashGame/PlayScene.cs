@@ -30,6 +30,7 @@ sealed class PlayScene : Scene
     private CrashEngine.Runtime.AgentLab.AgentLabWorld? _from; // Amedo
     private string? _switchTo; // Amedo
     private bool _switching; // Amedo
+    private bool _collectLastLevel; // Amedo 2026-11-19
     public static Func<string[]>? OverlayLines; // Amedo 2026-10-26
     public static float OverlayScale = 1f; // Amedo 2026-10-26
     public static Vector2 OverlayPosition = new(10f, 10f); // Amedo 2026-10-26
@@ -126,6 +127,7 @@ sealed class PlayScene : Scene
         {
             _from = null; // the last level's world is only needed for what carries over
             _sim.World.ContinueLevelSwitch(from);
+            _collectLastLevel = true; // Amedo 2026-11-19
         }
         else _sim.World.BootToTitle(play.BootStraight ? _cfg.Level : null);
         if (_cfg.RecordInput && InputTape.Current is null) // Amedo
@@ -161,6 +163,41 @@ sealed class PlayScene : Scene
         if (_levelRoot is { } root) root.Active = false;
         _levelGpu.DisposeAll();
         Console.WriteLine($"[CrashGame] this level unloaded before the next one loads: GPU {before / 1048576} -> {(GpuStats.TextureBytes + GpuStats.MeshBytes) / 1048576} MB");
+    }
+
+    // Amedo 2026-11-19
+    private void CollectLastLevel()
+    {
+        _collectLastLevel = false;
+        Collect("last level");
+    }
+
+    // Amedo 2026-11-20
+    private const long HeldGarbageBytes = 32L << 20;
+    private long _liveAfterCollect;
+    private int _lastRunState = 1;
+
+    // Amedo 2026-11-20
+    private void CollectWhenHeld(SceneSimulation sim)
+    {
+        int runState = sim.World.RunState_309718;
+        if (runState == 3 && _lastRunState != 3 && GC.GetTotalMemory(false) - _liveAfterCollect >= HeldGarbageBytes) Collect("world held:");
+        _lastRunState = runState;
+    }
+
+    // Amedo 2026-11-20
+    private void Collect(string why)
+    {
+        long heap = GC.GetTotalMemory(false), before, setBefore;
+        using (var self = System.Diagnostics.Process.GetCurrentProcess()) { before = self.PrivateMemorySize64; setBefore = self.WorkingSet64; } // Amedo 2026-11-20
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers(); // Amedo 2026-11-20
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true); // Amedo 2026-11-20
+        _liveAfterCollect = GC.GetTotalMemory(false);
+        using var after = System.Diagnostics.Process.GetCurrentProcess(); // Amedo 2026-11-20
+        Console.WriteLine($"[CrashGame] {why} collected in {watch.ElapsedMilliseconds} ms: C# {heap / 1048576} -> {_liveAfterCollect / 1048576} MB, process memory {before / 1048576} -> {after.PrivateMemorySize64 / 1048576} MB, in use {setBefore / 1048576} -> {after.WorkingSet64 / 1048576} MB");
     }
 
     // Amedo 2026-11-09
@@ -314,6 +351,7 @@ sealed class PlayScene : Scene
     {
         _perf.Frame();
         KeepFullscreen();
+        if (_collectLastLevel) CollectLastLevel(); // Amedo 2026-11-19
         if (Input.KeyDown(Key.Escape) || (_cfg.QuitAfter > 0 && EngineTime.Total >= _cfg.QuitAfter))
         {
             Engine.Instance.Quit();
@@ -327,6 +365,7 @@ sealed class PlayScene : Scene
         sim.SetCamera(new Vector3(v.M11, v.M21, v.M31), new Vector3(v.M12, v.M22, v.M32), -new Vector3(v.M13, v.M23, v.M33));
         PadInput.Read(sim.Pad);
         sim.Tick(EngineTime.Delta);
+        CollectWhenHeld(sim); // Amedo 2026-11-20
         if (_switchTo is { } next && !_switching && LevelReady(next)) // Amedo 2026-11-09
         {
             _switching = true;
