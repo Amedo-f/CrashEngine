@@ -49,8 +49,8 @@ public static class PlayInstall
     {
         try
         {
-            var root = Path.GetPathRoot(Path.GetFullPath(installFolder));
-            if (root is null) return null;
+            var root = PlatformFiles.DriveRoot(installFolder); // Amedo 2026-11-20
+            if (root.Length == 0) return null;
             long need = DiscBytes(iso) + 400L * 1024 * 1024, free = new DriveInfo(root).AvailableFreeSpace;
             return free < need ? $"Not enough space on {root}: needs about {need / 1e9:0.0} GB, {free / 1e9:0.0} GB free." : null;
         }

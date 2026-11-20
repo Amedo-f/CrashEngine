@@ -339,7 +339,7 @@ public sealed class ImGuiFileBrowser
         string? driveTarget = null;
         try
         {
-            foreach (var d in DriveInfo.GetDrives().Where(d => d.IsReady))
+            foreach (var d in CrashEngine.Platform.PlatformFiles.Drives()) // Amedo 2026-11-20
                 if (ImGui.Selectable(d.RootDirectory.FullName))
                     driveTarget = d.RootDirectory.FullName;
         }

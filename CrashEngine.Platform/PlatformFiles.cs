@@ -25,8 +25,19 @@ public static class PlatformFiles
         else if (OperatingSystem.IsLinux())
         {
             var icon = Path.Combine(Path.GetFullPath(workingDirectory), "Icons", "game-icon-48.png");
-            DesktopEntry.Create(Path.GetFullPath(Path.Combine(folder, name + ".desktop")), Path.GetFullPath(target), Path.GetFullPath(workingDirectory), name,
-                File.Exists(icon) ? icon : null);
+            DesktopEntry.Install(Path.GetFullPath(folder), name, Path.GetFullPath(target), Path.GetFullPath(workingDirectory), File.Exists(icon) ? icon : null);
         }
+    }
+
+    public static string DriveRoot(string path)
+    {
+        if (OperatingSystem.IsLinux()) return LinuxDrives.MountOf(path);
+        return Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+    }
+
+    public static IEnumerable<DriveInfo> Drives()
+    {
+        var drives = OperatingSystem.IsLinux() ? LinuxDrives.UserDrives() : DriveInfo.GetDrives();
+        return drives.Where(d => d.IsReady);
     }
 }
