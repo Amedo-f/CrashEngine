@@ -660,7 +660,8 @@ public sealed partial class SceneSimulation
     private static string? ResolveMovie(string? musicDirectory, string name)
     {
         if (musicDirectory is null || Directory.GetParent(musicDirectory) is not { } disc) return null;
-        string? dir = Path.GetDirectoryName(GamePaths.OnDisk(disc.FullName, name));
+        string folder = GamePaths.Folder(name); // Amedo 2026-11-20
+        string? dir = folder.Length == 0 ? disc.FullName : GamePaths.FindOnDisk(disc.FullName, folder.Split(GamePaths.Separator)); // Amedo 2026-11-20
         if (dir is null || !Directory.Exists(dir)) return null;
         string file = GamePaths.FileName(name);
         foreach (string ext in MovieExtensions)

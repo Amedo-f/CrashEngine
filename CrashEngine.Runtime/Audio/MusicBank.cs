@@ -1,3 +1,5 @@
+using CrashEngine.Core;
+
 namespace CrashEngine.Runtime.Audio;
 
 // Amedo 2026-09-28
@@ -25,7 +27,7 @@ public sealed class MusicBank
 
     public static MusicBank? Open(string directory, string name)
     {
-        string mh = Path.Combine(directory, name + ".MH"), mb = Path.Combine(directory, name + ".MB");
+        string mh = GamePaths.FindOnDisk(directory, name + ".MH"), mb = GamePaths.FindOnDisk(directory, name + ".MB"); // Amedo 2026-11-20
         if (!File.Exists(mh) || !File.Exists(mb)) return null;
         using var r = new BinaryReader(File.OpenRead(mh));
         int count = r.ReadInt32(), interleave = r.ReadInt32();

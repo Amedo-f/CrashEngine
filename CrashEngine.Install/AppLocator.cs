@@ -1,9 +1,11 @@
+using CrashEngine.Platform;
+
 namespace CrashEngine.Install;
 
 // Amedo 2026-11-12
 public static class AppLocator
 {
-    public const string EditorExe = "CrashLauncher.exe", HubExe = "CrashEngine Hub.exe";
+    public static readonly string EditorExe = PlatformInfo.ExeFile("CrashLauncher"), HubExe = PlatformInfo.ExeFile("CrashEngine Hub"); // Amedo 2026-11-20
 
     // Amedo 2026-11-15
 #if DEBUG

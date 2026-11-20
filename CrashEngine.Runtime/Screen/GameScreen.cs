@@ -44,7 +44,7 @@ public sealed partial class GameScreen // Amedo 2026-10-01
         GameFont.Page? particles = ReadParticlePage(globalRm2, 0); // Amedo
         int iconSize = 0; // Amedo
         GameTexts? agentLab = GameTexts.FromLanguage(languageDirectory, GameTexts.AgentLabFile), code = GameTexts.FromLanguage(languageDirectory, GameTexts.CodeFile); // Amedo 2026-10-01
-        var bd = discDirectory is null ? null : Path.Combine(discDirectory, "CRASH.BD");
+        var bd = discDirectory is null ? null : GamePaths.FindOnDisk(discDirectory, "CRASH.BD"); // Amedo 2026-11-20
         if (bd is not null && File.Exists(bd))
         {
             try
@@ -184,7 +184,7 @@ public sealed partial class GameScreen // Amedo 2026-10-01
     // Amedo 2026-10-01
     public static int ExportOriginalTexts(string discDirectory, string languageDirectory, string? discLanguage = null) // Amedo
     {
-        using var pkg = PackageReader.Open(Path.Combine(discDirectory, "CRASH.BD"));
+        using var pkg = PackageReader.Open(GamePaths.FindOnDisk(discDirectory, "CRASH.BD")); // Amedo 2026-11-20
         Directory.CreateDirectory(languageDirectory);
         int written = 0;
         string lang = discLanguage ?? PlaySettings.DetectDiscLanguage(discDirectory); // Amedo

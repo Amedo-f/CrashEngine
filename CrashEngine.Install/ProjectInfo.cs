@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CrashEngine.Core;
 
 namespace CrashEngine.Install;
 
@@ -29,7 +30,7 @@ public sealed record ProjectInfo(string Name, string Folder, string Tson, string
     {
         if (disc is null || !Directory.Exists(disc)) return "";
         foreach (var known in GameDiscs.Known)
-            if (File.Exists(Path.Combine(disc, known.Exe))) return known.Region;
+            if (File.Exists(GamePaths.FindOnDisk(disc, known.Exe))) return known.Region; // Amedo 2026-11-20
         return "";
     }
 }

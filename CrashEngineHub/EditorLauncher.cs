@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using CrashEngine.Install;
+using CrashEngine.Platform;
 
 namespace CrashEngineHub;
 
@@ -9,7 +10,7 @@ public static class EditorLauncher
     public static string? Start(params string[] args)
     {
         var exe = AppLocator.Find(AppLocator.EditorExe, "CrashLauncher");
-        if (exe is null) return "The editor (CrashLauncher.exe) was not found next to the Hub.";
+        if (exe is null) return $"The editor ({AppLocator.EditorExe}) was not found next to the Hub."; // Amedo 2026-11-20
         try
         {
             var psi = new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(exe)!, UseShellExecute = false };
@@ -25,7 +26,7 @@ public static class EditorLauncher
 
     public static void ShowFolder(string folder)
     {
-        try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true })?.Dispose(); }
+        try { PlatformFiles.ShowFolder(folder); } // Amedo 2026-11-20
         catch (Exception ex) { Console.WriteLine($"[hub] open folder: {ex.Message}"); }
     }
 }

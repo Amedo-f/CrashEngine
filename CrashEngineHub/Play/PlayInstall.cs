@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using CrashEngine.Install;
 using CrashEngine.Platform;
-using CrashEngine.Platform.Windows;
 
 namespace CrashEngineHub;
 
@@ -11,7 +10,7 @@ public static class PlayInstall
 {
     public const string GameName = "Crash Twinsanity";
     public const string GameFolder = "game";
-    public const string DiscFolder = "game\\disc\\ps2";
+    public static readonly string DiscFolder = Path.Combine("game", "disc", "ps2"); // Amedo 2026-11-20
 
     public sealed record Request(string Iso, GameDiscs.Disc Disc, string InstallFolder, string ShortcutFolder, string? Language, ModCard? Mod);
 
@@ -89,8 +88,7 @@ public static class PlayInstall
         WriteGameJson(target, project);
         WriteGraphicsJson(target);
         progress("Making the shortcut...", 1f);
-        if (OperatingSystem.IsWindows())
-            WinShortcut.Create(Path.GetFullPath(Path.Combine(r.ShortcutFolder, GameName + ".lnk")), Path.GetFullPath(Exe(r.InstallFolder)), Path.GetFullPath(target), GameName);
+        PlatformFiles.CreateShortcut(r.ShortcutFolder, GameName, Exe(r.InstallFolder), target); // Amedo 2026-11-20
     }
 
     private static bool SameDisc(string folder, GameDiscs.Disc disc) =>

@@ -29,7 +29,7 @@ public sealed class PackageReader : IDisposable
 
         if (Directory.Exists(source))
         {
-            var crash6 = Path.Combine(source, "Crash6");
+            var crash6 = GamePaths.FindOnDisk(source, "Crash6"); // Amedo 2026-11-20
             if (Directory.Exists(crash6))
             {
                 var bds = Directory.GetFiles(crash6, "*.BD", SearchOption.TopDirectoryOnly);

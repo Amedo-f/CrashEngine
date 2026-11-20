@@ -1,4 +1,5 @@
 using CrashEngine.Core;
+using CrashEngine.Platform;
 
 namespace CrashLauncher;
 
@@ -14,6 +15,5 @@ public sealed partial class GameScene : Scene
         _fileBrowser.OpenFolder(title, startDir, callback);
 
     // Amedo 2026-11-18
-    private static void ShowInFileBrowser(string folder) =>
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(OperatingSystem.IsWindows() ? "explorer.exe" : "xdg-open", $"\"{folder}\"") { UseShellExecute = true });
+    private static void ShowInFileBrowser(string folder) => PlatformFiles.ShowFolder(folder); // Amedo 2026-11-20
 }

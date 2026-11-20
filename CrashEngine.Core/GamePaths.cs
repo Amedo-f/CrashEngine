@@ -1,3 +1,5 @@
+using CrashEngine.Platform;
+
 namespace CrashEngine.Core;
 
 // Amedo 2026-11-14
@@ -27,4 +29,7 @@ public static class GamePaths
     public static string ToDisk(string gamePath) => gamePath.Replace(Separator, Path.DirectorySeparatorChar);
 
     public static string OnDisk(string root, string gamePath) => Path.Combine(root, ToDisk(gamePath));
+
+    // Amedo 2026-11-20
+    public static string FindOnDisk(string root, params string[] parts) => PlatformFiles.FindOnDisk(root, parts);
 }

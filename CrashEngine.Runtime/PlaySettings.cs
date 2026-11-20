@@ -1,3 +1,4 @@
+using CrashEngine.Core;
 using System.Text.Json;
 using Twinsanity.TwinsanityInterchange.Implementations.Base;
 using Twinsanity.TwinsanityInterchange.Implementations.PS2;
@@ -65,8 +66,8 @@ public sealed class PlaySettings
 
     public static PlaySettings Resolve(ProjectPlayValues project, string disc, string? projectFolder, PS2AnyTwinsanityRM2? globalRm2, string? savesDirectory = null) // Amedo
     {
-        bool ntsc = File.Exists(Path.Combine(disc, NtscExe));
-        bool patchable = ntsc || File.Exists(Path.Combine(disc, PalExe)); // Amedo
+        bool ntsc = File.Exists(GamePaths.FindOnDisk(disc, NtscExe)); // Amedo 2026-11-20
+        bool patchable = ntsc || File.Exists(GamePaths.FindOnDisk(disc, PalExe)); // Amedo 2026-11-20
         string? language = null;
         if (projectFolder is not null && !string.IsNullOrWhiteSpace(project.Language) && Directory.Exists(Path.Combine(projectFolder, "Language", project.Language)))
             language = Path.Combine(projectFolder, "Language", project.Language);
@@ -78,7 +79,7 @@ public sealed class PlaySettings
             AkuTouchBreak = patchable && project.AkuAkuTouchBreak,
             GoldenMusic = patchable && project.AkuAkuGoldenMusicId is { } id ? (int)id : -1,
             GoldenMusicVolume = Math.Clamp(project.AkuAkuGoldenMusicVolume ?? DefaultGoldenMusicVolume, 1, 100) / 100f,
-            MusicDirectory = Path.Combine(disc, "Crash6"),
+            MusicDirectory = GamePaths.FindOnDisk(disc, "Crash6"), // Amedo 2026-11-20
             LanguageDirectory = language,
             DiscLanguage = ntsc ? AmericanLanguage : Region.Pal.Language.DiscLanguage(project.DiscLanguage), // Amedo 2026-11-11
             SavesDirectory = savesDirectory ?? (projectFolder is null ? null : Path.Combine(projectFolder, "Saves")), // Amedo
@@ -87,12 +88,12 @@ public sealed class PlaySettings
     }
 
     public static bool IsPalDisc(string disc) =>
-        !File.Exists(Path.Combine(disc, NtscExe)) && File.Exists(Path.Combine(disc, PalExe));
+        !File.Exists(GamePaths.FindOnDisk(disc, NtscExe)) && File.Exists(GamePaths.FindOnDisk(disc, PalExe)); // Amedo 2026-11-20
 
     // Amedo
     private static bool BootStraightPatched(string disc, bool ntsc)
     {
-        string path = Path.Combine(disc, ntsc ? NtscExe : PalExe);
+        string path = GamePaths.FindOnDisk(disc, ntsc ? NtscExe : PalExe); // Amedo 2026-11-20
         long offset = ntsc ? 0x783F4 : 0x78504;
         uint patched = ntsc ? 0x0C0B5A03u : 0x0C0B5AE3u;
         try
@@ -112,7 +113,7 @@ public sealed class PlaySettings
 
     // Amedo
     public static string DetectDiscLanguage(string? crash6Directory) =>
-        crash6Directory is null || File.Exists(Path.Combine(crash6Directory, AmericanLanguage.ToUpperInvariant() + ".MH")) ? AmericanLanguage : PalLanguages[0];
+        crash6Directory is null || File.Exists(GamePaths.FindOnDisk(crash6Directory, AmericanLanguage.ToUpperInvariant() + ".MH")) ? AmericanLanguage : PalLanguages[0];
 
     private static float Seconds(int s) =>
         s == InfiniteGoldenSeconds ? BitConverter.UInt32BitsToSingle(InfiniteGoldenBits) : Math.Clamp(s, 1, MaxGoldenSeconds);
