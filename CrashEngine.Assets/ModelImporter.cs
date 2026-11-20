@@ -149,7 +149,7 @@ public static class ModelImporter
 
     private static List<RawSubmesh> ExtractRawAssimp(string path)
     {
-        using var ctx = new AssimpContext();
+        using var ctx = AssimpNative.NewContext(); // Amedo 2026-11-20
         var scene = ctx.ImportFile(path,
             PostProcessSteps.Triangulate      |
             PostProcessSteps.GenerateNormals  |
@@ -500,7 +500,7 @@ public static class ModelImporter
 
     private static Entity LoadAssimp(GL gl, string path)
     {
-        using var ctx = new AssimpContext();
+        using var ctx = AssimpNative.NewContext(); // Amedo 2026-11-20
         var scene = ctx.ImportFile(path,
             PostProcessSteps.Triangulate      |
             PostProcessSteps.GenerateNormals  |

@@ -53,7 +53,7 @@ public static class CharacterImporter
         if (ext is ".glb" or ".gltf" or ".obj" or ".stl" or ".ply") return false;
         try
         {
-            using var ctx = new AssimpContext();
+            using var ctx = AssimpNative.NewContext(); // Amedo 2026-11-20
             var scene = ctx.ImportFile(path, PostProcessSteps.None);
             return scene.Meshes.Any(m => m.HasBones);
         }
@@ -74,7 +74,7 @@ public static class CharacterImporter
         error = "";
         var raw = ModelImporter.ExtractRawSubmeshes(path);
         if (raw is null || raw.Count == 0) { error = $"no meshes could be read from the file {ModelImporter.LastReport}"; return null; } // Amedo
-        using var ctx = new AssimpContext();
+        using var ctx = AssimpNative.NewContext(); // Amedo 2026-11-20
         var scene = ctx.ImportFile(path, Steps);
         float unit = 1f;
         if (Path.GetExtension(path).Equals(".fbx", StringComparison.OrdinalIgnoreCase) && ModelImporter.FbxUnitScaleFactor(path) is { } cm && cm > 0)

@@ -48,6 +48,17 @@
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.1" />
   </ItemGroup>
+  <!-- Amedo 2026-11-20 -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+    <Content Include="..\Libraries\Native\Linux\libminizip.so.1">
+      <Link>libminizip.so.1</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\Libraries\Native\Linux\libminizip.copyright">
+      <Link>libminizip.copyright</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <!-- 2026-09-04: editor-only UI assets (not real game data), e.g. the Camera layout marker's
        billboard icon (Assets\Icons\camera_marker.png), copied next to the built exe so
