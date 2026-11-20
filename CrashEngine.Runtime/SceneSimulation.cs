@@ -180,6 +180,7 @@ public sealed partial class SceneSimulation
     // Amedo 2026-09-28
     private void CreateAgents()
     {
+        var held = new Dictionary<int, AgentLabAgent>(); // Amedo 2026-11-20
         foreach (var s in _snapshot)
         {
             if (s.Skipped || s.Chunk is null && _anchorUnloaded) continue; // Amedo 2026-11-10
@@ -189,7 +190,17 @@ public sealed partial class SceneSimulation
                 s.Entity.Parent?.RemoveChild(s.Entity);
                 home.AddChild(s.Entity);
             }
-            CreateAgent(s.Entity, s.Entity.Get<InstanceData>()!, s.Chunk ?? World.RootChunk); // Amedo 2026-09-29
+            var inst = s.Entity.Get<InstanceData>()!;
+            int slot = World.GameObject(inst.ObjectId) is { } go && (int)go.Type == 0 ? CharacterSlot(inst) : 6; // Amedo 2026-11-20
+            if (s.Chunk is null && slot != 6 && (held.GetValueOrDefault(slot) ?? CharacterSlotTaken(inst)) is { } taken) // Amedo 2026-11-20
+            {
+                AddStandIn_12DF70(taken, s.Entity, World.RootChunk);
+                s.Entity.Active = false;
+                _log?.Invoke($"[AgentLab] {World.RootChunk.Name}: {s.Entity.Name} not created (character slot {slot} already alive: {taken.Entity.Name})");
+                continue;
+            }
+            var agent = CreateAgent(s.Entity, inst, s.Chunk ?? World.RootChunk); // Amedo 2026-09-29
+            if (slot != 6) held.TryAdd(slot, agent); // Amedo 2026-11-20
         }
     }
 
