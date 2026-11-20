@@ -51,6 +51,11 @@ public sealed class GpuUploadQueue
     public static Action<string>? SlowItem { get; set; } // Amedo
     public static long MaxBytesPerFrame { get; set; } = 2L << 20; // Amedo
     private static long _bytesFrame = -1, _frameBytes; // Amedo
+    public static long MaxBytesPerSecond { get; set; } = (2L << 20) * 144; // Amedo 2026-11-20
+    private static double _secondBytes; // Amedo 2026-11-20
+    private static long _secondStamp; // Amedo 2026-11-20
+    public static int MaxTexturesPerFrame { get; set; } = 8; // Amedo 2026-11-20
+    private static int _frameTextures; // Amedo 2026-11-20
 
     public void Warm()
     {
@@ -72,12 +77,23 @@ public sealed class GpuUploadQueue
         {
             _bytesFrame = PerfStats.FrameNumber;
             _frameBytes = 0;
+            _frameTextures = 0; // Amedo 2026-11-20
+            long stamp = Stopwatch.GetTimestamp(); // Amedo 2026-11-20
+            double elapsed = _secondStamp == 0 ? 1.0 : (stamp - _secondStamp) / (double)Stopwatch.Frequency;
+            _secondStamp = stamp;
+            _secondBytes = Math.Min(MaxBytesPerFrame, _secondBytes + MaxBytesPerSecond * elapsed);
         }
+        if (capped && MaxBytesPerSecond > 0 && _secondBytes <= 0) return _next >= _resources.Count; // Amedo 2026-11-20
         while (_next < _resources.Count)
         {
             long bytes = _resources[_next].Uploaded ? 0 : _resources[_next].PendingBytes; // Amedo
             if (capped && _frameBytes > 0 && _frameBytes + bytes > MaxBytesPerFrame) break;
+            bool texture = _resources[_next] is Texture2D { Uploaded: false }; // Amedo 2026-11-20
+            if (capped && texture && MaxTexturesPerFrame > 0 && _frameTextures >= MaxTexturesPerFrame) break; // Amedo 2026-11-20
+            if (texture) _frameTextures++; // Amedo 2026-11-20
+            if (capped && MaxBytesPerSecond > 0 && _frameBytes > 0 && bytes > _secondBytes) break; // Amedo 2026-11-20
             _frameBytes += bytes;
+            if (capped) _secondBytes -= bytes; // Amedo 2026-11-20
             var r = _resources[_next++];
             if (SlowItem is not { } slow) // Amedo
             {
