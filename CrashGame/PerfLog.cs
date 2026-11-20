@@ -27,6 +27,19 @@ sealed class PerfLog
     private static float MissedMs => MathF.Min(SlowMs, PerfStats.FrameBudgetMs * 1.5f); // Amedo 2026-11-14
     private int _missed; // Amedo 2026-11-14
     private long _jitCount = System.Runtime.JitInfo.GetCompiledMethodCount(); // Amedo
+    private readonly long[] _gpuLast = new long[7]; // Amedo 2026-11-20
+    private readonly string[] _gpuFrames = { "-", "-", "-" }; // Amedo 2026-11-20
+
+    // Amedo 2026-11-20
+    private void GpuActivity()
+    {
+        long[] now = { GpuStats.MeshesMade, GpuStats.MeshesFreed, GpuStats.TexturesMade, GpuStats.TexturesFreed, GpuStats.PoolPagesMade, GpuStats.PoolPagesFreed, GpuStats.QueueBytes };
+        _gpuFrames[2] = _gpuFrames[1];
+        _gpuFrames[1] = _gpuFrames[0];
+        _gpuFrames[0] = string.Create(CultureInfo.InvariantCulture,
+            $"meshes +{now[0] - _gpuLast[0]}/-{now[1] - _gpuLast[1]} textures +{now[2] - _gpuLast[2]}/-{now[3] - _gpuLast[3]} pool pages +{now[4] - _gpuLast[4]}/-{now[5] - _gpuLast[5]} queued {(now[6] - _gpuLast[6]) / 1048576.0:0.0} MB");
+        Array.Copy(now, _gpuLast, now.Length);
+    }
 
     public void Frame()
     {
@@ -34,6 +47,7 @@ sealed class PerfLog
         long jit = System.Runtime.JitInfo.GetCompiledMethodCount(); // Amedo
         long jitNew = jit - _jitCount;
         _jitCount = jit;
+        GpuActivity(); // Amedo 2026-11-20
         if (_started || _clock.Elapsed.TotalSeconds >= WarmSeconds)
         {
             if (_started)
@@ -48,7 +62,7 @@ sealed class PerfLog
                         $"(sim {PerfStats.LastMs(PerfSection.Sim):0.0}, agents {PerfStats.LastMs(PerfSection.SimAgents):0.0}, player {PerfStats.LastMs(PerfSection.SimPlayer):0.0}, " +
                         $"phys {PerfStats.LastMs(PerfSection.SimPhysics):0.0}, stream {PerfStats.LastMs(PerfSection.Streaming):0.0}, cam {PerfStats.LastMs(PerfSection.Camera):0.0}, " +
                         $"fx {PerfStats.LastMs(PerfSection.Particles):0.0}, snd {PerfStats.LastMs(PerfSection.Sounds):0.0}, mus {PerfStats.LastMs(PerfSection.Music):0.0}) " +
-                        $"render {PerfStats.LastMs(PerfSection.Render):0.0} ui {PerfStats.LastMs(PerfSection.Ui):0.0} gc {PerfStats.LastGcPauseMs:0.0} present {PerfStats.LastMs(PerfSection.Present):0.0} wait {PerfStats.LastMs(PerfSection.FrameWait):0.0} events {PerfStats.LastMs(PerfSection.WindowEvents):0.0} other {other:0.0} jit {jitNew} draws {LastDraws}")); // Amedo
+                        $"render {PerfStats.LastMs(PerfSection.Render):0.0} ui {PerfStats.LastMs(PerfSection.Ui):0.0} gc {PerfStats.LastGcPauseMs:0.0} present {PerfStats.LastMs(PerfSection.Present):0.0} wait {PerfStats.LastMs(PerfSection.FrameWait):0.0} events {PerfStats.LastMs(PerfSection.WindowEvents):0.0} other {other:0.0} jit {jitNew} draws {LastDraws} | gpu (this, 1 and 2 frames before) {_gpuFrames[0]} ; {_gpuFrames[1]} ; {_gpuFrames[2]}")); // Amedo 2026-11-20
                 }
                 _frame.Add(PerfStats.LastFrameMs);
                 _update.Add(PerfStats.LastMs(PerfSection.Update));

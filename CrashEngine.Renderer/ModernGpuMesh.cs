@@ -55,7 +55,7 @@ public sealed class ModernGpuMesh : IDisposable
         gl.EnableVertexAttribArray(12); gl.VertexAttribIPointer(12, 4, VertexAttribIType.UnsignedInt, stride, (void*)48);
         gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 4, VertexAttribPointerType.Float, false, stride, (void*)64);
         gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 4, VertexAttribPointerType.Float, false, stride, (void*)80);
-        GpuStats.Meshes++;
+        GpuStats.Meshes++; GpuStats.MeshesMade++; // Amedo 2026-11-20
     }
 
     public unsafe void Draw(GL gl)
@@ -69,7 +69,7 @@ public sealed class ModernGpuMesh : IDisposable
 
     public void Dispose()
     {
-        GpuStats.Meshes--;
+        GpuStats.Meshes--; GpuStats.MeshesFreed++; // Amedo 2026-11-20
         GlState.ForgetVertexArray();
         _gl.DeleteVertexArray(_vao);
         _gl.DeleteBuffer(_vbo);

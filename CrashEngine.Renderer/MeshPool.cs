@@ -136,6 +136,7 @@ public static class MeshPool
         gl.DeleteBuffer(page.Vbo);
         gl.DeleteBuffer(page.Ebo);
         GpuStats.MeshPoolBytes -= page.Capacity;
+        GpuStats.PoolPagesFreed++; // Amedo 2026-11-20
     }
 
     private static unsafe Page Create(GL gl, int vertices, int indices)
@@ -155,6 +156,7 @@ public static class MeshPool
         GlState.VertexArray(gl, 0);
         page.Capacity = (long)vertices * sizeof(GpuMesh.Vertex) + (long)indices * sizeof(uint);
         GpuStats.MeshPoolBytes += page.Capacity;
+        GpuStats.PoolPagesMade++; // Amedo 2026-11-20
         Pages.Add(page);
         return page;
     }

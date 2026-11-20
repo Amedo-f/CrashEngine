@@ -8,6 +8,7 @@ public static class GpuStats
     public static int Textures, Meshes;
     public static long TextureBytes, MeshBytes;
     public static long MeshPoolBytes; // Amedo 2026-10-01
+    public static long MeshesMade, MeshesFreed, TexturesMade, TexturesFreed, PoolPagesMade, PoolPagesFreed, QueueBytes; // Amedo 2026-11-20
     public static int TextureStressScale = 1;
     public const int TextureStressMaxSide = 4096;
 

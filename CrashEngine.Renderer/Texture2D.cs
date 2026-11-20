@@ -80,7 +80,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
                           w, h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
         _bytes = (long)w * h * 4; // Amedo 2026-09-30
         GpuStats.TextureBytes += _bytes;
-        GpuStats.Textures++;
+        GpuStats.Textures++; GpuStats.TexturesMade++; // Amedo 2026-11-20
 
         if (_mipmaps) // Amedo 2026-10-02
         {
@@ -362,7 +362,7 @@ public sealed class Texture2D : IDisposable, IGpuResource // Amedo 2026-09-29
         GpuOwner.Forget(_owner, this);
         _owner = null;
         GpuStats.TextureBytes -= _bytes; // Amedo 2026-09-30
-        GpuStats.Textures--;
+        GpuStats.Textures--; GpuStats.TexturesFreed++; // Amedo 2026-11-20
         _gl.DeleteTexture(_id);
         GlState.ForgetTextures();
     }

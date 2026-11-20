@@ -94,6 +94,7 @@ public sealed class GpuUploadQueue
             if (capped && MaxBytesPerSecond > 0 && _frameBytes > 0 && bytes > _secondBytes) break; // Amedo 2026-11-20
             _frameBytes += bytes;
             if (capped) _secondBytes -= bytes; // Amedo 2026-11-20
+            GpuStats.QueueBytes += bytes; // Amedo 2026-11-20
             var r = _resources[_next++];
             if (SlowItem is not { } slow) // Amedo
             {

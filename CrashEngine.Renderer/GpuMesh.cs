@@ -167,7 +167,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
             _vao = page.Vao;
             Uploaded = true;
             GpuStats.MeshBytes += _bytes;
-            GpuStats.Meshes++;
+            GpuStats.Meshes++; GpuStats.MeshesMade++; // Amedo 2026-11-20
             ForgetVertices();
             return;
         }
@@ -215,7 +215,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
         if (Uploaded) return;
         Uploaded = true;
         GpuStats.MeshBytes += _bytes;
-        GpuStats.Meshes++;
+        GpuStats.Meshes++; GpuStats.MeshesMade++; // Amedo 2026-11-20
     }
 
     // Amedo 2026-10-01
@@ -336,7 +336,7 @@ public sealed partial class GpuMesh : IDisposable, IGpuResource // Amedo 2026-09
         GpuOwner.Forget(_owner, this);
         _owner = null;
         GpuStats.MeshBytes -= _bytes; // Amedo 2026-09-30
-        GpuStats.Meshes--;
+        GpuStats.Meshes--; GpuStats.MeshesFreed++; // Amedo 2026-11-20
         if (_page is { } page) // Amedo 2026-10-01
         {
             _page = null;
