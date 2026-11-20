@@ -180,13 +180,28 @@ public static partial class MeshDecoder
         _ => CollisionFallbackColor,
     };
 
-    public static (GpuMesh Mesh, Material Mat)? DecodeCollision(GL gl,
+    // Amedo 2026-11-20
+    private static readonly SysVec3 CollisionLightDir = GameMath.Normalize(new SysVec3(0.35f, 1f, 0.25f));
+    private const float CollisionEdgeLift = -0.1f;
+    private const float CollisionEdgeDarken = 0.35f;
+
+    // Amedo 2026-11-20
+    private static SysVec4 ShadeCollision(SysVec4 color, SysVec3 normal)
+    {
+        float light = 0.5f + 0.5f * MathF.Abs(GameMath.Dot(normal, CollisionLightDir));
+        return new SysVec4(color.X * light, color.Y * light, color.Z * light, 1f);
+    }
+
+    public sealed record CollisionView(GpuMesh Mesh, Material Mat, GpuMesh? Edges, Material? EdgeMat); // Amedo 2026-11-20
+
+    public static CollisionView? DecodeCollision(GL gl,
         Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.PS2AnyCollisionData coll,
         IReadOnlyList<SurfaceType>? surfaceTypes = null)
     {
         if (coll.Triangles.Count == 0 || coll.Vectors.Count == 0) return null;
 
         var verts = new List<GpuMesh.Vertex>(coll.Triangles.Count * 3);
+        var edges = new Dictionary<(int, int), (SysVec3 Normal, SysVec4 Color)>(); // Amedo 2026-11-20
 
         foreach (var tri in coll.Triangles)
         {
@@ -210,9 +225,13 @@ public static partial class MeshDecoder
             var normal = SysVec3.Cross(pb - pa, pc - pa);
             normal = GameMath.LengthSquared(normal) > 1e-12f ? SysVec3.Normalize(normal) : SysVec3.UnitY;
 
-            verts.Add(new GpuMesh.Vertex { Position = pa, Normal = normal, Color = debugColor });
-            verts.Add(new GpuMesh.Vertex { Position = pb, Normal = normal, Color = debugColor });
-            verts.Add(new GpuMesh.Vertex { Position = pc, Normal = normal, Color = debugColor });
+            var shaded = ShadeCollision(debugColor, normal); // Amedo 2026-11-20
+            verts.Add(new GpuMesh.Vertex { Position = pa, Normal = normal, Color = shaded });
+            verts.Add(new GpuMesh.Vertex { Position = pb, Normal = normal, Color = shaded });
+            verts.Add(new GpuMesh.Vertex { Position = pc, Normal = normal, Color = shaded });
+            AddCollisionEdge(edges, tri.Vector1Index, tri.Vector2Index, normal, shaded); // Amedo 2026-11-20
+            AddCollisionEdge(edges, tri.Vector2Index, tri.Vector3Index, normal, shaded);
+            AddCollisionEdge(edges, tri.Vector3Index, tri.Vector1Index, normal, shaded);
         }
         if (verts.Count < 3) return null;
 
@@ -220,18 +239,51 @@ public static partial class MeshDecoder
         var mesh = GpuMesh.FromOwned(gl, verts.ToArray(), idx); // Amedo 2026-09-29
 
         var localCenter = verts.Aggregate(SysVec3.Zero, (acc, v) => acc + v.Position) / verts.Count;
+        float radius = verts.Max(v => GameMath.Distance(v.Position, localCenter)); // Amedo 2026-11-20
         var mat = new Material
         {
             Culling         = Material.CullMode.Both,
             DoubleColor     = 1f,
-            AlphaBlend      = true,
-            DepthWrite      = false,
+            AlphaBlend      = false, // Amedo 2026-11-20
+            DepthWrite      = true, // Amedo 2026-11-20
+            AlwaysOnTop     = true, // Amedo 2026-11-20
             FogEnabled      = false,
             ShaderType      = "StandardUnlit",
             LocalCenter     = localCenter,
-            BoundingRadius  = verts.Max(v => SysVec3.Distance(v.Position, localCenter)),
+            BoundingRadius  = radius,
         };
-        return (mesh, mat);
+
+        // Amedo 2026-11-20
+        var lines = new GpuMesh.Vertex[edges.Count * 2];
+        int n = 0;
+        foreach (var ((i, j), (sum, color)) in edges)
+        {
+            var lift = (GameMath.LengthSquared(sum) > 1e-12f ? GameMath.Normalize(sum) : SysVec3.UnitY) * CollisionEdgeLift;
+            var edgeColor = new SysVec4(color.X * CollisionEdgeDarken, color.Y * CollisionEdgeDarken, color.Z * CollisionEdgeDarken, 1f);
+            var p = coll.Vectors[i];
+            var q = coll.Vectors[j];
+            lines[n++] = new GpuMesh.Vertex { Position = new SysVec3(p.X, p.Y, p.Z) + lift, Normal = SysVec3.UnitY, Color = edgeColor };
+            lines[n++] = new GpuMesh.Vertex { Position = new SysVec3(q.X, q.Y, q.Z) + lift, Normal = SysVec3.UnitY, Color = edgeColor };
+        }
+        GpuMesh? edgeMesh = n > 0 ? new GpuMesh(gl, lines, PrimitiveType.Lines) : null;
+        var edgeMat = edgeMesh is null ? null : new Material
+        {
+            Culling        = Material.CullMode.Both,
+            DoubleColor    = 1f,
+            AlwaysOnTop    = true,
+            FogEnabled     = false,
+            ShaderType     = "StandardUnlit",
+            LocalCenter    = localCenter,
+            BoundingRadius = radius,
+        };
+        return new CollisionView(mesh, mat, edgeMesh, edgeMat);
+    }
+
+    // Amedo 2026-11-20
+    private static void AddCollisionEdge(Dictionary<(int, int), (SysVec3 Normal, SysVec4 Color)> edges, int a, int b, SysVec3 normal, SysVec4 color)
+    {
+        var key = a < b ? (a, b) : (b, a);
+        edges[key] = edges.TryGetValue(key, out var e) ? (e.Normal + normal, e.Color) : (normal, color);
     }
 
     public static object BuildSceneryMeshes(GL gl,

@@ -19,6 +19,7 @@ namespace CrashEngine.Importer;
 public static class ChunkImporter
 {
     private const float INV_SCALE = 1f;
+    public const string CollisionEdgesName = "collision_edges"; // Amedo 2026-11-20
 
     // Amedo 2026-09-28
     public sealed record ParsedChunk(string Rm2Path, string Sm2Path, PS2AnyTwinsanityRM2 Rm2, PS2AnyTwinsanitySM2? Sm2);
@@ -138,6 +139,12 @@ public static class ChunkImporter
             var collChild = new Entity("collision_mesh");
             collChild.Add(new MeshRenderer { Mesh = collision.Mesh, Material = collision.Mat });
             collRoot.AddChild(collChild);
+            if (collision.Edges is { } edgeMesh) // Amedo 2026-11-20
+            {
+                var edgeChild = new Entity(CollisionEdgesName);
+                edgeChild.Add(new MeshRenderer { Mesh = edgeMesh, Material = collision.EdgeMat! });
+                collChild.AddChild(edgeChild);
+            }
         }
         Phase("collision"); // Amedo 2026-09-28
 

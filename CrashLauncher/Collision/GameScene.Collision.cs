@@ -148,14 +148,25 @@ public sealed partial class GameScene : Scene
 
     private void RedrawLevelCollision(Entity chunkRoot, PS2AnyCollisionData coll, PS2AnyTwinsanityRM2 rm2)
     {
-        var collMr = AllEntities(chunkRoot).FirstOrDefault(e => e.Has<CollisionMesh>())?.Children.FirstOrDefault()?.Get<CrashEngine.Importer.MeshRenderer>();
-        if (collMr is null) return;
+        var collChild = AllEntities(chunkRoot).FirstOrDefault(e => e.Has<CollisionMesh>())?.Children.FirstOrDefault(); // Amedo 2026-11-20
+        var collMr = collChild?.Get<CrashEngine.Importer.MeshRenderer>();
+        if (collChild is null || collMr is null) return;
         var surfTypes = MeshDecoder.BuildSurfaceTypeLookup(rm2, chunkRoot.Get<ChunkSource>()?.GlobalRm2);
         if (MeshDecoder.DecodeCollision(Engine.Instance.GL, coll, surfTypes) is { } rebuilt)
         {
             collMr.Mesh?.Dispose();
             collMr.Mesh     = rebuilt.Mesh;
             collMr.Material = rebuilt.Mat;
+            // Amedo 2026-11-20
+            var edgeChild = collChild.Children.FirstOrDefault(c => c.Name == ChunkImporter.CollisionEdgesName);
+            if (edgeChild?.Get<CrashEngine.Importer.MeshRenderer>() is { } edgeMr) edgeMr.Mesh?.Dispose();
+            if (edgeChild is not null) collChild.RemoveChild(edgeChild);
+            if (rebuilt.Edges is { } edgeMesh)
+            {
+                var edges = new Entity(ChunkImporter.CollisionEdgesName);
+                edges.Add(new CrashEngine.Importer.MeshRenderer { Mesh = edgeMesh, Material = rebuilt.EdgeMat! });
+                collChild.AddChild(edges);
+            }
         }
     }
 
