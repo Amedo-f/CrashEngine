@@ -5,4 +5,8 @@
     <!-- Amedo 2026-11-19 -->
     <Version>0.4.0</Version>
   </PropertyGroup>
+  <!-- Amedo 2026-11-20 -->
+  <PropertyGroup>
+    <TargetsLinux Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Linux')))">true</TargetsLinux>
+  </PropertyGroup>
 </Project>

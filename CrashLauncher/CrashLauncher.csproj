@@ -45,11 +45,11 @@
     <PackageReference Include="NLayer" Version="1.16.0" />
   </ItemGroup>
   <!-- Amedo 2026-11-14 -->
-  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+  <ItemGroup Condition="'$(TargetsLinux)' == 'true'">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.1" />
   </ItemGroup>
   <!-- Amedo 2026-11-20 -->
-  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+  <ItemGroup Condition="'$(TargetsLinux)' == 'true'">
     <Content Include="..\Libraries\Native\Linux\libminizip.so.1">
       <Link>libminizip.so.1</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -79,7 +79,7 @@
 
   <!-- Native PS2 ISO packer (TT Lab's own library, reused as-is — see BuildIsoToPS2.cs).
        Content item so it lands in BOTH build and publish output. -->
-  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux'))">
+  <ItemGroup Condition="'$(TargetsLinux)' != 'true'">
     <Content Include="..\Libraries\Native\Windows\PS2ImageMaker.dll">
       <Link>PS2ImageMaker.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
