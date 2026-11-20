@@ -21,6 +21,23 @@ public static class PlayInstall
 
     public static long DiscBytes(string iso) => File.Exists(iso) ? new FileInfo(iso).Length : 0;
 
+    // Amedo 2026-11-20
+    public static bool GameRunning(string installFolder)
+    {
+        string target = Path.GetFullPath(Target(installFolder)) + Path.DirectorySeparatorChar;
+        foreach (var name in new[] { GameName, "CrashGame" })
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName(name))
+                using (p)
+                {
+                    try
+                    {
+                        if (p.MainModule?.FileName is { } file && file.StartsWith(target, StringComparison.OrdinalIgnoreCase)) return true;
+                    }
+                    catch (Exception) { }
+                }
+        return false;
+    }
+
     private const string HubMark = ".crashengine_hub";
 
     public static bool ForeignFolder(string installFolder)

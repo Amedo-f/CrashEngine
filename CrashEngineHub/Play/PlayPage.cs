@@ -121,7 +121,10 @@ public sealed class PlayPage
         if (_status.Length > 0)
         {
             ImGui.SetCursorPosX(HubUi.LabelWidth);
+            bool warn = ReferenceEquals(_status, GameRunningMessage); // Amedo 2026-11-20
+            if (warn) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.2f, 1f));
             ImGui.TextWrapped(_status);
+            if (warn) ImGui.PopStyleColor();
         }
     }
 
@@ -163,9 +166,12 @@ public sealed class PlayPage
             catch (Exception ex) { _status = ex.Message; }
         });
 
+    private static readonly string GameRunningMessage = $"Close {PlayInstall.GameName} first: it is running from this folder."; // Amedo 2026-11-20
+
     private void Apply(bool force = false)
     {
         if (Disc is not { } disc || !File.Exists(_state.Iso)) { _status = "Choose your disc first."; return; }
+        if (PlayInstall.GameRunning(_state.InstallFolder)) { _status = GameRunningMessage; return; } // Amedo 2026-11-20
         if (PlayInstall.CheckSpace(_state.Iso, _state.InstallFolder) is { } space) { _status = space; return; }
         if (!force && PlayInstall.ForeignFolder(_state.InstallFolder)) { _confirmForeign = true; return; }
         _applyMod = _selected >= 0 && _selected < _mods.Count ? _mods[_selected] : null;
