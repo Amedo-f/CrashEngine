@@ -24,6 +24,7 @@ try
         typeof(CrashEngine.Renderer.RenderPipeline).Assembly, typeof(Engine).Assembly, typeof(Twinsanity.TwinsanityInterchange.Implementations.PS2.PS2AnyTwinsanityRM2).Assembly); // Amedo
     CrashEngine.Renderer.SceneTarget.ReuseHeldFrames = true;
     CrashEngine.Renderer.GpuMesh.KeepVertices = false;
+    CrashEngine.Importer.ChunkImporter.KeepDiscGraphics = false; // Amedo 2026-11-20
     var engine = new Engine("Crash Twinsanity", cfg.Width, cfg.Height, visible: false);
     if (CrashEngine.Renderer.Texture2D.LoadWindowIcons(Path.Combine(AppContext.BaseDirectory, "Icons"), "game-icon") is { Length: > 0 } icons) engine.SetWindowIcon(icons); // Amedo 2026-11-15
     engine.ActiveScene = new PlayScene(cfg);

@@ -829,6 +829,7 @@ public sealed partial class SceneSimulation
         foreach (var agent in fresh) agent.Begin();
         if (World.PlayerCharacter is not null) BindCharacters(fresh); // Amedo 2026-09-29
         _log?.Invoke($"[stream] loaded {r.Name} at {World.Now:0.00}s (A{r.DepthA} B{r.DepthB}): {World.Agents.Count - before} agents, {sw.ElapsedMilliseconds} ms ({how})"); // Amedo 2026-09-29
+        ReleaseDiscGraphics(r.Name, src); // Amedo 2026-11-20
         return chunk;
     }
 
@@ -859,6 +860,14 @@ public sealed partial class SceneSimulation
         r.SceneryLoaded = true;
         r.Links = LinksOf(src.Sm2);
         _log?.Invoke($"[stream] loaded the scenery of {r.Name} at {World.Now:0.00}s (A{r.DepthA} B{r.DepthB}): scenery only, no objects ({how})");
+        ReleaseDiscGraphics(r.Name, src); // Amedo 2026-11-20
+    }
+
+    // Amedo 2026-11-20
+    public void ReleaseDiscGraphics(string name, ChunkSource src)
+    {
+        var (textures, subModels) = ChunkImporter.ReleaseDiscGraphics(src);
+        if (textures + subModels > 0) _log?.Invoke($"[stream] {name}: disc graphics released after the GPU upload ({textures} textures, {subModels} sub-models)");
     }
 
     // Amedo 2026-10-06

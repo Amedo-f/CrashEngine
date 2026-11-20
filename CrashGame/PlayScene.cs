@@ -141,6 +141,7 @@ sealed class PlayScene : Scene
         _sim.Volume = _cfg.Volume;
         if (_sim.StartAudio() is { } audioError) Console.WriteLine("[CrashGame] sound output unavailable: " + audioError);
         Console.WriteLine($"[CrashGame] playing {_cfg.Level}: {_sim.World.Agents.Count} agents (scene ready in {built.ElapsedMilliseconds} ms{(_preloaded is null ? "" : ", built in the background")})");
+        if (src is not null) _sim.ReleaseDiscGraphics(_cfg.Level, src); // Amedo 2026-11-20
     }
 
     // Amedo 2026-11-09

@@ -20,6 +20,39 @@ public static class ChunkImporter
 {
     private const float INV_SCALE = 1f;
     public const string CollisionEdgesName = "collision_edges"; // Amedo 2026-11-20
+    public static bool KeepDiscGraphics { get; set; } = true; // Amedo 2026-11-20
+
+    // Amedo 2026-11-20
+    public static (int Textures, int SubModels) ReleaseDiscGraphics(ChunkSource source)
+    {
+        if (KeepDiscGraphics) return (0, 0);
+        int textures = 0, subModels = 0;
+        ReleaseDiscGraphics(source.Rm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_GRAPHICS_SECTION), ref textures, ref subModels);
+        ReleaseDiscGraphics(source.Sm2?.GetItem<BaseTwinSection>((uint)Constants.SCENERY_GRAPHICS_SECTION), ref textures, ref subModels);
+        return (textures, subModels);
+    }
+
+    // Amedo 2026-11-20
+    private static void ReleaseDiscGraphics(BaseTwinSection? gfx, ref int textures, ref int subModels)
+    {
+        if (gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION) is { } texSection)
+            for (int i = 0; i < texSection.GetItemsAmount(); i++)
+                if (texSection.GetItem(i) is PS2AnyTexture tex && tex.TextureData is not null)
+                {
+                    tex.TextureData = null!;
+                    tex.Colors = null!;
+                    textures++;
+                }
+        if (gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MODELS_SECTION) is { } modelSection)
+            for (int i = 0; i < modelSection.GetItemsAmount(); i++)
+                if (modelSection.GetItem(i) is PS2AnyModel model && model.SubModels is { } subs)
+                    foreach (var sub in subs)
+                        if (sub is Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems.PS2SubModel ps2)
+                        {
+                            ps2.ReleaseData();
+                            subModels++;
+                        }
+    }
 
     // Amedo 2026-09-28
     public sealed record ParsedChunk(string Rm2Path, string Sm2Path, PS2AnyTwinsanityRM2 Rm2, PS2AnyTwinsanitySM2? Sm2);

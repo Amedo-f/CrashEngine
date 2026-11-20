@@ -26,6 +26,17 @@ namespace Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.SubItems
         {
 
         }
+        // Amedo 2026-11-20
+        public void ReleaseData()
+        {
+            VertexData = null;
+            Vertexes = null;
+            UVW = null;
+            Colors = null;
+            EmitColor = null;
+            Normals = null;
+        }
+
         public int GetLength()
         {
             return 12 + (VertexData != null ? VertexData.Length : 0) + (UnusedBlob != null ? UnusedBlob.Length : 0);
