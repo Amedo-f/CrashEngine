@@ -174,7 +174,7 @@ public static class ParticleFx
     // Amedo
     private static bool Shown_1B5990(ParticleWorld world, ParticleEmitterSim em, Vector3? eye)
     {
-        if (eye is { } e && !(GameMath.Distance(e, em.Origin) < em.Def.DrawMaxDist)) return false;
+        if (!ParticleWorld.EmitFar && eye is { } e && !(GameMath.Distance(e, em.Origin) < em.Def.DrawMaxDist)) return false; // Amedo 2026-11-20
         return world.BoxInView?.Invoke(em.Origin, em.Def.Bounds * em.Scale) ?? true;
     }
 

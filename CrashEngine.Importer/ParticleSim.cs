@@ -195,6 +195,7 @@ public sealed class ParticleDef
 public sealed class ParticleWorld
 {
     public static float Dt { get; set; } = 1f / 60f;
+    public static bool EmitFar { get; set; } = true; // Amedo 2026-11-20
     private const float MaxCatchUp = 0.25f;
 
     public float Clock;
@@ -467,7 +468,7 @@ public sealed class ParticleEmitterSim
     {
         if (_released || world.Frame < _nextFrame) return; // Amedo 2026-09-29
 
-        float maxDist = IgnoreDistance ? 0f : Def.EmitMaxDist; // Amedo 2026-09-27
+        float maxDist = IgnoreDistance || ParticleWorld.EmitFar ? 0f : Def.EmitMaxDist; // Amedo 2026-11-20
         if (_emitting)
         {
             if (dist < Def.EmitMinDist) _emitting = false;
