@@ -264,7 +264,7 @@ public sealed partial class AgentLabAgent
         if (Anim is not { } anim || _destroyed) return;
         anim.LogicDriven = true;
         bool gate = World.GateActive && InTree;
-        uint m = gate ? _metric : 0u;
+        uint m = gate && AgentLabWorld.ThrottleFarAgents ? _metric : 0u; // Amedo 2026-11-20
         uint d = _animExtra == 0xFFFF || m <= _animExtra ? 0u : m - _animExtra;
         d = d <= AnimNear ? 0u : d - AnimNear;
         bool far = AnimFar <= d;

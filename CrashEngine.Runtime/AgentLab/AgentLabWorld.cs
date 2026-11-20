@@ -95,7 +95,7 @@ public sealed partial class AgentLabWorld
     public const uint GateSleep = 9375;
     public const float GateScale = 0.00021331057f;
     public bool UpdateGate { get; set; } = true;
-    public static bool ThrottleFarAgents { get; set; } = true; // Amedo
+    public static bool ThrottleFarAgents { get; set; } = false; // Amedo 2026-11-20
     public SceneryTree? Tree { get => RootChunk.Tree; set => RootChunk.Tree = value; } // Amedo 2026-09-28
     public Physics.CollisionWorld? Collision { get => RootChunk.Collision; set => RootChunk.Collision = value; } // Amedo 2026-09-27
     public Game.GameProgress Progress { get; } = new(); // Amedo
