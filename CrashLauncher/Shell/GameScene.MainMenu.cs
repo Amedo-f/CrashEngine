@@ -119,6 +119,7 @@ public sealed partial class GameScene
         }
         ImGui.MenuItem("Flip X on import (fix mirror)", null, ref _flipModelX);
         ImGui.Separator();
+        if (ImGui.MenuItem("Position")) AddPositionHere(); // Amedo 2026-11-20
         if (ImGui.MenuItem("AI Position")) AddAiPositionAt(System.Numerics.Vector3.Zero);
         if (ImGui.MenuItem("AI Path (link all selected)")) AddAiPathBetweenSelected();
     }

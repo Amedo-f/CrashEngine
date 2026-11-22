@@ -31,6 +31,12 @@ public sealed partial class GameScene : Scene
             SyncTriggerMarkers(chunkRoot);
             SyncCameraMarkers(chunkRoot);
             SyncPositionMarkers(chunkRoot);
+            if (chunkRoot.Get<ChunkSource>()?.Rm2 is { } rm2Ids) // Amedo 2026-11-21
+            {
+                int positions = Layouts(rm2Ids).Sum(l => CompactPositionIds(null, l)), aiPoints = Layouts(rm2Ids).Sum(l => CompactAiPositionIds(null, l));
+                if (positions + aiPoints > 0)
+                    _browser.Log($"Save Chunk: renumbered {positions} position id(s) and {aiPoints} AI position id(s) so each id is its place in the list (the game looks them up that way); objects' keys and AI links updated.");
+            }
             SyncAiPositionMarkers(chunkRoot);
             SyncSceneryLightMarkers(chunkRoot); // Amedo 2026-09-19
             SyncInstanceScale(chunkRoot);

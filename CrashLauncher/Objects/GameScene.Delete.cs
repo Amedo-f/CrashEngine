@@ -40,7 +40,7 @@ public sealed partial class GameScene : Scene
         if (_selectedSet.Count == 0) return;
 
         var actions   = new List<IEditAction>();
-        int cubeCount = 0, importCount = 0, aiPosDelCount = 0;
+        int cubeCount = 0, importCount = 0, aiPosDelCount = 0, posDelCount = 0; // Amedo 2026-11-20
         var deletedTransplantObjIds = new HashSet<uint>();
 
         var chunkSourceForPlaceholder = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
@@ -114,10 +114,9 @@ public sealed partial class GameScene : Scene
                 DeleteSceneryLight(e, parent, lightMarker, chunkSourceForPlaceholder);
                 aiPosDelCount++;
             }
-            else if (e.Has<PositionMarker>())
+            else if (parent is not null && e.Get<PositionMarker>() is { } posMarker) // Amedo 2026-11-20
             {
-                _browser.Log("Delete: (non-AI) Position markers aren't deletable yet -- they may be " +
-                              "referenced by an instance's Positions list by numeric id.");
+                if (DeletePosition(e, parent, posMarker, actions)) posDelCount++;
             }
             else if (_cubes.FirstOrDefault(c => c.Ent == e) is { } cube)
             {
@@ -138,6 +137,8 @@ public sealed partial class GameScene : Scene
         }
         if (aiPosDelCount > 0)
             _browser.Log($"Delete: removed {aiPosDelCount} AI position(s) + any paths that referenced them. Save Chunk to persist.");
+        if (posDelCount > 0)
+            _browser.Log($"Delete: removed {posDelCount} position(s) no object used as a key. Save Chunk to persist."); // Amedo 2026-11-20
 
         var chunkSourceForCleanup = Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>();
         if (chunkSourceForCleanup?.MeshTables is not null)
@@ -194,15 +195,46 @@ public sealed partial class GameScene : Scene
         return false;
     }
 
-    private static void DeleteAiPosition(Entity e, Entity parent, AiPositionMarker aiMarker, ChunkSource? chunkSourceForPlaceholder, List<IEditAction> actions)
+    private void DeleteAiPosition(Entity e, Entity parent, AiPositionMarker aiMarker, ChunkSource? chunkSourceForPlaceholder, List<IEditAction> actions)
     {
         var layouts = new List<BaseTwinSection>();
         if (chunkSourceForPlaceholder?.Rm2 is { } rm2)
             for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION; lid++)
                 if (rm2.GetItem<BaseTwinSection>((uint)lid) is { } layout) layouts.Add(layout);
+        var home = AiLayoutOf(aiMarker.Source); // Amedo 2026-11-21
         var delete = new AiPositionDeleteAction { Parent = parent, Entity = e, Position = aiMarker.Source, Layouts = layouts };
         delete.Redo();
         actions.Add(delete);
+        if (home is null) return; // Amedo 2026-11-21
+        var rec = new LayoutEditRecorder();
+        if (CompactAiPositionIds(rec, home) > 0) actions.Add(rec.Finish(null));
+    }
+
+    // Amedo 2026-11-20
+    private bool DeletePosition(Entity e, Entity parent, PositionMarker marker, List<IEditAction> actions)
+    {
+        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2 is not { } rm2) return false;
+        var layout = Layouts(rm2).FirstOrDefault(l => PositionsOf(l) is { } s && SectionHolds(s, marker.Source));
+        if (layout is null || PositionsOf(layout) is not { } posSec) return false;
+        ushort id = (ushort)marker.Source.GetID();
+        var users = new List<string>();
+        if (layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_INSTANCES_SECTION) is { } instSec)
+            for (int i = 0; i < instSec.GetItemsAmount(); i++)
+                if (instSec.GetItem(i) is Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyInstance inst && inst.Positions.Contains(id))
+                    users.Add(FlatEntities().FirstOrDefault(x => ReferenceEquals(x.Get<InstanceData>()?.Source, inst))?.Name ?? $"instance {inst.GetID():X4}");
+        if (users.Count > 0)
+        {
+            _browser.Log($"Delete: {e.Name} is a key of {string.Join(", ", users)}. Remove it from their Keys first (x in the Inspector), so their key numbers stay right.");
+            return false;
+        }
+        var rec = new LayoutEditRecorder();
+        rec.Section(posSec);
+        posSec.RemoveItem(marker.Source);
+        rec.Removed(parent, e);
+        parent.RemoveChild(e);
+        CompactPositionIds(rec, layout); // Amedo 2026-11-21
+        actions.Add(rec.Finish(null));
+        return true;
     }
 
     private static void DeleteSceneryLight(Entity e, Entity parent, CrashEngine.Importer.SceneryLightMarker lightMarker, ChunkSource? chunkSourceForPlaceholder)

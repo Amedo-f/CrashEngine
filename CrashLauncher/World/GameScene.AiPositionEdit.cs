@@ -32,13 +32,12 @@ public sealed partial class GameScene : Scene
         var rm2 = chunkRoot?.Get<ChunkSource>()?.Rm2;
         if (chunkRoot is null || rm2 is null || _aiPosRoot is null) { _browser.Log("Add AI Position: no level loaded."); return null; }
 
-        var aiSec = (layout ?? AiNetworkLayout(rm2))?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION); // Amedo 2026-11-15
+        var aiLayout = layout ?? AiNetworkLayout(rm2); // Amedo 2026-11-21
+        var aiSec = aiLayout?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION); // Amedo 2026-11-15
         if (aiSec is null) { _browser.Log("Add AI Position: this level has no AI-positions section."); return null; }
         rec.Section(aiSec);
-
-        uint id = 0; var used = new HashSet<uint>();
-        for (int i = 0; i < aiSec.GetItemsAmount(); i++) if (aiSec.GetItem(i) is PS2AnyAIPosition p) used.Add(p.GetID());
-        while (used.Contains(id)) id++;
+        CompactAiPositionIds(rec, aiLayout!); // Amedo 2026-11-21
+        uint id = (uint)aiSec.GetItemsAmount(); // Amedo 2026-11-21
 
         var ap = new PS2AnyAIPosition { Position = new TwinVec4(pos.X, pos.Y, pos.Z, 2.44f), UnkShort = 0 };
         ap.SetID(id);
@@ -52,6 +51,43 @@ public sealed partial class GameScene : Scene
         _selectedSet.Clear(); _selectedSet.Add(ent); _selected = ent; _revealSelectionInTree = true;
         _browser.Log($"Added AI Position 0x{id:X4} at ({pos.X:0.#},{pos.Y:0.#},{pos.Z:0.#}). Ctrl+D to copy, drag to move, Delete to remove. Save Chunk to keep.");
         return ent;
+    }
+
+    // Amedo 2026-11-21
+    private int CompactAiPositionIds(LayoutEditRecorder? rec, BaseTwinSection layout)
+    {
+        if (AiPositionsOf(layout) is not { } aiSec) return 0;
+        var remap = new Dictionary<ushort, ushort>();
+        for (int i = 0; i < aiSec.GetItemsAmount(); i++)
+            if (aiSec.GetItem(i).GetID() != (uint)i) remap[(ushort)aiSec.GetItem(i).GetID()] = (ushort)i;
+        if (remap.Count == 0) return 0;
+        var markers = new Dictionary<object, Entity>(ReferenceEqualityComparer.Instance);
+        if (_aiPosRoot is not null)
+            foreach (var m in _aiPosRoot.Children)
+                if (m.Get<AiPositionMarker>()?.Source is { } s) markers[s] = m;
+        for (int i = 0; i < aiSec.GetItemsAmount(); i++)
+        {
+            var item = aiSec.GetItem(i);
+            uint oldId = item.GetID(), newId = (uint)i;
+            if (oldId == newId) continue;
+            var marker = markers.GetValueOrDefault(item);
+            string oldName = marker?.Name ?? "", newName = $"AiPosition_{newId:X4}";
+            item.SetID(newId);
+            if (marker is not null) marker.Name = newName;
+            rec?.Changed(() => { item.SetID(oldId); if (marker is not null) marker.Name = oldName; },
+                         () => { item.SetID(newId); if (marker is not null) marker.Name = newName; });
+        }
+        if (layout.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_PATHS_SECTION) is { } pathSec)
+            for (int i = 0; i < pathSec.GetItemsAmount(); i++)
+            {
+                if (pathSec.GetItem(i) is not PS2AnyAIPath p || p.Args.Length < 2) continue;
+                ushort a0 = p.Args[0], b0 = p.Args[1];
+                ushort a1 = remap.TryGetValue(a0, out var na) ? na : a0, b1 = remap.TryGetValue(b0, out var nb) ? nb : b0;
+                if (a0 == a1 && b0 == b1) continue;
+                p.Args[0] = a1; p.Args[1] = b1;
+                rec?.Changed(() => { p.Args[0] = a0; p.Args[1] = b0; }, () => { p.Args[0] = a1; p.Args[1] = b1; });
+            }
+        return remap.Count;
     }
 
     // Amedo 2026-11-15

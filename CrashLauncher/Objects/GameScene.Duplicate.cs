@@ -59,7 +59,9 @@ public sealed partial class GameScene : Scene
                 else if (original.Get<LoadWallMarker>() is { } wallMarker)
                     DuplicateLoadWall(wallMarker, original, parent, chunkSource, offset, actions, newSelection);
                 else if (original.Get<CrashEngine.Importer.AiPositionMarker>() is { } aiMarker)
-                    DuplicateAiPosition(aiMarker, chunkSource, offset, newSelection);
+                    DuplicateAiPosition(aiMarker, original, chunkSource, offset, actions, newSelection);
+                else if (original.Get<CrashEngine.Importer.PositionMarker>() is { } posMarker) // Amedo 2026-11-20
+                    DuplicatePosition(posMarker, original, chunkSource, offset, actions, newSelection);
             }
         }
 
@@ -316,23 +318,43 @@ public sealed partial class GameScene : Scene
         newSelection.Add(newEntity);
     }
 
-    private void DuplicateAiPosition(CrashEngine.Importer.AiPositionMarker aiMarker, ChunkSource chunkSource, Vector3 offset, List<Entity> newSelection)
+    // Amedo 2026-11-20
+    private void DuplicatePosition(CrashEngine.Importer.PositionMarker marker, Entity original, ChunkSource chunkSource, Vector3 offset, List<IEditAction> actions, List<Entity> newSelection)
     {
-        var rm2 = chunkSource.Rm2;
-        BaseTwinSection? aiSec = null;
-        for (int lid = TwinConstants.LEVEL_LAYOUT_1_SECTION; lid <= TwinConstants.LEVEL_LAYOUT_8_SECTION && aiSec is null; lid++)
-            aiSec = rm2?.GetItem<BaseTwinSection>((uint)lid)?.GetItem<BaseTwinSection>((uint)TwinConstants.LAYOUT_AI_POSITIONS_SECTION);
-        if (aiSec is null || _aiPosRoot is null) return;
+        if (chunkSource.Rm2 is not { } rm2 || _positionsRoot is null) return;
+        var layout = Layouts(rm2).FirstOrDefault(l => PositionsOf(l) is { } s && SectionHolds(s, marker.Source)); // Amedo 2026-11-21
+        if (layout is null || PositionsOf(layout) is not { } posSec) return;
+        var rec = new LayoutEditRecorder();
+        rec.Section(posSec);
+        CompactPositionIds(rec, layout); // Amedo 2026-11-21
+        uint newId = (uint)posSec.GetItemsAmount(); // Amedo 2026-11-21
+        var src = original.Transform.Position; // Amedo 2026-11-21
+        var clone = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyPosition
+        {
+            Position = new TwinVec4(src.X + offset.X, src.Y + offset.Y, src.Z + offset.Z, marker.Source.Position.W),
+        };
+        clone.SetID(newId);
+        posSec.AddItem(clone);
+        var newEntity = MakePositionMarker(_positionsRoot, $"Position_{newId:X4}", clone.Position);
+        newEntity.Add(new CrashEngine.Importer.PositionMarker { Source = clone });
+        rec.Added(_positionsRoot, newEntity);
+        actions.Add(rec.Finish(newEntity));
+        newSelection.Add(newEntity);
+    }
 
-        uint newId = 0; var used = new HashSet<uint>();
-        for (int i = 0; i < aiSec.GetItemsAmount(); i++)
-            if (aiSec.GetItem(i) is Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition p) used.Add(p.GetID());
-        while (used.Contains(newId)) newId++;
+    private void DuplicateAiPosition(CrashEngine.Importer.AiPositionMarker aiMarker, Entity original, ChunkSource chunkSource, Vector3 offset, List<IEditAction> actions, List<Entity> newSelection)
+    {
+        var layout = AiLayoutOf(aiMarker.Source); // Amedo 2026-11-21
+        if (layout is null || AiPositionsOf(layout) is not { } aiSec || _aiPosRoot is null) return;
+        var rec = new LayoutEditRecorder();
+        rec.Section(aiSec);
+        CompactAiPositionIds(rec, layout); // Amedo 2026-11-21
+        uint newId = (uint)aiSec.GetItemsAmount(); // Amedo 2026-11-21
 
         var src = aiMarker.Source;
         var clone = new Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Layout.PS2AnyAIPosition
         {
-            Position = new TwinVec4(src.Position.X + offset.X, src.Position.Y + offset.Y, src.Position.Z + offset.Z, src.Position.W),
+            Position = new TwinVec4(original.Transform.Position.X + offset.X, original.Transform.Position.Y + offset.Y, original.Transform.Position.Z + offset.Z, src.Position.W), // Amedo 2026-11-21
             UnkShort = src.UnkShort,
         };
         clone.SetID(newId);
@@ -340,6 +362,8 @@ public sealed partial class GameScene : Scene
 
         var newEntity = MakeAiPositionMarker(_aiPosRoot, $"AiPosition_{newId:X4}", clone.Position); // Amedo
         newEntity.Add(new CrashEngine.Importer.AiPositionMarker { Source = clone });
+        rec.Added(_aiPosRoot, newEntity); // Amedo 2026-11-21
+        actions.Add(rec.Finish(newEntity)); // Amedo 2026-11-21
         newSelection.Add(newEntity);
     }
 }
