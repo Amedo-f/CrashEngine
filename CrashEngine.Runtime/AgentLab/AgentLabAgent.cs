@@ -177,7 +177,8 @@ public sealed partial class AgentLabAgent : Component
             if (!Levels[0].Stopped) TrajectoryFrame_23A6D8(); // Amedo
         }
 
-        if (_pendingBehaviour is { } switched) { _pendingBehaviour = null; _pendingDefault = false; StartBehaviour(switched.Graph, switched.Starter, switched.Originator, switched.Requester); }
+        // Amedo 2026-11-21
+        if (_pendingBehaviour is not null) { if (Levels[0].Stopped) Finish(); }
         else if (_pendingDefault) { _pendingDefault = false; RestartSpawnBehaviour(); }
         else if (Levels[0].Stopped) Finish();
     }
