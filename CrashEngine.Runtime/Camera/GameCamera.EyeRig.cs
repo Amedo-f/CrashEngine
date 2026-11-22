@@ -252,9 +252,8 @@ public sealed partial class GameCamera
             fwdT.Y = 0f;
             fwdE.Y = 0f;
             int ang = GameMath.AngleBetween_187EE0(fwdE, fwdT, 1);
-            var (s, c) = GameMath.SinCos(ang * GameMath.UnitToRad);
-            cos = c;
-            sin = s;
+            cos = GameMath.Cos_18B8E8(ang); // Amedo 2026-11-21
+            sin = GameMath.Sin_18B8C0(ang);
         }
         M.F(y + 0x3B0, cos < -0.1f ? cos + 0.1f : 0f);
         M.F(y + 0x3B4, sin);

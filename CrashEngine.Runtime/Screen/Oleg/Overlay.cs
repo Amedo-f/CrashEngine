@@ -60,7 +60,7 @@ public sealed class OverlayQueue
     }
 
     // Amedo
-    public static Vector2 FitPlaceToScreen_19FFA0(Vector2 anchor, Vector2 p) => new((p.X - anchor.X) / ScreenAspect + anchor.X, p.Y);
+    public static Vector2 FitPlaceToScreen_19FFA0(Vector2 anchor, Vector2 p) => new(CrashEngine.Core.GameMath.Ps2Add(CrashEngine.Core.GameMath.Ps2Div(CrashEngine.Core.GameMath.Ps2Sub(p.X, anchor.X), ScreenAspect), anchor.X), p.Y); // Amedo 2026-11-21
 
     // Amedo
     public static Vector2 FitSizeToScreen_1A0030(Vector2 size) => new(size.X / ScreenAspect, size.Y);

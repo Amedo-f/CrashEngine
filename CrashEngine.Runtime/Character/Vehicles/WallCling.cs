@@ -102,14 +102,17 @@ public sealed class WallCling : Vehicle
     {
         var z = new Vector3(_place.M31, _place.M32, _place.M33);
         var n = WallNormal;
-        var axis = new Vector3(z.Y * n.Z - z.Z * n.Y, z.Z * n.X - z.X * n.Z, z.X * n.Y - z.Y * n.X);
-        z *= GameMath.InverseLength(z);
-        if (!(5e-5f < axis.X * axis.X + axis.Y * axis.Y + axis.Z * axis.Z)) return;
-        axis *= GameMath.InverseLength(axis);
-        float dot = z.X * n.X + z.Y * n.Y + z.Z * n.Z;
-        var r = GameMath.AxisAngle_18CEA8(axis, GameMath.Acos_18B738(dot));
+        // Amedo 2026-11-21
+        var axis = new Vector3(GameMath.Ps2Sub(GameMath.Ps2Mul(z.Y, n.Z), GameMath.Ps2Mul(z.Z, n.Y)), GameMath.Ps2Sub(GameMath.Ps2Mul(z.Z, n.X), GameMath.Ps2Mul(z.X, n.Z)), GameMath.Ps2Sub(GameMath.Ps2Mul(z.X, n.Y), GameMath.Ps2Mul(z.Y, n.X)));
+        float kz = GameMath.InverseLength(z);
+        z = new Vector3(GameMath.Ps2Mul(z.X, kz), GameMath.Ps2Mul(z.Y, kz), GameMath.Ps2Mul(z.Z, kz));
+        if (!(5e-5f < GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(axis.X, axis.X), GameMath.Ps2Mul(axis.Y, axis.Y)), GameMath.Ps2Mul(axis.Z, axis.Z)))) return;
+        float ka = GameMath.InverseLength(axis);
+        axis = new Vector3(GameMath.Ps2Mul(axis.X, ka), GameMath.Ps2Mul(axis.Y, ka), GameMath.Ps2Mul(axis.Z, ka));
+        float dot = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(z.X, n.X), GameMath.Ps2Mul(z.Y, n.Y)), GameMath.Ps2Mul(z.Z, n.Z));
+        var r = GameMath.AxisAngle_18CEA8(axis, GameMath.Acos_18B738(dot), false);
         var p = _place.Translation;
-        _place *= r;
+        _place = GameMath.Mul_18E5A0(_place, r);
         _place.Translation = p;
     }
 

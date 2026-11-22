@@ -619,7 +619,7 @@ public sealed partial class GameCamera
     private float ShotSize_11FF80(float size, uint obj) =>
         obj == 0 ? 1f : M.F(obj + 0x6C) * (1f - size) + (M.F(obj + 0x74) - M.F(obj + 0x64)) * 0.25f * size;
 
-    private static float ShotDistance_11FFD0(float size, float c, float spread, float width) => MathF.Abs(c * size / (spread * 0.5f * width));
+    private static float ShotDistance_11FFD0(float size, float c, float spread, float width) => MathF.Abs(GameMath.Ps2Div(GameMath.Ps2Mul(c, size), GameMath.Ps2Mul(GameMath.Ps2Mul(spread, 0.5f), width))); // Amedo 2026-11-21
 
     private float ShotRadius_110AF0(uint cmd, uint d, Vector4 center)
     {
@@ -728,8 +728,8 @@ public sealed partial class GameCamera
 
     private static float Tan_18B968(int angle)
     {
-        var (s, c) = GameMath.SinCos(angle * GameMath.UnitToRad);
+        var (s, c) = GameMath.SinCos(GameMath.Ps2Mul(angle, GameMath.UnitToRad)); // Amedo 2026-11-21
         if (c == 0f) return s <= 0f ? -1e30f : 1e30f;
-        return s / c;
+        return GameMath.Ps2Div(s, c);
     }
 }

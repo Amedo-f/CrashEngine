@@ -346,12 +346,13 @@ public sealed class ProjectileAgent
 
     private static Vector3 Reflect_18D920(Vector3 v, Vector3 n)
     {
-        float d = GameMath.Dot(v, n);
+        // Amedo 2026-11-21
+        float d = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(v.X, n.X), GameMath.Ps2Mul(v.Y, n.Y)), GameMath.Ps2Mul(v.Z, n.Z));
         if (d == 0f) return v;
-        d += d;
-        float nn = GameMath.LengthSquared(n);
-        d *= 2.4999998e-09f < nn ? 1f / nn : 0f;
-        return v - n * d;
+        d = GameMath.Ps2Add(d, d);
+        float nn = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(n.X, n.X), GameMath.Ps2Mul(n.Y, n.Y)), GameMath.Ps2Mul(n.Z, n.Z));
+        d = GameMath.Ps2Mul(d, 2.4999998e-09f < nn ? GameMath.Ps2Div(1f, nn) : 0f);
+        return new Vector3(GameMath.Ps2Sub(v.X, GameMath.Ps2Mul(n.X, d)), GameMath.Ps2Sub(v.Y, GameMath.Ps2Mul(n.Y, d)), GameMath.Ps2Sub(v.Z, GameMath.Ps2Mul(n.Z, d)));
     }
 
     private float Random(float range) => World.Rng.RandomBelowFloat_18C180(range); // Amedo

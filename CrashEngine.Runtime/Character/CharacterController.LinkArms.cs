@@ -208,26 +208,30 @@ public sealed partial class CharacterController
     {
         if (HeldMatrix_11C?.Invoke() is not { } m || SetHeldMatrix_11C is not { } set) return;
         if (!HandPoints_13FC50(out var h1, out var h2)) return;
-        if (!(GameMath.Length(h1) < 1000f) || !(GameMath.Length(h2) < 1000f)) return;
+        // Amedo 2026-11-21
+        static float L2(Vector3 v) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(v.X, v.X), GameMath.Ps2Mul(v.Y, v.Y)), GameMath.Ps2Mul(v.Z, v.Z));
+        static Vector3 Scale(Vector3 v, float k) => new(GameMath.Ps2Mul(v.X, k), GameMath.Ps2Mul(v.Y, k), GameMath.Ps2Mul(v.Z, k));
+        static Vector3 Cross(Vector3 a, Vector3 b) => new(GameMath.Ps2Sub(GameMath.Ps2Mul(a.Y, b.Z), GameMath.Ps2Mul(a.Z, b.Y)), GameMath.Ps2Sub(GameMath.Ps2Mul(a.Z, b.X), GameMath.Ps2Mul(a.X, b.Z)), GameMath.Ps2Sub(GameMath.Ps2Mul(a.X, b.Y), GameMath.Ps2Mul(a.Y, b.X)));
+        if (!(GameMath.Ps2Sqrt(L2(h1)) < 1000f) || !(GameMath.Ps2Sqrt(L2(h2)) < 1000f)) return;
         if (link.Leader_15FE50() is not { } lead || lead.MotionState is 6 or 10) return;
-        var d = h2 - h1;
-        d *= GameMath.InvLength_11C030(ArmEps, new Vector4(d, 0f));
+        var d = new Vector3(GameMath.Ps2Sub(h2.X, h1.X), GameMath.Ps2Sub(h2.Y, h1.Y), GameMath.Ps2Sub(h2.Z, h1.Z));
+        d = Scale(d, GameMath.InvLength_11C030(ArmEps, new Vector4(d, 0f)));
         var up = new Vector3(m.M21, m.M22, m.M23);
-        var axis = Vector3.Cross(up, d);
-        up *= GameMath.InvLength_11C030(ArmEps, new Vector4(up, 0f));
-        if (5e-5f < GameMath.LengthSquared(axis))
+        var axis = Cross(up, d);
+        up = Scale(up, GameMath.InvLength_11C030(ArmEps, new Vector4(up, 0f)));
+        if (5e-5f < L2(axis))
         {
-            axis *= GameMath.InvLength_11C030(ArmEps, new Vector4(axis, 0f));
-            int angle = GameMath.Acos_18B738(GameMath.Dot(up, d));
-            if (angle != 0) m *= Matrix4x4.CreateFromAxisAngle(axis, angle * GameMath.UnitToRad);
+            axis = Scale(axis, GameMath.InvLength_11C030(ArmEps, new Vector4(axis, 0f)));
+            int angle = GameMath.Acos_18B738(GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(up.X, d.X), GameMath.Ps2Mul(up.Y, d.Y)), GameMath.Ps2Mul(up.Z, d.Z)));
+            m = GameMath.Mul_18E5A0(m, GameMath.AxisAngle_18CEA8(axis, angle, false));
         }
         var r0 = new Vector3(m.M11, m.M12, m.M13);
-        r0 *= GameMath.InvLength_11C030(ArmEps, new Vector4(r0, 0f));
+        r0 = Scale(r0, GameMath.InvLength_11C030(ArmEps, new Vector4(r0, 0f)));
         var r1 = new Vector3(m.M21, m.M22, m.M23);
-        r1 *= GameMath.InvLength_11C030(ArmEps, new Vector4(r1, 0f));
-        var r2 = Vector3.Cross(r0, r1);
-        r0 = Vector3.Cross(r1, r2);
-        var mid = (h1 + h2) * 0.5f;
+        r1 = Scale(r1, GameMath.InvLength_11C030(ArmEps, new Vector4(r1, 0f)));
+        var r2 = Cross(r0, r1);
+        r0 = Cross(r1, r2);
+        var mid = new Vector3(GameMath.Ps2Mul(GameMath.Ps2Add(h1.X, h2.X), 0.5f), GameMath.Ps2Mul(GameMath.Ps2Add(h1.Y, h2.Y), 0.5f), GameMath.Ps2Mul(GameMath.Ps2Add(h1.Z, h2.Z), 0.5f));
         set(new Matrix4x4(r0.X, r0.Y, r0.Z, 0f, r1.X, r1.Y, r1.Z, 0f, r2.X, r2.Y, r2.Z, 0f, mid.X, mid.Y, mid.Z, 1f));
     }
 }

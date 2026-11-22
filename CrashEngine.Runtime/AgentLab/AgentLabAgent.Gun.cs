@@ -37,18 +37,16 @@ public sealed partial class AgentLabAgent
 
     internal static float LineDistanceSquared_184340(in Vector3 a, in Vector3 b, in Vector3 p)
     {
-        float aa = a.X * a.X + a.Y * a.Y + a.Z * a.Z;
-        float ba = b.X * a.X + b.Y * a.Y + b.Z * a.Z;
-        float bp = b.X * p.X + b.Y * p.Y + b.Z * p.Z;
-        float ap = a.X * p.X + a.Y * p.Y + a.Z * p.Z;
-        float t = (bp - ap) - (ba - aa);
-        float m = t * -t;
-        float qx = p.X - a.X, qy = p.Y - a.Y, qz = p.Z - a.Z;
-        if (!(m < 0f)) return qx * qx + qy * qy + qz * qz;
-        float ex = a.X - b.X, ey = a.Y - b.Y, ez = a.Z - b.Z;
-        float l = ex * ex + ey * ey + ez * ez;
-        float inv = 1e-10f < l || l < -1e-10f ? 1f / l : 0f;
-        return MathF.Abs(m * inv + (qx * qx + qy * qy + qz * qz));
+        // Amedo 2026-11-21
+        static float D(in Vector3 u, in Vector3 v) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(u.X, v.X), GameMath.Ps2Mul(u.Y, v.Y)), GameMath.Ps2Mul(u.Z, v.Z));
+        static float Sq(float x, float y, float z) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(x, x), GameMath.Ps2Mul(y, y)), GameMath.Ps2Mul(z, z));
+        float t = GameMath.Ps2Sub(GameMath.Ps2Sub(D(b, p), D(a, p)), GameMath.Ps2Sub(D(b, a), D(a, a)));
+        float m = GameMath.Ps2Mul(t, -t);
+        float qx = GameMath.Ps2Sub(p.X, a.X), qy = GameMath.Ps2Sub(p.Y, a.Y), qz = GameMath.Ps2Sub(p.Z, a.Z);
+        if (!(m < 0f)) return Sq(qx, qy, qz);
+        float l = Sq(GameMath.Ps2Sub(a.X, b.X), GameMath.Ps2Sub(a.Y, b.Y), GameMath.Ps2Sub(a.Z, b.Z));
+        float inv = 1e-10f < l || l < -1e-10f ? GameMath.Ps2Div(1f, l) : 0f;
+        return MathF.Abs(GameMath.Ps2Add(GameMath.Ps2Mul(m, inv), Sq(qx, qy, qz)));
     }
 
     private float ShotHitMe_126708()

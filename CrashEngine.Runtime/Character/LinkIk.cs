@@ -86,7 +86,7 @@ public sealed class LinkIk
         return n;
     }
 
-    private static float Inv(float l) => Tiny < l || l < -Tiny ? 1f / l : 0f;
+    private static float Inv(float l) => Tiny < l || l < -Tiny ? GameMath.Ps2Div(1f, l) : 0f; // Amedo 2026-11-21
 
     private int Ccd_182378(int iterations, float tol)
     {
@@ -168,7 +168,7 @@ public sealed class LinkIk
 
     private static void Rotate_18C670(ref float sin, ref float cos, float s, float c, float eps)
     {
-        float nc = cos * c - sin * s, ns = cos * s + sin * c;
+        float nc = GameMath.Ps2Sub(GameMath.Ps2Mul(cos, c), GameMath.Ps2Mul(sin, s)), ns = GameMath.Ps2Add(GameMath.Ps2Mul(cos, s), GameMath.Ps2Mul(sin, c)); // Amedo 2026-11-21
         cos = nc;
         sin = ns;
         Normalize_18C548(ref sin, ref cos, eps);
@@ -176,11 +176,11 @@ public sealed class LinkIk
 
     private static void Normalize_18C548(ref float sin, ref float cos, float eps)
     {
-        float l2 = sin * sin + cos * cos, e = l2 - 1f;
-        if (e * e <= eps) return;
-        float inv = Inv(MathF.Sqrt(l2));
-        sin *= inv;
-        cos *= inv;
+        float l2 = GameMath.Ps2Add(GameMath.Ps2Mul(sin, sin), GameMath.Ps2Mul(cos, cos)), e = GameMath.Ps2Sub(l2, 1f); // Amedo 2026-11-21
+        if (GameMath.Ps2Mul(e, e) <= eps) return;
+        float inv = Inv(GameMath.Ps2Sqrt(l2));
+        sin = GameMath.Ps2Mul(sin, inv);
+        cos = GameMath.Ps2Mul(cos, inv);
     }
 
     private static void Clamp_181EF0(Joint j, ref float sin, ref float cos, float eps)

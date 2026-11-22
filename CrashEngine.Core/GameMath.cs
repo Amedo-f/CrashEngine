@@ -32,8 +32,17 @@ public static partial class GameMath
 
     public static float Ps2Mul(float a, float b) => Chop((double)a * b, 0.0);
 
+    // Amedo 2026-11-21
+    public static float Ps2Div(float a, float b)
+    {
+        if (b == 0f) return a == 0f ? 0f : (a < 0f) != float.IsNegative(b) ? -float.MaxValue : float.MaxValue; // Amedo 2026-11-21
+        double q = (double)a / b;
+        return Chop(q, Math.FusedMultiplyAdd(-q, b, a) / b);
+    }
+
     public static float Ps2Sqrt(float a)
     {
+        a = MathF.Abs(a); // Amedo 2026-11-21
         if (!(0f < a)) return 0f;
         float f = (float)Math.Sqrt(a);
         if ((double)f * f > a) f = MathF.BitDecrement(f);
@@ -48,30 +57,43 @@ public static partial class GameMath
         return Ps2Sqrt(Ps2Add(Ps2Add(Ps2Mul(dx, dx), Ps2Mul(dy, dy)), Ps2Mul(dz, dz)));
     }
 
+    // Amedo 2026-11-21
+    public static float Ps2Rsqrt(float a, float b) => Ps2Div(a, Ps2Sqrt(b));
+
     private static float Chop(double s, double e)
     {
         float f = (float)s;
-        if (f == 0f || float.IsInfinity(f)) return f;
+        if (f == 0f) return f;
+        if (float.IsInfinity(f)) return f > 0f ? float.MaxValue : -float.MaxValue; // Amedo 2026-11-21
+        if (MathF.Abs(f) < 1.17549435E-38f) return f < 0f ? -0f : 0f; // Amedo 2026-11-21
         double over = ((double)f - s) - e;
         if (f > 0f ? over > 0.0 : over < 0.0) f = f > 0f ? MathF.BitDecrement(f) : MathF.BitIncrement(f);
         return f;
     }
 
     // Amedo
-    public static (float Sin, float Cos) SinCosVu0_2E4C30(float rad) => (CosVu0(rad - 1.570796f), CosVu0(rad));
+    public static (float Sin, float Cos) SinCosVu0_2E4C30(float rad) => (CosVu0(Ps2Sub(rad, 1.570796f)), CosVu0(rad)); // Amedo 2026-11-21
 
-    // Amedo
+    // Amedo 2026-11-21
     private static float CosVu0(float v)
     {
         v = MathF.Abs(v);
-        float x = v * -0.159155f;
-        float t = MathF.Abs(MathF.Ceiling(x) - x - 0.5f) - 0.25f;
-        float t2 = t * t, t4 = t2 * t2, t8 = t4 * t4;
-        float acc = -41.341675f * t * t2;
-        acc += -76.57496f * t * t2 * t4;
-        acc += 81.602226f * t * t4;
-        acc += t * 6.283185f;
-        return acc + 39.710659f * t * t8;
+        float acc = Ps2Mul(v, -0.159155f);
+        acc = Ps2Sub(acc, 12582912f);
+        acc = Ps2Add(acc, 12582912f);
+        acc = Ps2Sub(acc, Ps2Mul(v, -0.159155f));
+        float t = Ps2Sub(MathF.Abs(Ps2Sub(acc, 0.5f)), 0.25f);
+        float t2 = Ps2Mul(t, t);
+        float a5 = Ps2Mul(t, -76.57496f), a4 = Ps2Mul(t, -41.341675f), a1 = Ps2Mul(t, 81.602226f);
+        float t4 = Ps2Mul(t2, t2);
+        a5 = Ps2Mul(a5, t2);
+        acc = Ps2Mul(a4, t2);
+        float a3 = Ps2Mul(t, 39.710659f);
+        float t8 = Ps2Mul(t4, t4);
+        acc = Ps2Add(acc, Ps2Mul(a5, t4));
+        acc = Ps2Add(acc, Ps2Mul(a1, t4));
+        acc = Ps2Add(acc, Ps2Mul(t, 6.283185f));
+        return Ps2Add(acc, Ps2Mul(a3, t8));
     }
 
     public static (float Sin, float Cos) SinCos(float rad) => SinCosVu0_2E4C30(rad); // Amedo
@@ -79,7 +101,7 @@ public static partial class GameMath
     // Amedo
     public static (float Cos, float Sin) CosSin_18B918(int angle)
     {
-        var (s, c) = SinCos(angle * UnitToRad);
+        var (s, c) = SinCos(Ps2Mul(angle, UnitToRad)); // Amedo 2026-11-21
         return (c, s);
     }
 
@@ -99,43 +121,45 @@ public static partial class GameMath
     // Amedo 2026-10-02
     public static int Acos_18B738(float x)
     {
-        float ax = MathF.Abs(x), rest = 1f - ax;
+        float ax = MathF.Abs(x), rest = Ps2Sub(1f, ax); // Amedo 2026-11-21
         if (rest < 0f) rest = 0f;
-        float a = (((ax * -0.0187293f + 0.074261f) * ax - 0.2121144f) * ax + 1.5707288f) * MathF.Sqrt(rest);
-        if (x < 0f) a = 3.1415927f - a;
-        return Trunc(a * RadToUnit);
+        float a = Ps2Mul(Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(Ps2Add(Ps2Mul(ax, -0.0187293f), 0.074261f), ax), 0.2121144f), ax), 1.5707288f), Ps2Sqrt(rest));
+        if (x < 0f) a = Ps2Sub(3.1415927f, a);
+        return Trunc(Ps2Mul(a, RadToUnit));
     }
 
     // Amedo
     public static int Asin16_18B7F8(float x)
     {
         float a = MathF.Abs(x);
-        float t = 1f - a;
+        float t = Ps2Sub(1f, a); // Amedo 2026-11-21
         if (t < 0f) t = 0f;
-        float r = 1.5707964f - MathF.Sqrt(t) * (((a * -0.0187293f + 0.074261f) * a - 0.2121144f) * a + 1.5707288f);
+        float r = Ps2Sub(1.5707964f, Ps2Mul(Ps2Sqrt(t), Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(Ps2Add(Ps2Mul(a, -0.0187293f), 0.074261f), a), 0.2121144f), a), 1.5707288f)));
         if (x < 0f) r = -r;
-        return Trunc(r * RadToUnit);
+        return Trunc(Ps2Mul(r, RadToUnit));
     }
 
     // Amedo
     public static int Atan2_182918(float y, float x)
     {
-        float r = MathF.Sqrt(x * x + y * y);
-        float s = r + x;
+        // Amedo 2026-11-21
+        float r = Ps2Sqrt(Ps2Add(Ps2Mul(x, x), Ps2Mul(y, y)));
+        float s = Ps2Add(r, x);
         if (!(0f < s)) return 0x8000;
-        float t = y / s;
-        float t2 = t * t;
+        float t = Ps2Div(y, s);
+        float t2 = Ps2Mul(t, t);
         float p;
-        if (t2 < 1f) p = ((((t2 * 0.0208351f - 0.085133f) * t2 + 0.180141f) * t2 - 0.3302995f) * t2 + 0.999866f) * t;
+        if (t2 < 1f) p = Ps2Mul(Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(t2, 0.0208351f), 0.085133f), t2), 0.180141f), t2), 0.3302995f), t2), 0.999866f), t);
         else
         {
-            float u = 1f / t;
-            float u2 = u * u;
-            p = ((((u2 * 0.0208351f - 0.085133f) * u2 + 0.180141f) * u2 - 0.3302995f) * u2 + 0.999866f) * u;
-            p = 0f < t ? 1.5707964f - p : -1.5707964f - p;
+            float u = Ps2Div(1f, t);
+            float u2 = Ps2Mul(u, u);
+            p = Ps2Mul(Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(Ps2Add(Ps2Mul(Ps2Sub(Ps2Mul(u2, 0.0208351f), 0.085133f), u2), 0.180141f), u2), 0.3302995f), u2), 0.999866f), u);
+            p = 0f < t ? Ps2Sub(1.5707964f, p) : Ps2Sub(-1.5707964f, p);
         }
-        int half = Trunc(p * RadToUnit);
-        return Trunc((half * UnitToRad + half * UnitToRad) * RadToUnit);
+        int half = Trunc(Ps2Mul(p, RadToUnit));
+        float h = Ps2Mul(half, UnitToRad);
+        return Trunc(Ps2Mul(Ps2Add(h, h), RadToUnit));
     }
 
     public static int Scale_15DE90(float k, int units) => Trunc(units * k);
@@ -146,8 +170,8 @@ public static partial class GameMath
     // Amedo
     public static float InvLength_11C030(float eps, float x, float y, float z)
     {
-        float l = x * x + y * y + z * z;
-        return eps < l ? 1f / MathF.Sqrt(l) : 0f;
+        float l = Ps2Add(Ps2Add(Ps2Mul(x, x), Ps2Mul(y, y)), Ps2Mul(z, z)); // Amedo 2026-11-21
+        return eps < l ? Ps2Div(1f, Ps2Sqrt(l)) : 0f;
     }
 
     public static float InvLength_11C030(float eps, Vector4 v) => InvLength_11C030(eps, v.X, v.Y, v.Z); // Amedo

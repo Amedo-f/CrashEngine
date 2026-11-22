@@ -424,7 +424,7 @@ public sealed class Humiliskate : Vehicle
     private void TurnAboutUp(float radians)
     {
         var up = new Vector3(Board.M21, Board.M22, Board.M23);
-        var r = GameMath.AxisAngle_18CEA8(up, GameMath.FromValue_11BFA0(radians, 0));
+        var r = GameMath.AxisAngle_18CEA8(up, GameMath.FromValue_11BFA0(radians, 0), true); // Amedo 2026-11-21
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();
@@ -694,7 +694,7 @@ public sealed class Humiliskate : Vehicle
         float kc = GameMath.InvLength_11C030(Eps, new Vector4(c, 1f));
         float dot = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
         c = new Vector3(c.X * kc, c.Y * kc, c.Z * kc);
-        var r = GameMath.AxisAngle_18CEA8(c, GameMath.Acos_18B738(dot));
+        var r = GameMath.AxisAngle_18CEA8(c, GameMath.Acos_18B738(dot), true); // Amedo 2026-11-21
         var t = Board.Translation;
         Board = Board * r;
         NormalizeRows();

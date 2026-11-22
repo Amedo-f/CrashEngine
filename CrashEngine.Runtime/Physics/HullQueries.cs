@@ -184,12 +184,15 @@ public static class HullQueries
     // Amedo 2026-10-05
     public static Vector4 PlaneFrom3_18D0A0(in Vector3 a, in Vector3 b, in Vector3 c)
     {
-        var e1 = b - a;
-        var e2 = c - a;
-        var n = new Vector3(e1.Y * e2.Z - e1.Z * e2.Y, e1.Z * e2.X - e1.X * e2.Z, e1.X * e2.Y - e1.Y * e2.X);
-        float len = MathF.Sqrt(n.X * n.X + n.Y * n.Y + n.Z * n.Z);
-        n *= 0f < len ? 1f / len : float.MaxValue;
-        return new Vector4(n, -(n.X * a.X + n.Y * a.Y + n.Z * a.Z));
+        // Amedo 2026-11-21
+        var e1 = new Vector3(GameMath.Ps2Sub(b.X, a.X), GameMath.Ps2Sub(b.Y, a.Y), GameMath.Ps2Sub(b.Z, a.Z));
+        var e2 = new Vector3(GameMath.Ps2Sub(c.X, a.X), GameMath.Ps2Sub(c.Y, a.Y), GameMath.Ps2Sub(c.Z, a.Z));
+        var n = new Vector3(GameMath.Ps2Sub(GameMath.Ps2Mul(e1.Y, e2.Z), GameMath.Ps2Mul(e2.Y, e1.Z)), GameMath.Ps2Sub(GameMath.Ps2Mul(e1.Z, e2.X), GameMath.Ps2Mul(e2.Z, e1.X)), GameMath.Ps2Sub(GameMath.Ps2Mul(e1.X, e2.Y), GameMath.Ps2Mul(e2.X, e1.Y)));
+        float len = GameMath.Ps2Sqrt(GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(n.X, n.X), GameMath.Ps2Mul(n.Y, n.Y)), GameMath.Ps2Mul(n.Z, n.Z)));
+        float q = GameMath.Ps2Div(1f, len);
+        n = new Vector3(GameMath.Ps2Mul(n.X, q), GameMath.Ps2Mul(n.Y, q), GameMath.Ps2Mul(n.Z, q));
+        float dot = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(n.X, a.X), GameMath.Ps2Mul(n.Y, a.Y)), GameMath.Ps2Mul(n.Z, a.Z));
+        return new Vector4(n, GameMath.Ps2Sub(0f, dot));
     }
 
     [ThreadStatic] private static ConvexHull? _unitSpace;
@@ -271,8 +274,11 @@ public static class HullQueries
 
     public static float Clip_1FC378(in Vector4 pl, in Vector3 a, in Vector3 b, out Vector3 q)
     {
-        float f = -Plane(pl, a) / (pl.X * (b.X - a.X) + pl.Y * (b.Y - a.Y) + pl.Z * (b.Z - a.Z));
-        q = a + (b - a) * f;
+        // Amedo 2026-11-21
+        float dx = GameMath.Ps2Sub(b.X, a.X), dy = GameMath.Ps2Sub(b.Y, a.Y), dz = GameMath.Ps2Sub(b.Z, a.Z);
+        float side = GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(pl.X, a.X), GameMath.Ps2Mul(pl.Y, a.Y)), GameMath.Ps2Mul(pl.Z, a.Z)), pl.W);
+        float f = GameMath.Ps2Div(-side, GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(pl.X, dx), GameMath.Ps2Mul(pl.Y, dy)), GameMath.Ps2Mul(pl.Z, dz)));
+        q = new Vector3(GameMath.Ps2Add(a.X, GameMath.Ps2Mul(dx, f)), GameMath.Ps2Add(a.Y, GameMath.Ps2Mul(dy, f)), GameMath.Ps2Add(a.Z, GameMath.Ps2Mul(dz, f)));
         return f;
     }
 

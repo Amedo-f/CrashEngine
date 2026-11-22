@@ -53,16 +53,16 @@ public abstract class SubCamera
     {
         if (k == 0f) return a;
         if (k == 1f) return b;
-        return new Vector4((b.X - a.X) * k + a.X, (b.Y - a.Y) * k + a.Y, (b.Z - a.Z) * k + a.Z, b.W);
+        return new Vector4(GameMath.Ps2Add(GameMath.Ps2Mul(GameMath.Ps2Sub(b.X, a.X), k), a.X), GameMath.Ps2Add(GameMath.Ps2Mul(GameMath.Ps2Sub(b.Y, a.Y), k), a.Y), GameMath.Ps2Add(GameMath.Ps2Mul(GameMath.Ps2Sub(b.Z, a.Z), k), a.Z), b.W); // Amedo 2026-11-21
     }
 
     public static float Project_184260(in Vector4 a, in Vector4 b, in Vector4 p)
     {
-        float n = ((b.X * p.X + b.Y * p.Y + b.Z * p.Z) - (a.X * p.X + a.Y * p.Y + a.Z * p.Z))
-                - ((b.X * a.X + b.Y * a.Y + b.Z * a.Z) - (a.X * a.X + a.Y * a.Y + a.Z * a.Z));
-        if (n * n == 0f) return 0f;
-        float dx = a.X - b.X, dy = a.Y - b.Y, dz = a.Z - b.Z;
-        return n / (dx * dx + dy * dy + dz * dz);
+        static float D(in Vector4 u, in Vector4 v) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(u.X, v.X), GameMath.Ps2Mul(u.Y, v.Y)), GameMath.Ps2Mul(u.Z, v.Z)); // Amedo 2026-11-21
+        float n = GameMath.Ps2Sub(GameMath.Ps2Sub(D(b, p), D(a, p)), GameMath.Ps2Sub(D(b, a), D(a, a)));
+        if (GameMath.Ps2Mul(n, n) == 0f) return 0f;
+        float dx = GameMath.Ps2Sub(a.X, b.X), dy = GameMath.Ps2Sub(a.Y, b.Y), dz = GameMath.Ps2Sub(a.Z, b.Z);
+        return GameMath.Ps2Div(n, GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(dx, dx), GameMath.Ps2Mul(dy, dy)), GameMath.Ps2Mul(dz, dz)));
     }
 
     protected static float Clamp01(float t) => 1f < t ? 1f : t < 0f ? 0f : t;
@@ -616,7 +616,7 @@ public sealed class BossAreaCamera : SubCamera
     }
 
     private static Vector4 RotY_18BEC0(Matrix4x4 m, Vector4 p) =>
-        new(p.X * m.M11 + p.Z * m.M31, p.Y, p.X * m.M13 + p.Z * m.M33, p.W);
+        new(GameMath.Ps2Add(GameMath.Ps2Mul(p.X, m.M11), GameMath.Ps2Mul(p.Z, m.M31)), p.Y, GameMath.Ps2Add(GameMath.Ps2Mul(p.X, m.M13), GameMath.Ps2Mul(p.Z, m.M33)), p.W); // Amedo 2026-11-21
 }
 
 // Amedo 2026-10-02
@@ -691,27 +691,26 @@ public sealed class ZoneCamera : SubCamera
 
     private static float Closest_184668(in Vector4 a, in Vector4 b, in Vector4 p, out Vector4 c)
     {
-        float aa = a.X * a.X + a.Y * a.Y + a.Z * a.Z;
-        float ba = b.X * a.X + b.Y * a.Y + b.Z * a.Z;
-        float bp = b.X * p.X + b.Y * p.Y + b.Z * p.Z;
-        float ap = a.X * p.X + a.Y * p.Y + a.Z * p.Z;
-        float n = (bp - ap) - (ba - aa);
+        // Amedo 2026-11-21
+        static float D(in Vector4 u, in Vector4 v) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(u.X, v.X), GameMath.Ps2Mul(u.Y, v.Y)), GameMath.Ps2Mul(u.Z, v.Z));
+        static float Sq(float x, float y, float z) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(x, x), GameMath.Ps2Mul(y, y)), GameMath.Ps2Mul(z, z));
+        float n = GameMath.Ps2Sub(GameMath.Ps2Sub(D(b, p), D(a, p)), GameMath.Ps2Sub(D(b, a), D(a, a)));
         if (!(0f < n))
         {
             c = a;
-            return DistanceSq(p, a);
+            return Sq(GameMath.Ps2Sub(p.X, a.X), GameMath.Ps2Sub(p.Y, a.Y), GameMath.Ps2Sub(p.Z, a.Z));
         }
-        float lx = a.X - b.X, ly = a.Y - b.Y, lz = a.Z - b.Z;
-        float l = lx * lx + ly * ly + lz * lz;
+        float lx = GameMath.Ps2Sub(a.X, b.X), ly = GameMath.Ps2Sub(a.Y, b.Y), lz = GameMath.Ps2Sub(a.Z, b.Z);
+        float l = Sq(lx, ly, lz);
         if (!(n < l))
         {
             c = b;
-            return DistanceSq(p, b);
+            return Sq(GameMath.Ps2Sub(p.X, b.X), GameMath.Ps2Sub(p.Y, b.Y), GameMath.Ps2Sub(p.Z, b.Z));
         }
-        float inv = SegEps < l || l < -SegEps ? 1f / l : 0f;
-        float k = -inv * n;
-        c = new Vector4(lx * k + a.X, ly * k + a.Y, lz * k + a.Z, a.W);
-        return MathF.Abs(k * n + DistanceSq(p, a));
+        float inv = SegEps < l || l < -SegEps ? GameMath.Ps2Div(1f, l) : 0f;
+        float k = GameMath.Ps2Mul(-inv, n);
+        c = new Vector4(GameMath.Ps2Add(GameMath.Ps2Mul(lx, k), a.X), GameMath.Ps2Add(GameMath.Ps2Mul(ly, k), a.Y), GameMath.Ps2Add(GameMath.Ps2Mul(lz, k), a.Z), a.W);
+        return MathF.Abs(GameMath.Ps2Add(GameMath.Ps2Mul(k, n), Sq(GameMath.Ps2Sub(p.X, a.X), GameMath.Ps2Sub(p.Y, a.Y), GameMath.Ps2Sub(p.Z, a.Z))));
     }
 
     private static float DistanceSq(Vector4 p, Vector4 q)

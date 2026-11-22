@@ -148,22 +148,25 @@ public sealed partial class AgentLabAgent
 
     private static Vector3 Apex_22C0E0(float g, Vector3 p, Vector3 target, float h)
     {
-        float vy = MathF.Sqrt(MathF.Abs((g + g) * h));
-        float dy = target.Y - p.Y;
-        float dx = target.X - p.X, dz = target.Z - p.Z;
-        float speed = MathF.Sqrt(dx * dx + dz * dz) / ((MathF.Sqrt(MathF.Abs((g + g) * (h - dy))) + vy) / g);
+        // Amedo 2026-11-21
+        float g2 = GameMath.Ps2Add(g, g);
+        float vy = GameMath.Ps2Sqrt(MathF.Abs(GameMath.Ps2Mul(g2, h)));
+        float dy = GameMath.Ps2Sub(target.Y, p.Y);
+        float dx = GameMath.Ps2Sub(target.X, p.X), dz = GameMath.Ps2Sub(target.Z, p.Z);
+        float speed = GameMath.Ps2Div(GameMath.Ps2Sqrt(GameMath.Ps2Add(GameMath.Ps2Mul(dx, dx), GameMath.Ps2Mul(dz, dz))), GameMath.Ps2Div(GameMath.Ps2Add(GameMath.Ps2Sqrt(MathF.Abs(GameMath.Ps2Mul(g2, GameMath.Ps2Sub(h, dy)))), vy), g));
         float inv = GameMath.InverseLength(new Vector3(dx, 0f, dz));
-        return new Vector3(dx * inv * speed, vy, dz * inv * speed);
+        return new Vector3(GameMath.Ps2Mul(GameMath.Ps2Mul(dx, inv), speed), vy, GameMath.Ps2Mul(GameMath.Ps2Mul(dz, inv), speed));
     }
 
     private static Vector3 Ballistic_22C210(float g, Vector3 p, Vector3 target, float t)
     {
-        float dx = target.X - p.X, dz = target.Z - p.Z;
-        float hd = MathF.Sqrt(dx * dx + dz * dz);
-        float vy = (target.Y - p.Y + g * (t * 0.5f) * t) / t;
+        // Amedo 2026-11-21
+        float dx = GameMath.Ps2Sub(target.X, p.X), dz = GameMath.Ps2Sub(target.Z, p.Z);
+        float hd = GameMath.Ps2Sqrt(GameMath.Ps2Add(GameMath.Ps2Mul(dx, dx), GameMath.Ps2Mul(dz, dz)));
+        float vy = GameMath.Ps2Div(GameMath.Ps2Add(GameMath.Ps2Sub(target.Y, p.Y), GameMath.Ps2Mul(GameMath.Ps2Mul(g, GameMath.Ps2Mul(t, 0.5f)), t)), t);
         if (MathF.Abs(hd) <= 5e-5f) return new Vector3(0f, vy, 0f);
-        float k = hd / t / hd;
-        return new Vector3(dx * k, vy, dz * k);
+        float k = GameMath.Ps2Div(GameMath.Ps2Div(hd, t), hd);
+        return new Vector3(GameMath.Ps2Mul(dx, k), vy, GameMath.Ps2Mul(dz, k));
     }
 
     private void Launch_2335D8(float spinY, float spinX, Vector3 v)
@@ -239,7 +242,7 @@ public sealed partial class AgentLabAgent
     {
         var m = Matrix4x4.Identity;
         m.M31 = d.X; m.M32 = d.Y; m.M33 = d.Z;
-        float k = 1f - d.Y * d.Y;
+        float k = GameMath.Ps2Sub(1f, GameMath.Ps2Mul(d.Y, d.Y)); // Amedo 2026-11-21
         Vector3 up, side;
         if (k == 0f)
         {
@@ -249,10 +252,12 @@ public sealed partial class AgentLabAgent
         }
         else
         {
-            up = new Vector3(-d.X * d.Y, k, -d.Y * d.Z);
-            up *= GameMath.InverseLength(up);
-            side = new Vector3(up.Y * d.Z - up.Z * d.Y, up.Z * d.X - up.X * d.Z, up.X * d.Y - up.Y * d.X);
-            side *= GameMath.InverseLength(side);
+            up = new Vector3(GameMath.Ps2Mul(-d.X, d.Y), k, GameMath.Ps2Mul(-d.Y, d.Z));
+            float ku = GameMath.InverseLength(up);
+            up = new Vector3(GameMath.Ps2Mul(up.X, ku), GameMath.Ps2Mul(up.Y, ku), GameMath.Ps2Mul(up.Z, ku));
+            side = new Vector3(GameMath.Ps2Sub(GameMath.Ps2Mul(up.Y, d.Z), GameMath.Ps2Mul(up.Z, d.Y)), GameMath.Ps2Sub(GameMath.Ps2Mul(up.Z, d.X), GameMath.Ps2Mul(up.X, d.Z)), GameMath.Ps2Sub(GameMath.Ps2Mul(up.X, d.Y), GameMath.Ps2Mul(up.Y, d.X)));
+            float ks = GameMath.InverseLength(side);
+            side = new Vector3(GameMath.Ps2Mul(side.X, ks), GameMath.Ps2Mul(side.Y, ks), GameMath.Ps2Mul(side.Z, ks));
         }
         m.M11 = side.X; m.M12 = side.Y; m.M13 = side.Z;
         m.M21 = up.X; m.M22 = up.Y; m.M23 = up.Z;

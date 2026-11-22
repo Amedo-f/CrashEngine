@@ -684,10 +684,9 @@ public sealed partial class AgentLabAgent
     internal static Matrix4x4 LookAlong_185920(Vector3 d, Vector3 up)
     {
         var r = AxisFrame_185C08(up, 1);
-        var local = new Vector3(d.X * r.M11 + d.Y * r.M12 + d.Z * r.M13,
-                                d.X * r.M21 + d.Y * r.M22 + d.Z * r.M23,
-                                d.X * r.M31 + d.Y * r.M32 + d.Z * r.M33);
-        var m = Along_185A40(local) * r;
+        static float Dot(Vector3 v, float x, float y, float z) => GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(v.X, x), GameMath.Ps2Mul(v.Y, y)), GameMath.Ps2Mul(v.Z, z)); // Amedo 2026-11-21
+        var local = new Vector3(Dot(d, r.M11, r.M12, r.M13), Dot(d, r.M21, r.M22, r.M23), Dot(d, r.M31, r.M32, r.M33));
+        var m = GameMath.Mul_18E5A0(Along_185A40(local), r);
         m.M14 = m.M24 = m.M34 = 0f;
         m.M41 = m.M42 = m.M43 = 0f;
         m.M44 = 1f;
@@ -702,12 +701,12 @@ public sealed partial class AgentLabAgent
         rows[index] = axis;
         int i = next[index];
         var a = GameMath.PerpendicularOf_18DA40(axis);
-        float ia = GameMath.InverseLength(a);
-        a = new Vector3(a.X * ia, a.Y * ia, a.Z * ia);
+        float ia = GameMath.InverseLength(a); // Amedo 2026-11-21
+        a = new Vector3(GameMath.Ps2Mul(a.X, ia), GameMath.Ps2Mul(a.Y, ia), GameMath.Ps2Mul(a.Z, ia));
         rows[i] = a;
-        var b = new Vector3(axis.Y * a.Z - axis.Z * a.Y, axis.Z * a.X - axis.X * a.Z, axis.X * a.Y - axis.Y * a.X);
+        var b = new Vector3(GameMath.Ps2Sub(GameMath.Ps2Mul(axis.Y, a.Z), GameMath.Ps2Mul(axis.Z, a.Y)), GameMath.Ps2Sub(GameMath.Ps2Mul(axis.Z, a.X), GameMath.Ps2Mul(axis.X, a.Z)), GameMath.Ps2Sub(GameMath.Ps2Mul(axis.X, a.Y), GameMath.Ps2Mul(axis.Y, a.X)));
         float ib = GameMath.InverseLength(b);
-        rows[next[i]] = new Vector3(b.X * ib, b.Y * ib, b.Z * ib);
+        rows[next[i]] = new Vector3(GameMath.Ps2Mul(b.X, ib), GameMath.Ps2Mul(b.Y, ib), GameMath.Ps2Mul(b.Z, ib));
         return new Matrix4x4(rows[0].X, rows[0].Y, rows[0].Z, 0f,
                              rows[1].X, rows[1].Y, rows[1].Z, 0f,
                              rows[2].X, rows[2].Y, rows[2].Z, 0f,

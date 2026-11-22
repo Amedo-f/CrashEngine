@@ -329,8 +329,10 @@ public sealed partial class AgentLabAgent
 
     private static Vector3 ClampLength_254080(Vector3 v, float max)
     {
-        float len = GameMath.Length(v);
-        return max < len ? v * (max / len) : v;
+        float len = GameMath.Ps2Sqrt(GameMath.Ps2Add(GameMath.Ps2Add(GameMath.Ps2Mul(v.X, v.X), GameMath.Ps2Mul(v.Y, v.Y)), GameMath.Ps2Mul(v.Z, v.Z))); // Amedo 2026-11-21
+        if (!(max < len)) return v;
+        float k = GameMath.Ps2Div(max, len);
+        return new Vector3(GameMath.Ps2Mul(v.X, k), GameMath.Ps2Mul(v.Y, k), GameMath.Ps2Mul(v.Z, k));
     }
 
     private void MoveBy_197048(Vector3 push)

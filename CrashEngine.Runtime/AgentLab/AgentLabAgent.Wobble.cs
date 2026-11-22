@@ -255,11 +255,11 @@ public sealed partial class AgentLabAgent
     // Amedo
     private static Quaternion Rotate_19A5B8(Quaternion q, Quaternion node)
     {
-        const float E = 1e-4f;
-        if (MathF.Abs(q.X) <= E && MathF.Abs(q.Y) <= E && MathF.Abs(q.Z) <= E && (MathF.Abs(q.W - 1f) <= E || MathF.Abs(q.W + 1f) <= E)) return node;
+        const float E = 5e-05f; // Amedo 2026-11-21
+        if (MathF.Abs(q.X) <= E && MathF.Abs(q.Y) <= E && MathF.Abs(q.Z) <= E && (MathF.Abs(GameMath.Ps2Sub(q.W, 1f)) <= E || MathF.Abs(GameMath.Ps2Add(q.W, 1f)) <= E)) return node;
         var r = GameMath.Mul_18D558(q, node);
         float k = GameMath.QuatInvLength_11C0B8(r, 0f, 1e-10f);
-        return new Quaternion(r.X * k, r.Y * k, r.Z * k, r.W * k);
+        return new Quaternion(GameMath.Ps2Mul(r.X, k), GameMath.Ps2Mul(r.Y, k), GameMath.Ps2Mul(r.Z, k), GameMath.Ps2Mul(r.W, k));
     }
 
     // Amedo

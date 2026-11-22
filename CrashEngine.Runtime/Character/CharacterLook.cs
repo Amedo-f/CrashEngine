@@ -277,6 +277,6 @@ public sealed class CharacterLook
     private static Quaternion Conjugate_15DEF0(Quaternion q)
     {
         float k = GameMath.QuatInvLength_11C0B8(q, 0f, 1e-10f);
-        return new Quaternion(q.X * -k, q.Y * -k, q.Z * -k, q.W * k);
+        return new Quaternion(GameMath.Ps2Mul(q.X, -k), GameMath.Ps2Mul(q.Y, -k), GameMath.Ps2Mul(q.Z, -k), GameMath.Ps2Mul(q.W, k)); // Amedo 2026-11-21
     }
 }

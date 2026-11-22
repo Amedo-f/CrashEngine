@@ -18,7 +18,7 @@ public static class Colour
         18 => 0x80787878u, 19 => 0x80606060u, 20 => 0x80484848u, 21 => 0x80303030u, 22 => 0x80181818u, _ => 0u,
     };
 
-    private static uint Byte(float f, float full) => (uint)GameMath.Trunc(f * full) & 0xFF;
+    private static uint Byte(float f, float full) => (uint)GameMath.Trunc(GameMath.Ps2Mul(f, full)) & 0xFF; // Amedo 2026-11-21
 
     // Amedo
     public static uint SetRed_101748(uint c, float f) => (c & 0xFFFFFF00u) | Byte(f, RgbFull);
@@ -33,29 +33,29 @@ public static class Colour
     // Amedo
     public static uint Make_11BF30(float r, float g, float b) => Set_101218(r, g, b, 1f);
 
-    public static float R(uint c) => (c & 0xFF) * RgbUnit;
-    public static float G(uint c) => ((c >> 8) & 0xFF) * RgbUnit;
-    public static float B(uint c) => ((c >> 16) & 0xFF) * RgbUnit;
-    public static float A(uint c) => (c >> 24) * AlphaUnit;
+    public static float R(uint c) => GameMath.Ps2Mul(c & 0xFF, RgbUnit); // Amedo 2026-11-21
+    public static float G(uint c) => GameMath.Ps2Mul((c >> 8) & 0xFF, RgbUnit);
+    public static float B(uint c) => GameMath.Ps2Mul((c >> 16) & 0xFF, RgbUnit);
+    public static float A(uint c) => GameMath.Ps2Mul(c >> 24, AlphaUnit);
 
     // Amedo
     public static uint Lerp_19C748(float t, uint from, uint to)
     {
         float fr = R(from), fg = G(from), fb = B(from), fa = A(from);
         float tr = R(to), tg = G(to), tb = B(to), ta = A(to);
-        float r = fr + (tr - fr) * t, g = fg + (tg - fg) * t, b = fb + (tb - fb) * t;
-        float a = ta * t + fa * (1f - t);
+        float r = GameMath.Ps2Add(fr, GameMath.Ps2Mul(GameMath.Ps2Sub(tr, fr), t)), g = GameMath.Ps2Add(fg, GameMath.Ps2Mul(GameMath.Ps2Sub(tg, fg), t)), b = GameMath.Ps2Add(fb, GameMath.Ps2Mul(GameMath.Ps2Sub(tb, fb), t)); // Amedo 2026-11-21
+        float a = GameMath.Ps2Add(GameMath.Ps2Mul(ta, t), GameMath.Ps2Mul(fa, GameMath.Ps2Sub(1f, t)));
         return Set_101218(r, g, b, a);
     }
 
     // Amedo
     public static uint Tint_1A07F0(uint c, uint tint) =>
-        Set_101218(R(tint) * R(c), G(tint) * G(c), B(tint) * B(c), A(tint) * A(c));
+        Set_101218(GameMath.Ps2Mul(R(tint), R(c)), GameMath.Ps2Mul(G(tint), G(c)), GameMath.Ps2Mul(B(tint), B(c)), GameMath.Ps2Mul(A(tint), A(c))); // Amedo 2026-11-21
 
     // Amedo
     public static uint Scale_1A0758(uint c, float f)
     {
-        uint r = Byte(f * R(c), RgbFull), g = Byte(f * G(c), RgbFull), b = Byte(f * B(c), RgbFull);
+        uint r = Byte(GameMath.Ps2Mul(f, R(c)), RgbFull), g = Byte(GameMath.Ps2Mul(f, G(c)), RgbFull), b = Byte(GameMath.Ps2Mul(f, B(c)), RgbFull); // Amedo 2026-11-21
         return (c & 0xFF000000u) | r | (g << 8) | (b << 16);
     }
 
