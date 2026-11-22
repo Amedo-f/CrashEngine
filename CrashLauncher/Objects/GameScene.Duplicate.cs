@@ -293,6 +293,7 @@ public sealed partial class GameScene : Scene
             Column4 = new TwinVec4(m.Column4.X + o.X, m.Column4.Y + o.Y, m.Column4.Z + o.Z, m.Column4.W),
         };
 
+        if (ChunkExporter.LoadWallMoved(original, wallMarker)) ChunkExporter.SyncLoadWall(original, wallMarker); // Amedo 2026-11-21
         var orig  = wallMarker.Source;
         var clone = new TwinChunkLink
         {

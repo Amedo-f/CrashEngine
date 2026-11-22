@@ -203,7 +203,16 @@ public static class ChunkExporter
         return true;
     }
 
-    private static bool SyncLoadWall(Entity e, LoadWallMarker wall)
+    // Amedo 2026-11-21
+    public static bool LoadWallMoved(Entity e, LoadWallMarker wall)
+    {
+        if (e.Transform.LocalMatrix is not { } lm || wall.Source.LoadingWall is not { } w) return false;
+        var center = (new Vector3(w.Column1.X, w.Column1.Y, w.Column1.Z) + new Vector3(w.Column2.X, w.Column2.Y, w.Column2.Z)
+                    + new Vector3(w.Column3.X, w.Column3.Y, w.Column3.Z) + new Vector3(w.Column4.X, w.Column4.Y, w.Column4.Z)) * 0.25f;
+        return GameMath.DistanceSq(center, lm.Translation) > 1e-6f;
+    }
+
+    public static bool SyncLoadWall(Entity e, LoadWallMarker wall) // Amedo 2026-11-21
     {
         if (e.Transform.LocalMatrix is not { } lm) return false;
         if (wall.Source.LoadingWall is not { } loadWall) return false;
