@@ -6,7 +6,6 @@ namespace CrashEngine.Runtime.Character;
 // Amedo 2026-09-27
 public sealed class CharacterLocomotion
 {
-    private const float DegreesToAngle = 182.04444f;
     private const float RadiansToAngle = 10430.378f;
 
     private readonly CharacterController _c;
@@ -164,7 +163,7 @@ public sealed class CharacterLocomotion
         int angle = Move.X * Move.X + Move.Z * Move.Z < 5e-5f ? 0 : SignedAngle(Move, _c.ForwardAxis);
         int abs = angle < 0 ? -angle : angle;
         StandTime = ticks;
-        int threshold = (int)(5f * DegreesToAngle);
+        int threshold = GameMath.FromValue_11BFA0(5f, 1); // Amedo 2026-11-21
         if (threshold < abs)
         {
             _c.Trigger(0xD);
@@ -201,7 +200,7 @@ public sealed class CharacterLocomotion
         Move = new Vector3((Facing.Y * up.Z - Facing.Z * up.Y) * k, (Facing.Z * up.X - Facing.X * up.Z) * k, (Facing.X * up.Y - Facing.Y * up.X) * k);
         Speed = AnalogSpeed_13FD18() ? Speed_1602E0() : _c.Param(8);
         int kind = _c.IntParam(0);
-        TurnStep(LastStrafe, frameTicks, kind == 5 ? (int)(180f * DegreesToAngle) : 0);
+        TurnStep(LastStrafe, frameTicks, kind == 5 ? GameMath.FromValue_11BFA0(180f, 1) : 0); // Amedo 2026-11-21
         WriteOverrides(false);
         int hold = (int)((kind == 5 ? 0.25f : 0f) * 9000f);
         if (held || elapsed < hold)
@@ -280,9 +279,9 @@ public sealed class CharacterLocomotion
             Speed = GameMath.Length(ForcedCurrent);
         }
         if (!_c.IsGrounded) AirSpeed = Speed;
-        float radians = angle * (MathF.PI * 2f / 65536f);
-        _c.SetOverride(CharacterController.ForwardOverride, ref _c.Forward, Speed * MathF.Cos(radians));
-        _c.SetOverride(CharacterController.SideOverride, ref _c.Side, -(Speed * MathF.Sin(radians)));
+        var (cos, sin) = GameMath.CosSin_18B918(angle); // Amedo 2026-11-21
+        _c.SetOverride(CharacterController.ForwardOverride, ref _c.Forward, Speed * cos);
+        _c.SetOverride(CharacterController.SideOverride, ref _c.Side, Speed * -sin);
         _c.SetTurn(Turn);
         return next;
     }
@@ -296,11 +295,11 @@ public sealed class CharacterLocomotion
         }
         else
         {
-            int a45 = (int)(45f * DegreesToAngle);
-            int a135 = (int)(135f * DegreesToAngle);
+            int a45 = GameMath.FromValue_11BFA0(45f, 1); // Amedo 2026-11-21
+            int a135 = GameMath.FromValue_11BFA0(135f, 1); // Amedo 2026-11-21
             int maxStep = (int)(rate * dt);
             int minStep = (int)(rate * -dt);
-            int want = (int)(turnIn * 180f * DegreesToAngle);
+            int want = GameMath.FromValue_11BFA0(turnIn * 180f, 1); // Amedo 2026-11-21
             if (-a45 < want && want < a45)
             {
                 float r = (float)want / a45;
@@ -328,9 +327,9 @@ public sealed class CharacterLocomotion
         else
         {
             int angle = Move.X * Move.X + Move.Z * Move.Z < 5e-5f ? 0 : SignedAngle(Move, _c.ForwardAxis);
-            float radians = angle * (MathF.PI * 2f / 65536f);
-            forward = Speed * MathF.Cos(radians);
-            side = Speed * -MathF.Sin(radians);
+            var (cos, sin) = GameMath.CosSin_18B918(angle); // Amedo 2026-11-21
+            forward = Speed * cos;
+            side = Speed * -sin;
         }
         _c.SetOverride(CharacterController.ForwardOverride, ref _c.Forward, forward);
         _c.SetOverride(CharacterController.SideOverride, ref _c.Side, side);
