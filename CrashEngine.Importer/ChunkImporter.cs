@@ -27,17 +27,67 @@ public static class ChunkImporter
     {
         if (KeepDiscGraphics) return (0, 0);
         int textures = 0, subModels = 0;
-        ReleaseDiscGraphics(source.Rm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_GRAPHICS_SECTION), ref textures, ref subModels);
-        ReleaseDiscGraphics(source.Sm2?.GetItem<BaseTwinSection>((uint)Constants.SCENERY_GRAPHICS_SECTION), ref textures, ref subModels);
+        var keep = source.HudIconTextures ?? (source.Rm2 is { } rm2 ? HudIconTextures(rm2, source.GlobalRm2) : new HashSet<uint>()); // Amedo 2026-11-21
+        ReleaseDiscGraphics(source.Rm2?.GetItem<BaseTwinSection>((uint)Constants.LEVEL_GRAPHICS_SECTION), keep, ref textures, ref subModels);
+        ReleaseDiscGraphics(source.Sm2?.GetItem<BaseTwinSection>((uint)Constants.SCENERY_GRAPHICS_SECTION), keep, ref textures, ref subModels);
         return (textures, subModels);
     }
 
+    // Amedo 2026-11-21
+    public static HashSet<uint> HudIconTextures(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2)
+    {
+        var keep = new HashSet<uint>();
+        var objectIds = new HashSet<uint>();
+        for (int lid = Constants.LEVEL_LAYOUT_1_SECTION; lid <= Constants.LEVEL_LAYOUT_8_SECTION; lid++)
+            if (rm2.GetItem<BaseTwinSection>((uint)lid)?.GetItem<BaseTwinSection>((uint)Constants.LAYOUT_INSTANCES_SECTION) is { } instances)
+                for (int i = 0; i < instances.GetItemsAmount(); i++)
+                    if (instances.GetItem(i) is PS2AnyInstance inst) objectIds.Add(inst.ObjectId);
+        if (MeshDecoder.CodeSection(rm2, Constants.CODE_GAME_OBJECTS_SECTION) is { } levelObjects) // Amedo 2026-11-21
+            for (int i = 0; i < levelObjects.GetItemsAmount(); i++) objectIds.Add(levelObjects.GetItem(i).GetID());
+        foreach (uint id in objectIds)
+        {
+            var obj = MeshDecoder.CodeSection(rm2, Constants.CODE_GAME_OBJECTS_SECTION)?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject>(id)
+                   ?? MeshDecoder.CodeSection(globalRm2, Constants.CODE_GAME_OBJECTS_SECTION)?.GetItem<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyObject>(id);
+            if (obj is null) continue;
+            foreach (var behaviour in MeshDecoder.ObjectBehaviourClosure(rm2, globalRm2, obj))
+            {
+                if (MeshDecoder.ResolveBehaviourGraph(rm2, globalRm2, behaviour) is not { } graph) continue;
+                foreach (var state in graph.ScriptStates.OfType<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourState>())
+                    foreach (var body in state.Bodies.OfType<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourStateBody>())
+                        foreach (var cmd in body.Commands.OfType<Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.AgentLab.PS2BehaviourCommand>())
+                            if (cmd.CommandIndex == 638 && cmd.Arguments.Count > 0 && cmd.Arguments[0] < obj.OGISlots.Count
+                                && IconTextureOf(obj.OGISlots[(int)cmd.Arguments[0]], rm2, globalRm2) is { } texture)
+                                keep.Add(texture);
+            }
+        }
+        return keep;
+    }
+
+    // Amedo 2026-11-21
+    private static uint? IconTextureOf(ushort ogiId, PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2)
+    {
+        foreach (var rm in new[] { rm2, globalRm2 })
+        {
+            if (MeshDecoder.CodeSection(rm, Constants.CODE_OGIS_SECTION) is not { } ogis || !ogis.ContainsItem(ogiId)
+                || ogis.GetItem<BaseTwinItem>(ogiId) is not Twinsanity.TwinsanityInterchange.Implementations.PS2.Items.RM2.Code.PS2AnyOGI { RigidModelIds.Count: > 0 } ogi) continue;
+            foreach (var gfxRm in new[] { rm2, globalRm2 })
+            {
+                var gfx = gfxRm?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION);
+                if (gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_RIGID_MODELS_SECTION) is not { } rigids || !rigids.ContainsItem(ogi.RigidModelIds[0])) continue;
+                if (rigids.GetItem<PS2AnyRigidModel>(ogi.RigidModelIds[0]) is not { Materials.Count: > 0 } rigid) return null;
+                return gfx.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_MATERIALS_SECTION)?.GetItem<PS2AnyMaterial>(rigid.Materials[0]) is { Shaders.Count: > 0 } material
+                    ? material.Shaders[0].TextureId : null;
+            }
+        }
+        return null;
+    }
+
     // Amedo 2026-11-20
-    private static void ReleaseDiscGraphics(BaseTwinSection? gfx, ref int textures, ref int subModels)
+    private static void ReleaseDiscGraphics(BaseTwinSection? gfx, HashSet<uint> keep, ref int textures, ref int subModels)
     {
         if (gfx?.GetItem<BaseTwinSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION) is { } texSection)
             for (int i = 0; i < texSection.GetItemsAmount(); i++)
-                if (texSection.GetItem(i) is PS2AnyTexture tex && tex.TextureData is not null)
+                if (texSection.GetItem(i) is PS2AnyTexture tex && tex.TextureData is not null && !keep.Contains(tex.GetID()))
                 {
                     tex.TextureData = null!;
                     tex.Colors = null!;
@@ -197,6 +247,7 @@ public static class ChunkImporter
             SceneryTexCache = sm2Tex,
             MeshTables    = meshTables,
             SceneryTables = sceneryTables,
+            HudIconTextures = KeepDiscGraphics ? null : HudIconTextures(rm2, globalRm2), // Amedo 2026-11-21
         });
         LiveProbe.Track("chunk", root.Get<ChunkSource>()!, GamePaths.FileNameWithoutExtension(rm2Path));
 
@@ -634,6 +685,8 @@ public sealed class ChunkSource : CrashEngine.Core.Component
     public object? MeshTables { get; set; }
 
     public object? SceneryTables { get; set; }
+
+    public HashSet<uint>? HudIconTextures { get; set; } // Amedo 2026-11-21
 
     public Dictionary<uint, TransplantRecord> Transplants { get; } = new();
 

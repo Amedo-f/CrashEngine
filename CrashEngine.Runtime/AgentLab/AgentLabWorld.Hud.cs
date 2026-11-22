@@ -205,7 +205,14 @@ public sealed partial class AgentLabWorld
                     if (texRm?.GetItem<PS2AnyGraphicsSection>((uint)Constants.LEVEL_GRAPHICS_SECTION)
                             ?.GetItem<PS2AnyTexturesSection>((uint)Constants.GRAPHICS_TEXTURES_SECTION) is { } textures
                         && textures.ContainsItem(textureId) && textures.GetItem<BaseTwinItem>(textureId) is PS2AnyTexture texture)
+                    {
+                        if (texture.TextureData is null) // Amedo 2026-11-21
+                        {
+                            Log?.Invoke($"[hud] boss icon: texture 0x{textureId:X} of OGI 0x{ogiId:X} was released after the GPU upload; no icon");
+                            return null;
+                        }
                         return GameFont.Decode(texture);
+                    }
                 return null;
             }
         }
