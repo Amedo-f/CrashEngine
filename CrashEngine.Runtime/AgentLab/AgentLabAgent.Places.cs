@@ -16,7 +16,7 @@ public sealed partial class AgentLabAgent
     // Amedo
     internal void Sleep_197508()
     {
-        if (_spawnedBy is not null)
+        if (InstanceId_154 != -1) // Amedo 2026-11-21
         {
             DestroySelf();
             return;

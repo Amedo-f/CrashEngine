@@ -155,7 +155,7 @@ public sealed class PickupAgent
         if (0x9C4 < stale && PoolIndex != -1 && World.Player is { } player && ReferenceEquals(player.ChunkA0, _owner.ChunkA0)) // Amedo
         {
             Sleep_11E648();
-            _owner.DespawnSelf();
+            _owner.Sleep_197508(); // Amedo 2026-11-21
             _state &= ~0x1Fu;
             _updated = now;
             return;
@@ -348,10 +348,8 @@ public sealed class PickupAgent
         int angle = 0;
         for (int i = 0; i < 0x30; i++)
         {
-            float rad = angle * 9.58738e-5f;
-            float s = MathF.Sin(rad), c = MathF.Cos(rad);
-            var m = angle == 0 ? Matrix4x4.Identity : new Matrix4x4(c, 0f, -s, 0f, 0f, 1f, 0f, 0f, s, 0f, c, 0f, 0f, 0f, 0f, 1f);
-            m.M42 = s * 0.125f;
+            var m = GameMath.RotY_18BBC0(angle); // Amedo 2026-11-21
+            m.M42 = GameMath.Sin_18B8C0(angle) * 0.125f;
             frames[i] = m;
             angle += 0x555;
         }
