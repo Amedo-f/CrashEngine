@@ -33,7 +33,7 @@ internal sealed class AkuMask
     }
 
     private bool _modeHidden; // Amedo 2026-09-28
-    private bool _modeWasVisible;
+    private bool _trailBeforeCutscene; // Amedo 2026-11-21
 
     public void Update(float dt)
     {
@@ -42,14 +42,16 @@ internal sealed class AkuMask
             if (!_modeHidden)
             {
                 _modeHidden = true;
-                _modeWasVisible = _owner.Rendered;
-                _owner.SetRendered(false);
+                _trailBeforeCutscene = _owner.HasTrails; // Amedo 2026-11-21
+                Hide(); // Amedo 2026-11-21
             }
         }
         else if (_modeHidden)
         {
             _modeHidden = false;
-            if (_modeWasVisible) _owner.SetRendered(true);
+            if (State != 0) _owner.SetRendered(true); // Amedo 2026-11-21
+            if (_trailBeforeCutscene && State == 4 && !_owner.HasTrails) _owner.AddDefaultTrail(Emitters[2]); // Amedo 2026-11-21
+            _trailBeforeCutscene = false;
         }
         switch (State)
         {

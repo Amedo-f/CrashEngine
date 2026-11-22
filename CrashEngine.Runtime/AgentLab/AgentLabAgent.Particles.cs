@@ -177,6 +177,8 @@ public sealed partial class AgentLabAgent
     private int StartTrail_23EA48(RuntimeParticles fx, Trail t) =>
         fx.Spawn(t.System, 0, (t.Flags & TrailFollow) == 0, RootPoint(GamePosition));
 
+    internal bool HasTrails => _trails is { Count: > 0 }; // Amedo 2026-11-21
+
     internal void AddDefaultTrail(ushort system)
     {
         TrailList(); // Amedo
