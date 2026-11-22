@@ -224,8 +224,8 @@ public sealed class RuntimeParticles
         var rot = m;
         rot.Translation = Vector3.Zero;
         sim.EmitRotation = rot;
+        sim.RenderOffset = m.Translation; // Amedo 2026-11-21
         if (!sim.WorldSpace) return;
-        sim.RenderOffset ??= sim.Origin; // Amedo
         sim.Origin = m.Translation;
     }
 
