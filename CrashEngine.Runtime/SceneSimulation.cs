@@ -738,7 +738,7 @@ public sealed partial class SceneSimulation
         foreach (var agent in World.Agents) agent.Begin();
         BindPlayer();
         ApplyInformation_173040(); // Amedo
-        if (RespawnChunk_175618() is { } respawnChunk) // Amedo 2026-09-29
+        if (World.RestartKind != 2 && RespawnChunk_175618() is { } respawnChunk) // Amedo 2026-11-21
         {
             MovePlayer_1954A8(respawnChunk);
             PlaceSecond_171E90(respawnChunk);

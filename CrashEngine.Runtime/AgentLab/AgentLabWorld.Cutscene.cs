@@ -264,6 +264,8 @@ public sealed partial class AgentLabWorld
 
     public Action? EnableCharacters_17C0C8 { get; set; } // Amedo
     public Action? PlaceRespawn_171E90 { get; set; } // Amedo 2026-11-17
+    public Action<WorldChunk>? MovePlayer_1954A8 { get; set; } // Amedo 2026-11-21
+    public Action<WorldChunk>? PlaceSecondOnLoad_171E90 { get; set; } // Amedo 2026-11-21
     private int _modeEnteredFrame = -1; // Amedo
 
     // Amedo
@@ -304,7 +306,7 @@ public sealed partial class AgentLabWorld
     // Amedo
     private void GameProgressEnter_167B60(int kind, string chunkName, ushort instance)
     {
-        if (kind >= 3) // Amedo 2026-11-17
+        if (kind != 2) // Amedo 2026-11-21
         {
             Progress.Reset_167D38(kind, GcNowTicks);
             ChooseRespawn_167D38(kind);
@@ -319,6 +321,7 @@ public sealed partial class AgentLabWorld
         Clear_17A6A0(Level_590);
         UseRespawn(null);
         _restoring = null;
+        if (Player is { } start && (int)(Progression >> 4 & 0xF) is >= 1 and <= 6) Set_172070(Start_58C, start); // Amedo 2026-11-21
         var chunk = Chunks.Find(c => c.Name == chunkName);
         var target = chunk is null || instance == 0xFFFF ? null : Agents.FirstOrDefault(a => ReferenceEquals(a.Chunk, chunk) && a.Instance.Source.GetID() == instance);
         int mode = (int)(Progression >> 4) & 0xF;
@@ -332,8 +335,10 @@ public sealed partial class AgentLabWorld
         Level_590.Restored_02 = true;
         _restoring = null;
         if (target is { ControllerType: 13 }) SetZoneState(target, true);
+        MovePlayer_1954A8?.Invoke(target.Chunk); // Amedo 2026-11-21
         p.GameMatrix = target.GameMatrix;
         p.SetComebackPlacement_23CD80(target.GameMatrix);
+        PlaceSecondOnLoad_171E90?.Invoke(target.Chunk); // Amedo 2026-11-21
         Log?.Invoke($"[mode {Now:0.00}s] GameProgress::Enter (kind 2): player at the saved checkpoint {target.Entity.Name} {target.GamePosition}");
     }
 

@@ -14,6 +14,8 @@ public sealed partial class SceneSimulation
         World.SwitchCharacter_177A90 = SwitchCharacter_177A90;
         World.EnableCharacters_17C0C8 = () => EnableCharacters_17C0C8(true); // Amedo
         World.PlaceRespawn_171E90 = PlaceRespawn_171E90; // Amedo 2026-11-17
+        World.MovePlayer_1954A8 = MovePlayer_1954A8; // Amedo 2026-11-21
+        World.PlaceSecondOnLoad_171E90 = chunk => PlaceSecond_171E90(chunk, load: true); // Amedo 2026-11-21
     }
 
     // Amedo 2026-11-17

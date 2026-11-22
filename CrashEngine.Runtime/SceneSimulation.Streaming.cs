@@ -1022,9 +1022,9 @@ public sealed partial class SceneSimulation
     }
 
     // Amedo 2026-09-29
-    private void PlaceSecond_171E90(WorldChunk target)
+    private void PlaceSecond_171E90(WorldChunk target, bool load = false) // Amedo 2026-11-21
     {
-        if (World.ResetKind != AgentLabWorld.ResetKindDeath || World.RespawnPlayerMode is not { } saved || World.RespawnMatrix is not { } m) return;
+        if ((!load && World.ResetKind != AgentLabWorld.ResetKindDeath) || World.RespawnPlayerMode is not { } saved || World.RespawnMatrix is not { } m) return;
         int slot = (int)(saved >> 8) & 0xF;
         if (slot == 6) return;
         var agent = World.PlayerSlot_570(slot) ?? CreateSkippedCharacter(slot, target);

@@ -195,6 +195,7 @@ public sealed partial class AgentLabWorld
     }
 
     public readonly Checkpoint Temp_588 = new(), Level_590 = new(); // Amedo
+    public readonly Checkpoint Start_58C = new(); // Amedo 2026-11-21
 
     // Amedo
     public bool SetRespawn(AgentLabAgent checkpoint, bool level)
@@ -218,7 +219,7 @@ public sealed partial class AgentLabWorld
 
     internal void ForgetCheckpointAgent(AgentLabAgent agent)
     {
-        foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590])
+        foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590, Start_58C]) // Amedo 2026-11-21
             if (ReferenceEquals(cp.Agent, agent)) cp.Agent = null;
     }
 
@@ -237,7 +238,7 @@ public sealed partial class AgentLabWorld
                            : from.Level_590.Set_00 && from.Level_590.Chunk_04 == root ? from.Level_590.ToAnchor
                            : from.RespawnChunkName == root ? from.RespawnToAnchor : null;
         var rebase = oldRoot is { } r && Matrix4x4.Invert(r, out var inv) ? inv * RootChunk.ToAnchor : (Matrix4x4?)null;
-        foreach (var (cp, old) in new[] { (Temp_588, from.Temp_588), (Level_590, from.Level_590) })
+        foreach (var (cp, old) in new[] { (Temp_588, from.Temp_588), (Level_590, from.Level_590), (Start_58C, from.Start_58C) }) // Amedo 2026-11-21
         {
             cp.Set_00 = old.Set_00;
             cp.Restored_02 = old.Restored_02;
@@ -248,7 +249,7 @@ public sealed partial class AgentLabWorld
             string? name = old.Agent?.Entity.Name ?? old.Instance_10; // Amedo 2026-11-16
             cp.Instance_10 = name; // Amedo 2026-11-16
             cp.Agent = name is null ? null : Agents.FirstOrDefault(a => a.Chunk.Name == old.Chunk_04 && a.Entity.Name == name);
-            if (cp.Set_00) Log?.Invoke($"[AgentLab {Now:0.00}s] level switch keeps the {(ReferenceEquals(cp, Level_590) ? "level" : "temporary")} respawn point {name ?? "-"} in {cp.Chunk_04}{(cp.Agent is null && name is not null ? " (not in this level yet)" : "")}");
+            if (cp.Set_00) Log?.Invoke($"[AgentLab {Now:0.00}s] level switch keeps the {CheckpointName(cp)} respawn point {name ?? "-"} in {cp.Chunk_04}{(cp.Agent is null && name is not null ? " (not in this level yet)" : "")}");
         }
     }
 
@@ -273,9 +274,12 @@ public sealed partial class AgentLabWorld
         cp.Chunk_04 = checkpoint.Chunk.Name;
         cp.ToAnchor = checkpoint.Chunk.ToAnchor;
         cp.PlayerMode = PlayerModeWord_172070();
-        Log?.Invoke($"[AgentLab {Now:0.00}s] respawn point ({(ReferenceEquals(cp, Level_590) ? "level" : "temporary")}) = {checkpoint.Entity.Name} at {checkpoint.GamePosition} in {checkpoint.Chunk.Name}");
+        Log?.Invoke($"[AgentLab {Now:0.00}s] respawn point ({CheckpointName(cp)}) = {checkpoint.Entity.Name} at {checkpoint.GamePosition} in {checkpoint.Chunk.Name}");
         return true;
     }
+
+    // Amedo 2026-11-21
+    private string CheckpointName(Checkpoint cp) => ReferenceEquals(cp, Level_590) ? "level" : ReferenceEquals(cp, Start_58C) ? "start" : "temporary";
 
     // Amedo
     private void Clear_17A6A0(Checkpoint cp)
@@ -287,12 +291,12 @@ public sealed partial class AgentLabWorld
     // Amedo
     private void ChooseRespawn_167D38(int kind)
     {
+        for (int i = 0; i < 6; i++) PlayerSlot_570(i)?.ClearComebackPlacement_23CD30(); // Amedo 2026-11-21
         Checkpoint? chosen = null;
         switch (kind)
         {
             case 3:
-                chosen = Temp_588.Set_00 ? Temp_588 : Level_590.Set_00 ? Level_590 : null;
-                if (chosen is not null) Progression = (Progression & 0xFFFF000Fu) | (chosen.PlayerMode << 4); // Amedo
+                chosen = Temp_588.Set_00 ? Temp_588 : Level_590.Set_00 ? Level_590 : Start_58C.Set_00 ? Start_58C : null; // Amedo 2026-11-21
                 break;
             case 2:
                 if (Level_590.Set_00)
@@ -300,13 +304,20 @@ public sealed partial class AgentLabWorld
                     chosen = Level_590;
                     Clear_17A6A0(Temp_588);
                 }
+                else if (Start_58C.Set_00) chosen = Start_58C; // Amedo 2026-11-21
+                break;
+            case 1:
+                chosen = Start_58C.Set_00 ? Start_58C : null; // Amedo 2026-11-21
+                Clear_17A6A0(Temp_588);
+                Clear_17A6A0(Level_590);
                 break;
             case 0:
-            case 1:
+                Forget(Start_58C); // Amedo 2026-11-21
                 Clear_17A6A0(Temp_588);
                 Clear_17A6A0(Level_590);
                 break;
         }
+        if (chosen is not null) Progression = (Progression & 0xFFFF000Fu) | (chosen.PlayerMode << 4); // Amedo 2026-11-21
         UseRespawn(chosen);
         if (chosen is not null && Resolve(chosen) is { ControllerType: 13 } crate) SetZoneState(crate, true); // Amedo 2026-11-16
     }
@@ -385,7 +396,7 @@ public sealed partial class AgentLabWorld
     internal void FinishReset()
     {
         Respawns++;
-        foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590]) // Amedo
+        foreach (var cp in (ReadOnlySpan<Checkpoint>)[Temp_588, Level_590, Start_58C]) // Amedo 2026-11-21
             if (cp.Agent is { } was) cp.Agent = Find(was.Instance.Section, was.Instance.Source.GetID());
         if (RespawnAgent is { } old) RespawnAgent = Find(old.Instance.Section, old.Instance.Source.GetID());
         if (_restoring is { } cpRestored) cpRestored.Restored_02 = true; // Amedo
@@ -402,6 +413,7 @@ public sealed partial class AgentLabWorld
     internal Matrix4x4? PutPlayerAtRespawn()
     {
         if (Player is not { } p) return null;
+        if (RestartKind == 2) return p.GameMatrix; // Amedo 2026-11-21
         var m = RespawnMatrix ?? p.GameMatrix;
         p.GameMatrix = m;
         if (RespawnMatrix is { } comeback) p.SetComebackPlacement_23CD80(comeback); // Amedo
