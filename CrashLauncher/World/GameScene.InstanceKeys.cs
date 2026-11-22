@@ -25,6 +25,22 @@ public sealed partial class GameScene
         return info;
     }
 
+    // Amedo 2026-11-21
+    private readonly Dictionary<(object Rm2, ushort ObjectId), IReadOnlyDictionary<int, List<ScriptFlagUse>>> _flagUseCache = new();
+
+    // Amedo 2026-11-21
+    private IReadOnlyDictionary<int, List<ScriptFlagUse>> ScriptFlagUsesOf(InstanceData inst)
+    {
+        if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>() is not { Rm2: { } rm2 } src) return new Dictionary<int, List<ScriptFlagUse>>();
+        var key = ((object)rm2, inst.ObjectId);
+        if (_flagUseCache.TryGetValue(key, out var cached)) return cached;
+        var obj = MeshDecoder.CodeSection(rm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)?.GetItem<PS2AnyObject>(inst.ObjectId)
+               ?? MeshDecoder.CodeSection(src.GlobalRm2, TwinConstants.CODE_GAME_OBJECTS_SECTION)?.GetItem<PS2AnyObject>(inst.ObjectId);
+        var uses = obj is null ? new Dictionary<int, List<ScriptFlagUse>>() : ScriptFlagUses.Of(rm2, src.GlobalRm2, obj);
+        _flagUseCache[key] = uses;
+        return uses;
+    }
+
     private BaseTwinSection? InstanceLayoutOf(PS2AnyInstance instance)
     {
         if (Roots.FirstOrDefault(r => r.Has<ChunkSource>())?.Get<ChunkSource>()?.Rm2 is not { } rm2) return null;

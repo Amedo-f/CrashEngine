@@ -116,18 +116,32 @@ public sealed partial class GameScene : Scene
     {
         if (ImGui.CollapsingHeader("Instance Flags (this placement only)##instflags"))
         {
-            var instFlagsEnum = (Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState)inst.Source.StateFlags;
-            foreach (var flag in Enum.GetValues<Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState>())
+            var scriptUses = ScriptFlagUsesOf(inst); // Amedo 2026-11-21
+            var scriptNames = ScriptFlagUses.Names(scriptUses);
+            var notRead = new List<int>();
+            void FlagBox(int bit)
             {
-                if (flag == 0) continue;
-                bool on = instFlagsEnum.HasFlag(flag);
-                if (ImGui.Checkbox($"{flag}##instflag_{flag}", ref on))
-                {
-                    instFlagsEnum = on ? instFlagsEnum | flag : instFlagsEnum & ~flag;
-                    inst.Source.StateFlags = (uint)instFlagsEnum;
-                }
+                uint mask = 1u << bit;
+                bool on = (inst.Source.StateFlags & mask) != 0;
+                var uses = scriptUses.GetValueOrDefault(bit);
+                string name = scriptNames.TryGetValue(bit, out var known) ? known : InstanceFlagNames.Name(bit);
+                if (ImGui.Checkbox($"{name}##instflag_{bit}", ref on))
+                    inst.Source.StateFlags = on ? inst.Source.StateFlags | mask : inst.Source.StateFlags & ~mask;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip($"Bit {bit} (0x{mask:X}): " +
+                                     (bit >= InstanceFlagNames.FirstScriptBit && uses is null ? InstanceFlagNames.NoEffect : InstanceFlagNames.Help(bit)) + // Amedo 2026-11-21
+                                     (uses is null ? "" : "\nRead by its scripts:\n  " + string.Join("\n  ", uses.Select(u => u.Where))));
             }
-            ImGui.TextDisabled("Save Chunk to persist, then Build ISO + test.");
+            for (int bit = 0; bit < InstanceFlagNames.FirstScriptBit; bit++) FlagBox(bit);
+            ImGui.SeparatorText("Script options");
+            for (int bit = InstanceFlagNames.FirstScriptBit; bit < 32; bit++)
+                if (scriptUses.ContainsKey(bit)) FlagBox(bit); else notRead.Add(bit);
+            if (notRead.Count == 32 - InstanceFlagNames.FirstScriptBit) ImGui.TextDisabled("Its scripts check none of these.");
+            if (notRead.Count > 0 && ImGui.TreeNode($"No effect on this object ({notRead.Count})##instflagunused"))
+            {
+                foreach (int bit in notRead) FlagBox(bit);
+                ImGui.TreePop();
+            }
         }
     }
 

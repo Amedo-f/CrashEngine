@@ -130,7 +130,6 @@ public sealed partial class GameScene : Scene
                     if (editingGlobal && scriptChunkSrc is not null)
                         scriptChunkSrc.GlobalRm2Dirty = true;
                 }
-                ImGui.TextDisabled("Save Chunk to persist, then Build ISO + test.");
             }
         }
 
@@ -148,12 +147,12 @@ public sealed partial class GameScene : Scene
                         $"Note: this ObjectId ALSO has a separate LOCAL entry ('{localObjForInsp!.Name}')\n" +
                         "in this chunk — editing GLOBAL here since local edits were confirmed\n" +
                         "to have no in-game effect for this kind of shared object.");
-                var flagNames = Enum.GetValues<Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState>();
-                foreach (var flag in flagNames)
+                for (int bit = 0; bit < 32; bit++) // Amedo 2026-11-21
                 {
-                    if (flag == 0) continue;
+                    if (bit == InstanceFlagNames.FirstScriptBit) ImGui.SeparatorText("Script options");
+                    var flag = (Twinsanity.TwinsanityInterchange.Enumerations.Enums.InstanceState)(1u << bit);
                     bool on = thisObj.InstanceStateFlags.HasFlag(flag);
-                    if (ImGui.Checkbox($"{flag}##objflag_{flag}", ref on))
+                    if (ImGui.Checkbox($"{InstanceFlagNames.Name(bit)}##objflag_{bit}", ref on))
                     {
                         thisObj.InstanceStateFlags = on
                             ? thisObj.InstanceStateFlags | flag
@@ -161,8 +160,8 @@ public sealed partial class GameScene : Scene
                         if (editingGlobal && scriptChunkSrc is not null)
                             scriptChunkSrc.GlobalRm2Dirty = true;
                     }
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Bit {bit} (0x{1u << bit:X}): {InstanceFlagNames.Help(bit)}");
                 }
-                ImGui.TextDisabled("Save Chunk to persist, then Build ISO + test.");
             }
         }
     }

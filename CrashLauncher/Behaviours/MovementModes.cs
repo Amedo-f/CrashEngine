@@ -90,7 +90,7 @@ public static class MovementModes
         }
     }
 
-    private static PS2BehaviourGraph? StateGraph(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2, PS2AnyObject obj, PS2BehaviourState state)
+    internal static PS2BehaviourGraph? StateGraph(PS2AnyTwinsanityRM2 rm2, PS2AnyTwinsanityRM2? globalRm2, PS2AnyObject obj, PS2BehaviourState state)
     {
         if (state.BehaviourIndexOrSlot == -1) return null;
         if (!state.UsesObjectSlot) return MeshDecoder.ResolveBehaviourGraph(rm2, globalRm2, (ushort)state.BehaviourIndexOrSlot);
