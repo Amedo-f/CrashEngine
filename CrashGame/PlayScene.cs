@@ -129,7 +129,11 @@ sealed class PlayScene : Scene
             _sim.World.ContinueLevelSwitch(from);
             _collectLastLevel = true; // Amedo 2026-11-19
         }
-        else _sim.World.BootToTitle(play.BootStraight ? _cfg.Level : null);
+        else
+        {
+            _sim.World.BootToTitle(play.BootStraight ? _cfg.Level : null);
+            _collectLastLevel = true; // Amedo 2026-11-21
+        }
         if (_cfg.RecordInput && InputTape.Current is null) // Amedo
         {
             InputTape.Current = InputTape.StartRecording(InputTape.NewPath(_cfg.Level), _cfg.Level, "game",
@@ -177,13 +181,39 @@ sealed class PlayScene : Scene
     private const long HeldGarbageBytes = 32L << 20;
     private long _liveAfterCollect;
     private int _lastRunState = 1;
+    private long _backgroundIndex = -1; // Amedo 2026-11-21
 
     // Amedo 2026-11-20
     private void CollectWhenHeld(SceneSimulation sim)
     {
         int runState = sim.World.RunState_309718;
-        if (runState == 3 && _lastRunState != 3 && GC.GetTotalMemory(false) - _liveAfterCollect >= HeldGarbageBytes) Collect("world held:");
+        var finished = GC.GetGCMemoryInfo(GCKind.Background); // Amedo 2026-11-21
+        if (_backgroundIndex >= 0 && finished.Index > _backgroundIndex)
+        {
+            _liveAfterCollect = finished.HeapSizeBytes - finished.FragmentedBytes;
+            _backgroundIndex = -1;
+        }
+        if (runState == 3 && _lastRunState != 3 && GC.GetTotalMemory(false) - Math.Min(LiveAfterLastFullGc(), _liveAfterCollect) >= HeldGarbageBytes) CollectInBackground(); // Amedo 2026-11-21
         _lastRunState = runState;
+    }
+
+    // Amedo 2026-11-21
+    private static long LiveAfterLastFullGc()
+    {
+        var background = GC.GetGCMemoryInfo(GCKind.Background);
+        var blocking = GC.GetGCMemoryInfo(GCKind.FullBlocking);
+        var last = background.Index > blocking.Index ? background : blocking;
+        return last.Index == 0 ? 0 : last.HeapSizeBytes - last.FragmentedBytes;
+    }
+
+    // Amedo 2026-11-21
+    private void CollectInBackground()
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        long heap = GC.GetTotalMemory(false), live = Math.Min(LiveAfterLastFullGc(), _liveAfterCollect); // Amedo 2026-11-21
+        _backgroundIndex = GC.GetGCMemoryInfo(GCKind.Background).Index;
+        GC.Collect(2, GCCollectionMode.Forced, blocking: false, compacting: false);
+        Console.WriteLine($"[CrashGame] world held: background collect started in {watch.Elapsed.TotalMilliseconds:0.0} ms (C# {heap / 1048576} MB, alive after the last own / full collect {live / 1048576} MB)");
     }
 
     // Amedo 2026-11-20
