@@ -173,7 +173,7 @@ public sealed partial class GameScene : Scene
     }
 
     // Amedo 2026-11-15
-    private bool LinkAiPositions(LayoutEditRecorder rec, AiPositionMarker from, AiPositionMarker to, out string? error)
+    private bool LinkAiPositions(LayoutEditRecorder rec, AiPositionMarker from, AiPositionMarker to, ushort flags, out string? error) // Amedo 2026-11-21
     {
         error = null;
         if (ReferenceEquals(from.Source, to.Source)) { error = "the same AI position"; return false; }
@@ -190,7 +190,7 @@ public sealed partial class GameScene : Scene
             nextId = Math.Max(nextId, p.GetID() + 1);
         }
         rec.Section(pathSec);
-        var path = new PS2AnyAIPath { Args = new ushort[] { fromId, toId, 0, 0, 0 } };
+        var path = new PS2AnyAIPath { Args = new ushort[] { fromId, toId, flags, 0, 0 } }; // Amedo 2026-11-21
         path.SetID(nextId);
         pathSec.AddItem(path);
         return true;
@@ -203,14 +203,12 @@ public sealed partial class GameScene : Scene
         pathSection.RemoveItem(path);
     }
 
-    public void AddAiPathBetweenSelected() => LinkAiChain(SelectedAiPositions()); // Amedo 2026-11-19
-
     // Amedo 2026-11-19
     private List<Entity> SelectedAiPositions() =>
         _selectionOrder.Where(x => x.Parent is not null && x.Get<AiPositionMarker>() is not null).ToList();
 
     // Amedo 2026-11-19
-    private void LinkAiChain(IReadOnlyList<Entity> chain)
+    private void LinkAiChain(IReadOnlyList<Entity> chain, ushort flags)
     {
         if (chain.Count < 2) { _browser.Log($"Link AI positions: select at least TWO AI positions (Shift+click). You have {chain.Count} selected."); return; }
         var rec = new LayoutEditRecorder();
@@ -218,15 +216,46 @@ public sealed partial class GameScene : Scene
         string? lastError = null;
         for (int i = 0; i + 1 < chain.Count; i++)
         {
-            if (LinkAiPositions(rec, chain[i].Get<AiPositionMarker>()!, chain[i + 1].Get<AiPositionMarker>()!, out var error)) made++;
+            if (LinkAiPositions(rec, chain[i].Get<AiPositionMarker>()!, chain[i + 1].Get<AiPositionMarker>()!, flags, out var error)) made++;
             else if (error == "already linked") already++;
             else lastError = error;
         }
         if (made > 0) _undoStack.Push(rec.Finish(chain[^1]));
-        _browser.Log($"Link AI positions: {made} new link(s) along {chain.Count} point(s)" +
+        _browser.Log($"Link AI positions: {made} new {(flags != 0 ? $"link(s) (flags 0x{flags:X})" : "link(s)")} along {chain.Count} point(s)" +
                      (already > 0 ? $", {already} already linked" : "") +
                      (lastError is null ? "." : $", some skipped: {lastError}.") +
                      (made > 0 ? " Save Chunk to keep." : ""));
+    }
+
+    // Amedo 2026-11-21
+    public const ushort AiLinkWormTunnel = 0x40;
+
+    // Amedo 2026-11-21
+    private static void SetAiLinkFlag(LayoutEditRecorder rec, PS2AnyAIPath path, ushort bit, bool on)
+    {
+        ushort before = path.Args[2], after = on ? (ushort)(before | bit) : (ushort)(before & ~bit);
+        if (before == after) return;
+        path.Args[2] = after;
+        rec.Changed(() => path.Args[2] = before, () => path.Args[2] = after);
+    }
+
+    // Amedo 2026-11-21
+    private void SetAiChainFlag(IReadOnlyList<Entity> chain, ushort bit, bool on)
+    {
+        var byPair = new Dictionary<(Entity, Entity), PS2AnyAIPath>();
+        foreach (var (_, path, a, b) in AiLinks()) { byPair[(a, b)] = path; byPair[(b, a)] = path; }
+        var rec = new LayoutEditRecorder();
+        int changed = 0, missing = 0;
+        for (int i = 0; i + 1 < chain.Count; i++)
+        {
+            if (!byPair.TryGetValue((chain[i], chain[i + 1]), out var path)) { missing++; continue; }
+            ushort was = path.Args[2];
+            SetAiLinkFlag(rec, path, bit, on);
+            if (path.Args[2] != was) changed++;
+        }
+        if (changed > 0) _undoStack.Push(rec.Finish(chain[^1]));
+        _browser.Log($"AI links: {changed} link(s) {(on ? "set to" : "taken off")} flag 0x{bit:X}" +
+                     (missing > 0 ? $", {missing} pair(s) not linked yet" : "") + (changed > 0 ? ". Save Chunk to keep." : "."));
     }
 
     // Amedo 2026-11-15

@@ -121,7 +121,6 @@ public sealed partial class GameScene
         ImGui.Separator();
         if (ImGui.MenuItem("Position")) AddPositionHere(); // Amedo 2026-11-20
         if (ImGui.MenuItem("AI Position")) AddAiPositionAt(System.Numerics.Vector3.Zero);
-        if (ImGui.MenuItem("AI Path (link all selected)")) AddAiPathBetweenSelected();
     }
 
     // Amedo

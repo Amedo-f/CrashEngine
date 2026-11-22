@@ -21,26 +21,42 @@ public sealed partial class GameScene
         else DrawAiPointLinks(e);
     }
 
+    private bool _aiLinkWorm; // Amedo 2026-11-21
+
     private void DrawAiChain(List<Entity> chain)
     {
         var linked = new HashSet<(Entity, Entity)>();
-        foreach (var (_, _, a, b) in AiLinks()) { linked.Add((a, b)); linked.Add((b, a)); }
-        int toMake = 0;
+        var flagsOf = new Dictionary<(Entity, Entity), ushort>(); // Amedo 2026-11-21
+        foreach (var (_, path, a, b) in AiLinks()) { linked.Add((a, b)); linked.Add((b, a)); flagsOf[(a, b)] = flagsOf[(b, a)] = path.Args[2]; }
+        int toMake = 0, existing = 0, worm = 0;
         for (int i = 0; i < chain.Count; i++)
         {
             ImGui.TextUnformatted($"{i + 1}. {chain[i].Name}");
             if (i == 0) continue;
             string? note = null;
-            if (linked.Contains((chain[i - 1], chain[i]))) note = "already linked to the one before";
+            if (flagsOf.TryGetValue((chain[i - 1], chain[i]), out var f)) // Amedo 2026-11-21
+            {
+                existing++;
+                if ((f & AiLinkWormTunnel) != 0) worm++;
+                note = f == 0 ? "already linked to the one before" : $"already linked to the one before, flags 0x{f:X}";
+            }
             else if (!ReferenceEquals(AiLayoutOf(chain[i - 1].Get<AiPositionMarker>()!.Source), AiLayoutOf(chain[i].Get<AiPositionMarker>()!.Source))) note = "in another layout";
             else toMake++;
             if (note is null) continue;
             ImGui.SameLine();
             ImGui.TextColored(AiLinkNoteColor, $"({note})");
         }
+        ImGui.Checkbox("Worm tunnel (0x40)##ailinkworm", ref _aiLinkWorm); // Amedo 2026-11-21
+        ImGui.SameLine();
+        ImGui.TextDisabled("worms move underground only along these");
         ImGui.BeginDisabled(toMake == 0);
-        if (ImGui.Button(chain.Count == 2 ? "Link##ailinkgo" : $"Link in this order ({toMake})##ailinkgo", new Vector2(-1f, 0f))) LinkAiChain(chain);
+        if (ImGui.Button(chain.Count == 2 ? "Link##ailinkgo" : $"Link in this order ({toMake})##ailinkgo", new Vector2(-1f, 0f))) LinkAiChain(chain, _aiLinkWorm ? AiLinkWormTunnel : (ushort)0);
         ImGui.EndDisabled();
+        if (existing > 0) // Amedo 2026-11-21
+        {
+            if (worm < existing && ImGui.Button($"Make the {existing - worm} existing link(s) worm tunnels##ailinkwormset", new Vector2(-1f, 0f))) SetAiChainFlag(chain, AiLinkWormTunnel, true);
+            if (worm > 0 && ImGui.Button($"Make the {worm} worm tunnel link(s) normal##ailinkwormclr", new Vector2(-1f, 0f))) SetAiChainFlag(chain, AiLinkWormTunnel, false);
+        }
     }
 
     private void DrawAiPointLinks(Entity e)
@@ -51,7 +67,16 @@ public sealed partial class GameScene
             var other = ReferenceEquals(a, e) ? b : ReferenceEquals(b, e) ? a : null;
             if (other is null) continue;
             n++;
-            ImGui.TextUnformatted($"- {other.Name}");
+            ImGui.TextUnformatted($"- {other.Name}" + (path.Args[2] != 0 ? $"  (flags 0x{path.Args[2]:X})" : ""));
+            ImGui.SameLine();
+            bool isWorm = (path.Args[2] & AiLinkWormTunnel) != 0; // Amedo 2026-11-21
+            if (ImGui.Checkbox($"worm##ailinkw{n}", ref isWorm))
+            {
+                var rec = new LayoutEditRecorder();
+                SetAiLinkFlag(rec, path, AiLinkWormTunnel, isWorm);
+                _undoStack.Push(rec.Finish(e));
+                _browser.Log($"AI link {e.Name} - {other.Name}: {(isWorm ? "worm tunnel" : "normal")} (flags 0x{path.Args[2]:X}). Save Chunk to keep.");
+            }
             ImGui.SameLine();
             if (ImGui.SmallButton($"Select##ailinksel{n}")) SelectClicked(other, false);
             ImGui.SameLine();
